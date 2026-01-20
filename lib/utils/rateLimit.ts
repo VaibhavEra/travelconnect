@@ -10,6 +10,15 @@ interface RateLimitRecord {
   blockedUntil?: number;
 }
 
+// Helper to format wait time
+const formatWaitTime = (seconds: number): string => {
+  if (seconds < 60) {
+    return `${seconds} second${seconds !== 1 ? "s" : ""}`;
+  }
+  const minutes = Math.ceil(seconds / 60);
+  return `${minutes} minute${minutes !== 1 ? "s" : ""}`;
+};
+
 class RateLimiter {
   private records: Map<string, RateLimitRecord> = new Map();
 
@@ -19,7 +28,7 @@ class RateLimiter {
   check(
     key: string,
     config: RateLimitConfig,
-  ): { allowed: boolean; retryAfter?: number } {
+  ): { allowed: boolean; retryAfter?: string } {
     const now = Date.now();
     const record = this.records.get(key);
 
@@ -34,8 +43,8 @@ class RateLimiter {
 
     // Currently blocked
     if (record.blockedUntil && now < record.blockedUntil) {
-      const retryAfter = Math.ceil((record.blockedUntil - now) / 1000);
-      return { allowed: false, retryAfter };
+      const retryAfterSeconds = Math.ceil((record.blockedUntil - now) / 1000);
+      return { allowed: false, retryAfter: formatWaitTime(retryAfterSeconds) };
     }
 
     // Window expired, reset
@@ -54,8 +63,8 @@ class RateLimiter {
     if (record.attempts > config.maxAttempts) {
       record.blockedUntil = now + config.blockDurationMs;
       this.records.set(key, record);
-      const retryAfter = Math.ceil(config.blockDurationMs / 1000);
-      return { allowed: false, retryAfter };
+      const retryAfterSeconds = Math.ceil(config.blockDurationMs / 1000);
+      return { allowed: false, retryAfter: formatWaitTime(retryAfterSeconds) };
     }
 
     this.records.set(key, record);
@@ -82,11 +91,7 @@ export const rateLimiter = new RateLimiter();
 
 // Preset configs
 export const rateLimitConfigs = {
-  login: {
-    maxAttempts: 5,
-    windowMs: 15 * 60 * 1000, // 15 minutes
-    blockDurationMs: 30 * 60 * 1000, // 30 minutes
-  },
+  // REMOVED: login config (database handles this now)
   signup: {
     maxAttempts: 3,
     windowMs: 60 * 60 * 1000, // 1 hour
