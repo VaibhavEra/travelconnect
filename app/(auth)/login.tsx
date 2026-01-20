@@ -3,7 +3,6 @@ import OfflineNotice from "@/components/OfflineNotice";
 import { haptics } from "@/lib/utils/haptics";
 import { useNetworkStatus } from "@/lib/utils/network";
 import { parseSupabaseError } from "@/lib/utils/parseSupabaseError";
-import { rateLimitConfigs, rateLimiter } from "@/lib/utils/rateLimit";
 import { sanitize } from "@/lib/utils/sanitize";
 import { LoginFormData, loginSchema } from "@/lib/validations/auth";
 import { useAuthStore } from "@/stores/authStore";
@@ -28,8 +27,15 @@ import {
 export default function LoginScreen() {
   const [loading, setLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
-  const passwordInputRef = useRef<TextInput>(null);
+
+  const passwordRef = useRef<TextInput>(null);
+
   const signIn = useAuthStore((state) => state.signIn);
+  const checkAccountLocked = useAuthStore((state) => state.checkAccountLocked);
+  const recordFailedLogin = useAuthStore((state) => state.recordFailedLogin);
+  const clearFailedAttempts = useAuthStore(
+    (state) => state.clearFailedAttempts,
+  );
   const { isOffline } = useNetworkStatus();
 
   const {
@@ -38,6 +44,7 @@ export default function LoginScreen() {
     formState: { errors, touchedFields },
   } = useForm<LoginFormData>({
     resolver: zodResolver(loginSchema),
+    mode: "onTouched",
     defaultValues: {
       email: "",
       password: "",
@@ -55,65 +62,76 @@ export default function LoginScreen() {
       return;
     }
 
-    // Rate limiting check
-    const rateCheck = rateLimiter.check(
-      `login:${data.email}`,
-      rateLimitConfigs.login,
-    );
-    if (!rateCheck.allowed) {
-      haptics.error();
-      Alert.alert(
-        "Too Many Attempts",
-        `Too many failed login attempts. Please wait ${rateCheck.retryAfter} seconds before trying again.`,
-      );
-      return;
-    }
+    // REMOVED: Client-side rate limiter
+    // Database handles lockout now
 
     setLoading(true);
-    try {
-      const sanitizedEmail = sanitize.email(data.email);
-      await signIn(sanitizedEmail, data.password);
+    const sanitizedEmail = sanitize.email(data.email);
 
+    try {
+      // Attempt login FIRST
+      await signIn(sanitizedEmail, data.password.trim());
+
+      // Login successful - navigate (clearFailedAttempts now in signIn)
       haptics.success();
-      // Reset rate limiter on successful login
-      rateLimiter.reset(`login:${data.email}`);
       router.replace("/");
     } catch (error: any) {
       haptics.error();
-
-      console.log("🔍 Login error:", error.message, error.name);
 
       // Check for unverified email error
       if (
         error.message === "EMAIL_NOT_VERIFIED" ||
         error.name === "EmailNotVerifiedError"
       ) {
-        setLoading(false);
-
         const { pendingVerification } = useAuthStore.getState();
-        console.log("📧 Pending verification:", pendingVerification);
 
         if (pendingVerification) {
           Alert.alert(
             "Email Not Verified",
-            "Please verify your email to continue. We can resend a verification code.",
+            "Please verify your email to continue.",
             [
+              { text: "Cancel", style: "cancel" },
               {
                 text: "Verify Now",
-                onPress: () => {
-                  console.log("➡️ Navigating to OTP screen");
-                  router.push("/(auth)/verify-otp");
-                },
+                onPress: () => router.push("/(auth)/verify-otp"),
               },
             ],
           );
-          return;
+        } else {
+          Alert.alert(
+            "Email Not Verified",
+            "Please check your email for the verification code and complete registration.",
+          );
         }
+        setLoading(false);
+        return;
+      }
+
+      // Record failed login attempt AFTER login fails
+      await recordFailedLogin(sanitizedEmail);
+
+      // NOW check if account should be locked
+      const isLocked = await checkAccountLocked(sanitizedEmail);
+
+      if (isLocked) {
+        Alert.alert(
+          "Account Locked",
+          "Too many failed login attempts. Please try again in 15 minutes or reset your password.",
+          [
+            { text: "OK", style: "cancel" },
+            {
+              text: "Reset Password",
+              onPress: () => router.push("/(auth)/forgot-password"),
+            },
+          ],
+        );
+      } else {
+        // Generic error message (doesn't reveal if email exists)
+        const errorMessage = parseSupabaseError(error);
+        Alert.alert("Login Failed", errorMessage);
       }
 
       setLoading(false);
-      const errorMessage = parseSupabaseError(error);
-      Alert.alert("Login Failed", errorMessage);
     }
   };
 
@@ -132,7 +150,7 @@ export default function LoginScreen() {
           {/* Header */}
           <View style={styles.header}>
             <Text style={styles.title}>Welcome Back</Text>
-            <Text style={styles.subtitle}>Login to continue</Text>
+            <Text style={styles.subtitle}>Login to your account</Text>
           </View>
 
           {/* Form */}
@@ -155,7 +173,7 @@ export default function LoginScreen() {
                   textContentType="emailAddress"
                   returnKeyType="next"
                   editable={!loading}
-                  onSubmitEditing={() => passwordInputRef.current?.focus()}
+                  onSubmitEditing={() => passwordRef.current?.focus()}
                   blurOnSubmit={false}
                 />
               )}
@@ -166,17 +184,16 @@ export default function LoginScreen() {
               name="password"
               render={({ field: { onChange, onBlur, value } }) => (
                 <FormInput
-                  ref={passwordInputRef}
+                  ref={passwordRef}
                   label="Password"
                   placeholder="Enter your password"
                   value={value}
-                  onChangeText={onChange}
+                  onChangeText={(text) => onChange(text.trim())}
                   onBlur={onBlur}
                   error={errors.password?.message}
                   touched={touchedFields.password}
                   secureTextEntry={!showPassword}
                   autoCapitalize="none"
-                  autoComplete="password"
                   textContentType="password"
                   returnKeyType="done"
                   editable={!loading}
@@ -200,19 +217,16 @@ export default function LoginScreen() {
               )}
             />
 
-            {/* Forgot Password Link */}
-            <View style={styles.forgotPasswordContainer}>
-              <Link href="/(auth)/forgot-password" asChild>
-                <TouchableOpacity
-                  disabled={loading}
-                  onPress={() => haptics.light()}
-                >
-                  <Text style={styles.forgotPasswordText}>
-                    Forgot Password?
-                  </Text>
-                </TouchableOpacity>
-              </Link>
-            </View>
+            <TouchableOpacity
+              onPress={() => {
+                haptics.selection();
+                router.push("/(auth)/forgot-password");
+              }}
+              disabled={loading}
+              style={styles.forgotPassword}
+            >
+              <Text style={styles.forgotPasswordText}>Forgot Password?</Text>
+            </TouchableOpacity>
 
             <TouchableOpacity
               style={[
@@ -262,9 +276,10 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     padding: 24,
     paddingTop: 60,
+    paddingBottom: 40,
   },
   header: {
-    marginBottom: 40,
+    marginBottom: 32,
   },
   title: {
     fontSize: 32,
@@ -279,10 +294,10 @@ const styles = StyleSheet.create({
   form: {
     marginBottom: 24,
   },
-  forgotPasswordContainer: {
-    alignItems: "flex-end",
+  forgotPassword: {
+    alignSelf: "flex-end",
     marginTop: -8,
-    marginBottom: 8,
+    marginBottom: 16,
   },
   forgotPasswordText: {
     color: "#007AFF",
