@@ -22,7 +22,7 @@ export default function AuthLayout() {
         options={{
           title: "Verify OTP",
           headerShown: false,
-          gestureEnabled: false, // Prevent swipe back
+          gestureEnabled: false,
         }}
       />
       <Stack.Screen
@@ -30,6 +30,23 @@ export default function AuthLayout() {
         options={{
           title: "Forgot Password",
           headerShown: false,
+        }}
+      />
+      {/* ADD THESE TWO NEW SCREENS */}
+      <Stack.Screen
+        name="verify-reset-otp"
+        options={{
+          title: "Verify Reset Code",
+          headerShown: false,
+          gestureEnabled: false,
+        }}
+      />
+      <Stack.Screen
+        name="reset-new-password"
+        options={{
+          title: "New Password",
+          headerShown: false,
+          gestureEnabled: false,
         }}
       />
     </Stack>
