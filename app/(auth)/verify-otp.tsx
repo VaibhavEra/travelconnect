@@ -15,6 +15,8 @@ import {
   View,
 } from "react-native";
 
+const isDev = __DEV__;
+
 export default function VerifyOtpScreen() {
   const [otp, setOtp] = useState("");
   const [loading, setLoading] = useState(false);
@@ -37,10 +39,19 @@ export default function VerifyOtpScreen() {
   // Redirect if no pending verification
   useEffect(() => {
     if (!pendingVerification) {
-      console.log("⚠️ No pending verification, redirecting to login");
+      if (isDev) {
+        console.log(
+          "[VerifyOTP] No pending verification, redirecting to login",
+        );
+      }
       router.replace("/(auth)/login");
     } else {
-      console.log("✅ Pending verification found:", pendingVerification);
+      if (isDev) {
+        console.log(
+          "[VerifyOTP] Pending verification found:",
+          pendingVerification,
+        );
+      }
     }
   }, [pendingVerification]);
 
@@ -57,17 +68,30 @@ export default function VerifyOtpScreen() {
 
     setLoading(true);
     try {
-      console.log("🔐 Verifying OTP for:", pendingVerification.email);
+      if (isDev) {
+        console.log(
+          "[VerifyOTP] Verifying OTP for:",
+          pendingVerification.email,
+        );
+      }
+
       await verifyEmailOtp(pendingVerification.email, otp);
       haptics.success();
 
-      console.log("✅ Email verified successfully");
+      if (isDev) {
+        console.log("[VerifyOTP] Email verified successfully");
+      }
+
       Alert.alert("Success!", "Your email has been verified successfully.", [
         { text: "OK", onPress: () => router.replace("/") },
       ]);
     } catch (error: any) {
       haptics.error();
-      console.log("❌ OTP verification failed:", error);
+
+      if (isDev) {
+        console.log("[VerifyOTP] Verification failed:", error);
+      }
+
       const errorMessage = parseSupabaseError(error);
       Alert.alert("Verification Failed", errorMessage);
     } finally {
@@ -78,17 +102,27 @@ export default function VerifyOtpScreen() {
   const handleResend = async () => {
     setLoading(true);
     try {
-      console.log("📤 Resending OTP to:", pendingVerification.email);
+      if (isDev) {
+        console.log("[VerifyOTP] Resending OTP to:", pendingVerification.email);
+      }
+
       await resendEmailOtp(pendingVerification.email);
       haptics.success();
       setResendTimer(60);
       setCanResend(false);
       setOtp(""); // Clear OTP input
       Alert.alert("Success", "Verification code sent to your email");
-      console.log("✅ OTP resent successfully");
+
+      if (isDev) {
+        console.log("[VerifyOTP] OTP resent successfully");
+      }
     } catch (error: any) {
       haptics.error();
-      console.log("❌ Resend OTP failed:", error);
+
+      if (isDev) {
+        console.log("[VerifyOTP] Resend failed:", error);
+      }
+
       const errorMessage = parseSupabaseError(error);
       Alert.alert("Error", errorMessage);
     } finally {
