@@ -8,18 +8,16 @@ export const availabilityCheck = {
     email: string,
   ): Promise<{ available: boolean; error?: string }> => {
     try {
-      const { data, error } = await supabase
-        .from("profiles")
-        .select("email")
-        .eq("email", email.toLowerCase())
-        .maybeSingle();
+      const { data, error } = await supabase.rpc("check_email_available", {
+        check_email: email,
+      });
 
       if (error) {
         console.error("Email check error:", error);
         return { available: true }; // Fail open to not block users
       }
 
-      return { available: !data };
+      return { available: data as boolean };
     } catch (error) {
       console.error("Email check exception:", error);
       return { available: true };
@@ -33,21 +31,19 @@ export const availabilityCheck = {
     phone: string,
   ): Promise<{ available: boolean; error?: string }> => {
     try {
-      // Format with country code
+      // Ensure phone has country code
       const phoneWithCode = phone.startsWith("+91") ? phone : `+91${phone}`;
 
-      const { data, error } = await supabase
-        .from("profiles")
-        .select("phone")
-        .eq("phone", phoneWithCode)
-        .maybeSingle();
+      const { data, error } = await supabase.rpc("check_phone_available", {
+        check_phone: phoneWithCode,
+      });
 
       if (error) {
         console.error("Phone check error:", error);
         return { available: true }; // Fail open
       }
 
-      return { available: !data };
+      return { available: data as boolean };
     } catch (error) {
       console.error("Phone check exception:", error);
       return { available: true };
@@ -61,18 +57,16 @@ export const availabilityCheck = {
     username: string,
   ): Promise<{ available: boolean; error?: string }> => {
     try {
-      const { data, error } = await supabase
-        .from("profiles")
-        .select("username")
-        .eq("username", username.toLowerCase())
-        .maybeSingle();
+      const { data, error } = await supabase.rpc("check_username_available", {
+        check_username: username,
+      });
 
       if (error) {
         console.error("Username check error:", error);
         return { available: true };
       }
 
-      return { available: !data };
+      return { available: data as boolean };
     } catch (error) {
       console.error("Username check exception:", error);
       return { available: true };
