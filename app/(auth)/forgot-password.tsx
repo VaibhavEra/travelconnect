@@ -1,6 +1,13 @@
 import FormInput from "@/components/FormInput";
+import OfflineNotice from "@/components/OfflineNotice";
 import { haptics } from "@/lib/utils/haptics";
-import { parseSupabaseError } from "@/lib/utils/parseSupabaseError";
+import { useNetworkStatus } from "@/lib/utils/network";
+import { rateLimitConfigs, rateLimiter } from "@/lib/utils/rateLimit";
+import { sanitize } from "@/lib/utils/sanitize";
+import {
+  ForgotPasswordFormData,
+  forgotPasswordSchema,
+} from "@/lib/validations/auth";
 import { useAuthStore } from "@/stores/authStore";
 import { Ionicons } from "@expo/vector-icons";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -18,20 +25,12 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
-import { z } from "zod";
-
-const forgotPasswordSchema = z.object({
-  email: z
-    .email({ error: "Please enter a valid email address" })
-    .min(1, { error: "Email is required" }),
-});
-
-type ForgotPasswordFormData = z.infer<typeof forgotPasswordSchema>;
 
 export default function ForgotPasswordScreen() {
   const [loading, setLoading] = useState(false);
   const [emailSent, setEmailSent] = useState(false);
   const resetPassword = useAuthStore((state) => state.resetPassword);
+  const { isOffline } = useNetworkStatus();
 
   const {
     control,
@@ -46,15 +45,82 @@ export default function ForgotPasswordScreen() {
   });
 
   const onSubmit = async (data: ForgotPasswordFormData) => {
+    // Check network
+    if (isOffline) {
+      haptics.error();
+      Alert.alert(
+        "No Internet",
+        "Please check your internet connection and try again.",
+      );
+      return;
+    }
+
+    // Rate limiting check (prevent spam)
+    const rateCheck = rateLimiter.check(
+      `reset-password:${data.email}`,
+      rateLimitConfigs.passwordReset,
+    );
+    if (!rateCheck.allowed) {
+      haptics.error();
+      Alert.alert(
+        "Too Many Requests",
+        `Please wait ${rateCheck.retryAfter} seconds before requesting another reset code.`,
+      );
+      return;
+    }
+
     setLoading(true);
     try {
-      await resetPassword(data.email);
+      const sanitizedEmail = sanitize.email(data.email);
+      await resetPassword(sanitizedEmail);
       haptics.success();
+
+      // Always show success (don't reveal if email exists - security)
       setEmailSent(true);
     } catch (error: any) {
       haptics.error();
-      const errorMessage = parseSupabaseError(error);
-      Alert.alert("Error", errorMessage);
+
+      // Don't reveal if email doesn't exist (prevents email enumeration)
+      // Always show success to user
+      setEmailSent(true);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleResend = async () => {
+    const email = getValues("email");
+
+    // Rate limit resend attempts
+    const rateCheck = rateLimiter.check(
+      `reset-password:${email}`,
+      rateLimitConfigs.passwordReset,
+    );
+    if (!rateCheck.allowed) {
+      haptics.error();
+      Alert.alert(
+        "Too Many Requests",
+        `Please wait ${rateCheck.retryAfter} seconds before requesting another reset code.`,
+      );
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const sanitizedEmail = sanitize.email(email);
+      await resetPassword(sanitizedEmail);
+      haptics.success();
+      Alert.alert(
+        "Code Resent",
+        "A new verification code has been sent to your email.",
+      );
+    } catch (error: any) {
+      // Still show success (don't reveal email existence)
+      haptics.success();
+      Alert.alert(
+        "Code Sent",
+        "If an account exists, you'll receive a verification code.",
+      );
     } finally {
       setLoading(false);
     }
@@ -63,25 +129,41 @@ export default function ForgotPasswordScreen() {
   if (emailSent) {
     return (
       <View style={styles.container}>
+        <OfflineNotice />
         <View style={styles.content}>
           <View style={styles.successContainer}>
             <Ionicons name="mail-outline" size={64} color="#007AFF" />
             <Text style={styles.successTitle}>Check Your Email</Text>
             <Text style={styles.successMessage}>
-              We've sent password reset instructions to:
+              We've sent a verification code to:
             </Text>
             <Text style={styles.email}>{getValues("email")}</Text>
             <Text style={styles.successSubtext}>
-              Click the link in the email to reset your password. If you don't
-              see it, check your spam folder.
+              Enter the 6-digit code to reset your password.
             </Text>
 
+            {/* UPDATED: Navigate to verify-reset-otp */}
             <TouchableOpacity
               style={styles.button}
-              onPress={() => router.replace("/(auth)/login")}
+              onPress={() => {
+                router.push({
+                  pathname: "./verify-reset-otp",
+                  params: { email: getValues("email") },
+                });
+              }}
               activeOpacity={0.8}
             >
-              <Text style={styles.buttonText}>Back to Login</Text>
+              <Text style={styles.buttonText}>Enter Code</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={styles.resendButton}
+              onPress={handleResend}
+              disabled={loading}
+            >
+              <Text style={styles.resendText}>
+                {loading ? "Sending..." : "Resend code"}
+              </Text>
             </TouchableOpacity>
 
             <TouchableOpacity
@@ -104,6 +186,7 @@ export default function ForgotPasswordScreen() {
       behavior={Platform.OS === "ios" ? "padding" : "height"}
       style={styles.container}
     >
+      <OfflineNotice />
       <ScrollView
         contentContainerStyle={styles.scrollContent}
         keyboardShouldPersistTaps="handled"
@@ -125,8 +208,8 @@ export default function ForgotPasswordScreen() {
           <View style={styles.header}>
             <Text style={styles.title}>Forgot Password?</Text>
             <Text style={styles.subtitle}>
-              Enter your email and we'll send you instructions to reset your
-              password
+              Enter your email and we'll send you a verification code to reset
+              your password
             </Text>
           </View>
 
@@ -140,7 +223,7 @@ export default function ForgotPasswordScreen() {
                   label="Email"
                   placeholder="you@example.com"
                   value={value}
-                  onChangeText={onChange}
+                  onChangeText={(text) => onChange(sanitize.email(text))}
                   onBlur={onBlur}
                   error={errors.email?.message}
                   touched={touchedFields.email}
@@ -156,15 +239,18 @@ export default function ForgotPasswordScreen() {
             />
 
             <TouchableOpacity
-              style={[styles.button, loading && styles.buttonDisabled]}
+              style={[
+                styles.button,
+                (loading || isOffline) && styles.buttonDisabled,
+              ]}
               onPress={handleSubmit(onSubmit)}
-              disabled={loading}
+              disabled={loading || isOffline}
               activeOpacity={0.8}
             >
               {loading ? (
                 <ActivityIndicator color="#fff" />
               ) : (
-                <Text style={styles.buttonText}>Send Reset Link</Text>
+                <Text style={styles.buttonText}>Send Reset Code</Text>
               )}
             </TouchableOpacity>
           </View>
@@ -281,14 +367,15 @@ const styles = StyleSheet.create({
     color: "#999",
     textAlign: "center",
     lineHeight: 20,
-    marginBottom: 32,
+    marginBottom: 24,
   },
   resendButton: {
     marginTop: 16,
     padding: 8,
   },
   resendText: {
-    color: "#666",
+    color: "#007AFF",
     fontSize: 14,
+    fontWeight: "600",
   },
 });
