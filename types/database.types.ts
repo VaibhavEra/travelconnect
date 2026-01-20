@@ -12,33 +12,29 @@ export type Database = {
   __InternalSupabase: {
     PostgrestVersion: "14.1"
   }
-  graphql_public: {
-    Tables: {
-      [_ in never]: never
-    }
-    Views: {
-      [_ in never]: never
-    }
-    Functions: {
-      graphql: {
-        Args: {
-          extensions?: Json
-          operationName?: string
-          query?: string
-          variables?: Json
-        }
-        Returns: Json
-      }
-    }
-    Enums: {
-      [_ in never]: never
-    }
-    CompositeTypes: {
-      [_ in never]: never
-    }
-  }
   public: {
     Tables: {
+      failed_login_attempts: {
+        Row: {
+          attempted_at: string | null
+          email: string
+          id: string
+          ip_address: string | null
+        }
+        Insert: {
+          attempted_at?: string | null
+          email: string
+          id?: string
+          ip_address?: string | null
+        }
+        Update: {
+          attempted_at?: string | null
+          email?: string
+          id?: string
+          ip_address?: string | null
+        }
+        Relationships: []
+      }
       packages: {
         Row: {
           accepted_at: string | null
@@ -112,6 +108,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "packages_sender_id_fkey"
+            columns: ["sender_id"]
+            isOneToOne: false
+            referencedRelation: "public_profiles"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "packages_trip_id_fkey"
             columns: ["trip_id"]
             isOneToOne: false
@@ -176,6 +179,13 @@ export type Database = {
             columns: ["sender_id"]
             isOneToOne: false
             referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "payments_sender_id_fkey"
+            columns: ["sender_id"]
+            isOneToOne: false
+            referencedRelation: "public_profiles"
             referencedColumns: ["id"]
           },
         ]
@@ -288,14 +298,65 @@ export type Database = {
             referencedRelation: "profiles"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "trips_traveller_id_fkey"
+            columns: ["traveller_id"]
+            isOneToOne: false
+            referencedRelation: "public_profiles"
+            referencedColumns: ["id"]
+          },
         ]
       }
     }
     Views: {
-      [_ in never]: never
+      public_profiles: {
+        Row: {
+          created_at: string | null
+          full_name: string | null
+          id: string | null
+          kyc_status: string | null
+          rating: number | null
+          rating_count: number | null
+          username: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          full_name?: string | null
+          id?: string | null
+          kyc_status?: string | null
+          rating?: number | null
+          rating_count?: number | null
+          username?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          full_name?: string | null
+          id?: string | null
+          kyc_status?: string | null
+          rating?: number | null
+          rating_count?: number | null
+          username?: string | null
+        }
+        Relationships: []
+      }
     }
     Functions: {
+      check_email_available: { Args: { check_email: string }; Returns: boolean }
+      check_phone_available: { Args: { check_phone: string }; Returns: boolean }
+      check_username_available: {
+        Args: { check_username: string }
+        Returns: boolean
+      }
+      clear_failed_attempts: {
+        Args: { user_email: string }
+        Returns: undefined
+      }
       generate_otp: { Args: never; Returns: string }
+      is_account_locked: { Args: { user_email: string }; Returns: boolean }
+      record_failed_login: {
+        Args: { user_email: string; user_ip?: string }
+        Returns: undefined
+      }
     }
     Enums: {
       [_ in never]: never
@@ -424,9 +485,6 @@ export type CompositeTypes<
     : never
 
 export const Constants = {
-  graphql_public: {
-    Enums: {},
-  },
   public: {
     Enums: {},
   },
