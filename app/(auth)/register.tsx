@@ -57,9 +57,10 @@ export default function RegisterScreen() {
     watch,
     setError,
     clearErrors,
-    formState: { errors, touchedFields },
+    formState: { errors, touchedFields, isValid },
   } = useForm<RegisterFormData>({
     resolver: zodResolver(registerSchema),
+    mode: "onTouched", // Validate after blur
     defaultValues: {
       full_name: "",
       username: "",
@@ -77,105 +78,137 @@ export default function RegisterScreen() {
 
   // Debounced username availability check
   useEffect(() => {
-    const timeoutId = setTimeout(() => {
+    let cancelled = false;
+
+    const timeoutId = setTimeout(async () => {
       if (username && username.length >= 3) {
-        checkUsernameAvailability(username);
+        setCheckingUsername(true);
+        try {
+          const { available } = await availabilityCheck.username(username);
+          if (!cancelled) {
+            setUsernameAvailable(available);
+
+            if (!available) {
+              setError("username", {
+                type: "manual",
+                message: "Username is already taken",
+              });
+            } else {
+              // Clear manual error but keep Zod errors
+              if (errors.username?.type === "manual") {
+                clearErrors("username");
+              }
+            }
+          }
+        } catch (error) {
+          console.error("Username check failed:", error);
+        } finally {
+          if (!cancelled) {
+            setCheckingUsername(false);
+          }
+        }
       } else {
         setUsernameAvailable(null);
+        // Clear manual availability error
+        if (errors.username?.type === "manual") {
+          clearErrors("username");
+        }
       }
     }, 500);
 
-    return () => clearTimeout(timeoutId);
+    return () => {
+      clearTimeout(timeoutId);
+      cancelled = true;
+    };
   }, [username]);
 
   // Debounced email availability check
   useEffect(() => {
-    const timeoutId = setTimeout(() => {
+    let cancelled = false;
+
+    const timeoutId = setTimeout(async () => {
       if (email && email.includes("@")) {
-        checkEmailAvailability(email);
+        setCheckingEmail(true);
+        try {
+          const { available } = await availabilityCheck.email(email);
+          if (!cancelled) {
+            setEmailAvailable(available);
+
+            if (!available) {
+              setError("email", {
+                type: "manual",
+                message: "Email is already registered",
+              });
+            } else {
+              if (errors.email?.type === "manual") {
+                clearErrors("email");
+              }
+            }
+          }
+        } catch (error) {
+          console.error("Email check failed:", error);
+        } finally {
+          if (!cancelled) {
+            setCheckingEmail(false);
+          }
+        }
       } else {
         setEmailAvailable(null);
+        if (errors.email?.type === "manual") {
+          clearErrors("email");
+        }
       }
     }, 500);
 
-    return () => clearTimeout(timeoutId);
+    return () => {
+      clearTimeout(timeoutId);
+      cancelled = true;
+    };
   }, [email]);
 
   // Debounced phone availability check
   useEffect(() => {
-    const timeoutId = setTimeout(() => {
+    let cancelled = false;
+
+    const timeoutId = setTimeout(async () => {
       if (phone && phone.length === 10) {
-        checkPhoneAvailability(phone);
+        setCheckingPhone(true);
+        try {
+          const { available } = await availabilityCheck.phone(phone);
+          if (!cancelled) {
+            setPhoneAvailable(available);
+
+            if (!available) {
+              setError("phone", {
+                type: "manual",
+                message: "Phone number is already registered",
+              });
+            } else {
+              if (errors.phone?.type === "manual") {
+                clearErrors("phone");
+              }
+            }
+          }
+        } catch (error) {
+          console.error("Phone check failed:", error);
+        } finally {
+          if (!cancelled) {
+            setCheckingPhone(false);
+          }
+        }
       } else {
         setPhoneAvailable(null);
+        if (errors.phone?.type === "manual") {
+          clearErrors("phone");
+        }
       }
     }, 500);
 
-    return () => clearTimeout(timeoutId);
+    return () => {
+      clearTimeout(timeoutId);
+      cancelled = true;
+    };
   }, [phone]);
-
-  const checkUsernameAvailability = async (username: string) => {
-    setCheckingUsername(true);
-    try {
-      const { available } = await availabilityCheck.username(username);
-      setUsernameAvailable(available);
-
-      if (!available) {
-        setError("username", {
-          type: "manual",
-          message: "Username is already taken",
-        });
-      } else {
-        clearErrors("username");
-      }
-    } catch (error) {
-      console.error("Username check failed:", error);
-    } finally {
-      setCheckingUsername(false);
-    }
-  };
-
-  const checkEmailAvailability = async (email: string) => {
-    setCheckingEmail(true);
-    try {
-      const { available } = await availabilityCheck.email(email);
-      setEmailAvailable(available);
-
-      if (!available) {
-        setError("email", {
-          type: "manual",
-          message: "Email is already registered",
-        });
-      } else {
-        clearErrors("email");
-      }
-    } catch (error) {
-      console.error("Email check failed:", error);
-    } finally {
-      setCheckingEmail(false);
-    }
-  };
-
-  const checkPhoneAvailability = async (phone: string) => {
-    setCheckingPhone(true);
-    try {
-      const { available } = await availabilityCheck.phone(phone);
-      setPhoneAvailable(available);
-
-      if (!available) {
-        setError("phone", {
-          type: "manual",
-          message: "Phone number is already registered",
-        });
-      } else {
-        clearErrors("phone");
-      }
-    } catch (error) {
-      console.error("Phone check failed:", error);
-    } finally {
-      setCheckingPhone(false);
-    }
-  };
 
   // Password strength indicator
   const getPasswordStrength = (
@@ -188,7 +221,7 @@ export default function RegisterScreen() {
     const hasUpper = /[A-Z]/.test(pass);
     const hasLower = /[a-z]/.test(pass);
     const hasNumber = /[0-9]/.test(pass);
-    const hasSpecial = /[!@#$%^&*]/.test(pass);
+    const hasSpecial = /[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]/.test(pass);
 
     const strength = [hasUpper, hasLower, hasNumber, hasSpecial].filter(
       Boolean,
@@ -200,29 +233,20 @@ export default function RegisterScreen() {
 
   const passwordStrength = getPasswordStrength(password);
 
+  // Check if form can be submitted
+  const canSubmit =
+    isValid &&
+    !loading &&
+    !isOffline &&
+    !checkingUsername &&
+    !checkingEmail &&
+    !checkingPhone &&
+    usernameAvailable !== false &&
+    emailAvailable !== false &&
+    phoneAvailable !== false;
+
   const onSubmit = async (data: RegisterFormData) => {
-    // Check network
-    if (isOffline) {
-      haptics.error();
-      Alert.alert(
-        "No Internet",
-        "Please check your internet connection and try again.",
-      );
-      return;
-    }
-
-    // Rate limiting check
-    const rateCheck = rateLimiter.check("signup", rateLimitConfigs.signup);
-    if (!rateCheck.allowed) {
-      haptics.error();
-      Alert.alert(
-        "Too Many Attempts",
-        `Please wait ${rateCheck.retryAfter} seconds before trying again.`,
-      );
-      return;
-    }
-
-    // Final availability checks
+    // Double-check availability before submitting
     if (usernameAvailable === false) {
       haptics.error();
       Alert.alert("Error", "Username is already taken. Please choose another.");
@@ -244,12 +268,33 @@ export default function RegisterScreen() {
       return;
     }
 
+    // Check network
+    if (isOffline) {
+      haptics.error();
+      Alert.alert(
+        "No Internet",
+        "Please check your internet connection and try again.",
+      );
+      return;
+    }
+
+    // Rate limiting check
+    const rateCheck = rateLimiter.check("signup", rateLimitConfigs.signup);
+    if (!rateCheck.allowed) {
+      haptics.error();
+      Alert.alert(
+        "Too Many Attempts",
+        `Please wait ${rateCheck.retryAfter} seconds before trying again.`,
+      );
+      return;
+    }
+
     setLoading(true);
     try {
       // Sanitize inputs
       const sanitizedData = {
         email: sanitize.email(data.email),
-        password: data.password, // Don't sanitize password
+        password: data.password.trim(),
         full_name: sanitize.name(data.full_name),
         username: sanitize.username(data.username),
         phone: sanitize.phone(data.phone),
@@ -264,6 +309,18 @@ export default function RegisterScreen() {
     } catch (error: any) {
       haptics.error();
       const errorMessage = parseSupabaseError(error);
+
+      // If duplicate error, update availability states
+      if (errorMessage.includes("Username already taken")) {
+        setUsernameAvailable(false);
+      }
+      if (errorMessage.includes("Email already registered")) {
+        setEmailAvailable(false);
+      }
+      if (errorMessage.includes("Phone number already registered")) {
+        setPhoneAvailable(false);
+      }
+
       Alert.alert("Registration Failed", errorMessage);
     } finally {
       setLoading(false);
@@ -321,10 +378,7 @@ export default function RegisterScreen() {
                   label="Username"
                   placeholder="johndoe"
                   value={value}
-                  onChangeText={(text) => {
-                    onChange(sanitize.username(text));
-                    setUsernameAvailable(null);
-                  }}
+                  onChangeText={(text) => onChange(sanitize.username(text))}
                   onBlur={onBlur}
                   error={errors.username?.message}
                   touched={touchedFields.username}
@@ -337,7 +391,7 @@ export default function RegisterScreen() {
                   rightIcon={
                     checkingUsername ? (
                       <ActivityIndicator size="small" color="#666" />
-                    ) : usernameAvailable === true ? (
+                    ) : usernameAvailable === true && username.length >= 3 ? (
                       <Ionicons
                         name="checkmark-circle"
                         size={24}
@@ -360,10 +414,7 @@ export default function RegisterScreen() {
                   label="Email"
                   placeholder="you@example.com"
                   value={value}
-                  onChangeText={(text) => {
-                    onChange(sanitize.email(text));
-                    setEmailAvailable(null);
-                  }}
+                  onChangeText={(text) => onChange(sanitize.email(text))}
                   onBlur={onBlur}
                   error={errors.email?.message}
                   touched={touchedFields.email}
@@ -378,7 +429,7 @@ export default function RegisterScreen() {
                   rightIcon={
                     checkingEmail ? (
                       <ActivityIndicator size="small" color="#666" />
-                    ) : emailAvailable === true ? (
+                    ) : emailAvailable === true && email.includes("@") ? (
                       <Ionicons
                         name="checkmark-circle"
                         size={24}
@@ -401,10 +452,7 @@ export default function RegisterScreen() {
                   label="Phone Number"
                   placeholder="9876543210"
                   value={value}
-                  onChangeText={(text) => {
-                    onChange(sanitize.phone(text));
-                    setPhoneAvailable(null);
-                  }}
+                  onChangeText={(text) => onChange(sanitize.phone(text))}
                   onBlur={onBlur}
                   error={errors.phone?.message}
                   touched={touchedFields.phone}
@@ -418,7 +466,7 @@ export default function RegisterScreen() {
                   rightIcon={
                     checkingPhone ? (
                       <ActivityIndicator size="small" color="#666" />
-                    ) : phoneAvailable === true ? (
+                    ) : phoneAvailable === true && phone.length === 10 ? (
                       <Ionicons
                         name="checkmark-circle"
                         size={24}
@@ -442,7 +490,7 @@ export default function RegisterScreen() {
                     label="Password"
                     placeholder="Create a strong password"
                     value={value}
-                    onChangeText={onChange}
+                    onChangeText={(text) => onChange(text.trim())}
                     onBlur={onBlur}
                     error={errors.password?.message}
                     touched={touchedFields.password}
@@ -494,7 +542,7 @@ export default function RegisterScreen() {
                   label="Confirm Password"
                   placeholder="Re-enter your password"
                   value={value}
-                  onChangeText={onChange}
+                  onChangeText={(text) => onChange(text.trim())}
                   onBlur={onBlur}
                   error={errors.confirmPassword?.message}
                   touched={touchedFields.confirmPassword}
@@ -528,12 +576,9 @@ export default function RegisterScreen() {
             />
 
             <TouchableOpacity
-              style={[
-                styles.button,
-                (loading || isOffline) && styles.buttonDisabled,
-              ]}
+              style={[styles.button, !canSubmit && styles.buttonDisabled]}
               onPress={handleSubmit(onSubmit)}
-              disabled={loading || isOffline}
+              disabled={!canSubmit}
               activeOpacity={0.8}
             >
               {loading ? (
