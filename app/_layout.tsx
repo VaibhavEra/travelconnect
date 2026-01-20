@@ -10,19 +10,34 @@ export default function RootLayout() {
 
   useEffect(() => {
     initialize();
-  }, []);
+  }, [initialize]);
 
   useEffect(() => {
     if (loading) return;
 
     const inAuthGroup = segments[0] === "(auth)";
 
+    // Check if user is on password reset screens
+    const isOnPasswordResetFlow =
+      segments[1] === "verify-reset-otp" ||
+      segments[1] === "reset-new-password";
+
     if (!session && !inAuthGroup) {
+      // No session and not in auth screens → redirect to login
       router.replace("/(auth)/login");
     } else if (session && inAuthGroup) {
+      // Has session and in auth screens
+
+      // CRITICAL: Don't redirect if user is resetting password
+      if (isOnPasswordResetFlow) {
+        // Let them complete password reset flow
+        return;
+      }
+
+      // Otherwise redirect to home (they're logged in)
       router.replace("/");
     }
-  }, [session, segments, loading]);
+  }, [session, loading]); // Removed segments from deps to prevent loops
 
   if (loading) {
     return (
