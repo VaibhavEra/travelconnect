@@ -1,6 +1,8 @@
 // app/index.tsx
+import ModeSwitcher from "@/components/shared/ModeSwitcher";
 import { haptics } from "@/lib/utils/haptics";
 import { useAuthStore } from "@/stores/authStore";
+import { useModeStore } from "@/stores/modeStore";
 import { useProfileStore } from "@/stores/profileStore";
 import { BorderRadius, Colors, Spacing, Typography } from "@/styles";
 import { Ionicons } from "@expo/vector-icons";
@@ -8,6 +10,7 @@ import { useState } from "react";
 import {
   ActivityIndicator,
   Alert,
+  ScrollView,
   StyleSheet,
   Text,
   TouchableOpacity,
@@ -17,6 +20,7 @@ import {
 export default function Index() {
   const { session, user, loading, signOut } = useAuthStore();
   const profile = useProfileStore((state) => state.profile);
+  const { currentMode } = useModeStore();
   const [signingOut, setSigningOut] = useState(false);
 
   const handleSignOut = async () => {
@@ -55,108 +59,137 @@ export default function Index() {
   }
 
   return (
-    <View style={styles.container}>
-      <Text style={styles.title}>ShelfScore</Text>
+    <ScrollView contentContainerStyle={styles.scrollContent}>
+      <View style={styles.container}>
+        <Text style={styles.title}>TravelConnect</Text>
 
-      {session ? (
-        <View style={styles.authContainer}>
-          <View style={styles.statusBadge}>
-            <Ionicons
-              name="checkmark-circle"
-              size={32}
-              color={Colors.success}
-            />
-          </View>
-
-          <Text style={styles.success}>Logged In</Text>
-
-          <View style={styles.infoCard}>
-            <View style={styles.infoRow}>
-              <Ionicons
-                name="mail-outline"
-                size={20}
-                color={Colors.text.secondary}
-              />
-              <Text style={styles.info}>{user?.email}</Text>
+        {session ? (
+          <View style={styles.authContainer}>
+            {/* Mode Switcher - NEW */}
+            <View style={styles.modeSwitcherContainer}>
+              <Text style={styles.sectionTitle}>Current Mode</Text>
+              <ModeSwitcher />
+              <View style={styles.modeInfo}>
+                <Ionicons
+                  name={
+                    currentMode === "sender"
+                      ? "search-outline"
+                      : "airplane-outline"
+                  }
+                  size={24}
+                  color={Colors.primary}
+                />
+                <Text style={styles.modeDescription}>
+                  {currentMode === "sender"
+                    ? "Search for trips and send parcels"
+                    : "Create trips and carry parcels"}
+                </Text>
+              </View>
             </View>
 
-            {profile && (
-              <>
-                <View style={styles.infoRow}>
-                  <Ionicons
-                    name="person-outline"
-                    size={20}
-                    color={Colors.text.secondary}
-                  />
-                  <Text style={styles.info}>{profile.full_name}</Text>
-                </View>
+            <View style={styles.statusBadge}>
+              <Ionicons
+                name="checkmark-circle"
+                size={32}
+                color={Colors.success}
+              />
+            </View>
 
-                <View style={styles.infoRow}>
-                  <Ionicons
-                    name="at-outline"
-                    size={20}
-                    color={Colors.text.secondary}
-                  />
-                  <Text style={styles.info}>@{profile.username}</Text>
-                </View>
+            <Text style={styles.success}>Logged In</Text>
 
-                <View style={styles.infoRow}>
-                  <Ionicons
-                    name="call-outline"
-                    size={20}
-                    color={Colors.text.secondary}
-                  />
-                  <Text style={styles.info}>{profile.phone}</Text>
-                </View>
+            <View style={styles.infoCard}>
+              <Text style={styles.sectionTitle}>Profile Info</Text>
 
-                {profile.roles && profile.roles.length > 0 && (
+              <View style={styles.infoRow}>
+                <Ionicons
+                  name="mail-outline"
+                  size={20}
+                  color={Colors.text.secondary}
+                />
+                <Text style={styles.info}>{user?.email}</Text>
+              </View>
+
+              {profile && (
+                <>
                   <View style={styles.infoRow}>
                     <Ionicons
-                      name="shield-checkmark-outline"
+                      name="person-outline"
                       size={20}
                       color={Colors.text.secondary}
                     />
-                    <Text style={styles.info}>{profile.roles.join(", ")}</Text>
+                    <Text style={styles.info}>{profile.full_name}</Text>
                   </View>
-                )}
-              </>
-            )}
-          </View>
 
-          <TouchableOpacity
-            style={[styles.signOutButton, signingOut && styles.buttonDisabled]}
-            onPress={handleSignOut}
-            disabled={signingOut}
-            activeOpacity={0.8}
-          >
-            {signingOut ? (
-              <ActivityIndicator color={Colors.text.inverse} size="small" />
-            ) : (
-              <>
-                <Ionicons
-                  name="log-out-outline"
-                  size={20}
-                  color={Colors.text.inverse}
-                />
-                <Text style={styles.signOutText}>Sign Out</Text>
-              </>
-            )}
-          </TouchableOpacity>
-        </View>
-      ) : (
-        <View style={styles.authContainer}>
-          <View style={styles.statusBadge}>
-            <Ionicons name="close-circle" size={32} color={Colors.error} />
+                  <View style={styles.infoRow}>
+                    <Ionicons
+                      name="at-outline"
+                      size={20}
+                      color={Colors.text.secondary}
+                    />
+                    <Text style={styles.info}>@{profile.username}</Text>
+                  </View>
+
+                  <View style={styles.infoRow}>
+                    <Ionicons
+                      name="call-outline"
+                      size={20}
+                      color={Colors.text.secondary}
+                    />
+                    <Text style={styles.info}>{profile.phone}</Text>
+                  </View>
+                </>
+              )}
+            </View>
+
+            <TouchableOpacity
+              style={[
+                styles.signOutButton,
+                signingOut && styles.buttonDisabled,
+              ]}
+              onPress={handleSignOut}
+              disabled={signingOut}
+              activeOpacity={0.8}
+            >
+              {signingOut ? (
+                <ActivityIndicator color={Colors.text.inverse} size="small" />
+              ) : (
+                <>
+                  <Ionicons
+                    name="log-out-outline"
+                    size={20}
+                    color={Colors.text.inverse}
+                  />
+                  <Text style={styles.signOutText}>Sign Out</Text>
+                </>
+              )}
+            </TouchableOpacity>
+
+            {/* Phase 3 Preview */}
+            <View style={styles.phasePreview}>
+              <Text style={styles.phaseText}>
+                Phase 3: Tab navigation will show different screens based on
+                mode
+              </Text>
+            </View>
           </View>
-          <Text style={styles.notLoggedIn}>Not Logged In</Text>
-          <Text style={styles.subtitle}>Auth store is working!</Text>
-        </View>
-      )}
-    </View>
+        ) : (
+          <View style={styles.authContainer}>
+            <View style={styles.statusBadge}>
+              <Ionicons name="close-circle" size={32} color={Colors.error} />
+            </View>
+            <Text style={styles.notLoggedIn}>Not Logged In</Text>
+            <Text style={styles.subtitle}>Auth store is working!</Text>
+          </View>
+        )}
+      </View>
+    </ScrollView>
   );
 }
 
 const styles = StyleSheet.create({
+  scrollContent: {
+    flexGrow: 1,
+  },
   container: {
     flex: 1,
     justifyContent: "center",
@@ -167,13 +200,40 @@ const styles = StyleSheet.create({
   title: {
     fontSize: Typography.sizes.xxxl,
     fontWeight: Typography.weights.bold,
-    marginBottom: Spacing.xxl - 8,
+    marginBottom: Spacing.lg,
     color: Colors.text.primary,
   },
   authContainer: {
     alignItems: "center",
     width: "100%",
     maxWidth: 400,
+  },
+  modeSwitcherContainer: {
+    width: "100%",
+    backgroundColor: Colors.background.tertiary,
+    borderRadius: BorderRadius.lg,
+    padding: Spacing.lg,
+    marginBottom: Spacing.lg,
+    alignItems: "center",
+    gap: Spacing.md,
+  },
+  sectionTitle: {
+    fontSize: Typography.sizes.md,
+    fontWeight: Typography.weights.semibold,
+    color: Colors.text.primary,
+    marginBottom: Spacing.xs,
+  },
+  modeInfo: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: Spacing.sm,
+    marginTop: Spacing.sm,
+  },
+  modeDescription: {
+    fontSize: Typography.sizes.sm,
+    color: Colors.text.secondary,
+    flex: 1,
+    textAlign: "center",
   },
   statusBadge: {
     marginBottom: Spacing.md,
@@ -236,5 +296,18 @@ const styles = StyleSheet.create({
     color: Colors.text.inverse,
     fontSize: Typography.sizes.md,
     fontWeight: Typography.weights.semibold,
+  },
+  phasePreview: {
+    marginTop: Spacing.lg,
+    padding: Spacing.md,
+    backgroundColor: Colors.background.secondary,
+    borderRadius: BorderRadius.md,
+    width: "100%",
+  },
+  phaseText: {
+    fontSize: Typography.sizes.sm,
+    color: Colors.text.tertiary,
+    textAlign: "center",
+    fontStyle: "italic",
   },
 });

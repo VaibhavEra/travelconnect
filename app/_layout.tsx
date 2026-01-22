@@ -1,5 +1,6 @@
 // app/_layout.tsx (REFACTORED with theme)
 import { useAuthStore } from "@/stores/authStore";
+import { useModeStore } from "@/stores/modeStore";
 import { Colors } from "@/styles";
 import { Slot, useRouter, useSegments } from "expo-router";
 import { useEffect } from "react";
@@ -8,14 +9,17 @@ import { ActivityIndicator, StyleSheet, View } from "react-native";
 export default function RootLayout() {
   const router = useRouter();
   const segments = useSegments();
-  const { session, loading, initialize } = useAuthStore();
+  const { session, loading: authLoading, initialize } = useAuthStore();
+  const { initialize: initializeMode, loading: modeLoading } = useModeStore();
 
   useEffect(() => {
     initialize();
-  }, [initialize]);
+    initializeMode(); // Initialize mode on app launch
+  }, [initialize, initializeMode]);
 
   useEffect(() => {
-    if (loading) return;
+    // Wait for both auth and mode to load
+    if (authLoading || modeLoading) return;
 
     const inAuthGroup = segments[0] === "(auth)";
 
@@ -39,9 +43,9 @@ export default function RootLayout() {
       // Otherwise redirect to home (they're logged in)
       router.replace("/");
     }
-  }, [session, loading]); // Removed segments from deps to prevent loops
+  }, [session, authLoading, modeLoading]); // Add modeLoading to deps
 
-  if (loading) {
+  if (authLoading || modeLoading) {
     return (
       <View style={styles.loadingContainer}>
         <ActivityIndicator size="large" color={Colors.primary} />
