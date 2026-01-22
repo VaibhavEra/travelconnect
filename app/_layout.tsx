@@ -1,4 +1,4 @@
-// app/_layout.tsx (REFACTORED with theme)
+// app/_layout.tsx (UPDATE)
 import { useAuthStore } from "@/stores/authStore";
 import { useModeStore } from "@/stores/modeStore";
 import { Colors } from "@/styles";
@@ -14,14 +14,14 @@ export default function RootLayout() {
 
   useEffect(() => {
     initialize();
-    initializeMode(); // Initialize mode on app launch
+    initializeMode();
   }, [initialize, initializeMode]);
 
   useEffect(() => {
-    // Wait for both auth and mode to load
     if (authLoading || modeLoading) return;
 
     const inAuthGroup = segments[0] === "(auth)";
+    const inTabsGroup = segments[0] === "(tabs)";
 
     // Check if user is on password reset screens
     const isOnPasswordResetFlow =
@@ -36,14 +36,16 @@ export default function RootLayout() {
 
       // CRITICAL: Don't redirect if user is resetting password
       if (isOnPasswordResetFlow) {
-        // Let them complete password reset flow
         return;
       }
 
-      // Otherwise redirect to home (they're logged in)
-      router.replace("/");
+      // Redirect to tabs (mode-based)
+      router.replace("/(tabs)/explore");
+    } else if (session && !inTabsGroup && segments[0] !== "(auth)") {
+      // Has session but not in tabs (e.g., on /index) → redirect to tabs
+      router.replace("/(tabs)/explore");
     }
-  }, [session, authLoading, modeLoading]); // Add modeLoading to deps
+  }, [session, authLoading, modeLoading, segments]);
 
   if (authLoading || modeLoading) {
     return (

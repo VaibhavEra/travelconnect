@@ -2,80 +2,92 @@ import { haptics } from "@/lib/utils/haptics";
 import { useModeStore } from "@/stores/modeStore";
 import { BorderRadius, Colors, Spacing, Typography } from "@/styles";
 import { Ionicons } from "@expo/vector-icons";
+import { useRouter } from "expo-router";
 import { StyleSheet, Text, TouchableOpacity, View } from "react-native";
 
 export default function ModeSwitcher() {
   const { currentMode, switchMode } = useModeStore();
+  const router = useRouter();
 
   const handleModeSwitch = async (mode: "sender" | "traveller") => {
     if (mode === currentMode) return;
 
     haptics.selection();
     await switchMode(mode);
+
+    // Navigate to first tab of new mode
+    if (mode === "sender") {
+      router.replace("/(tabs)/explore");
+    } else {
+      router.replace("/(tabs)/my-trips");
+    }
   };
 
   return (
-    <View style={styles.container}>
-      <TouchableOpacity
-        style={[
-          styles.button,
-          styles.buttonLeft,
-          currentMode === "sender" && styles.buttonActive,
-        ]}
-        onPress={() => handleModeSwitch("sender")}
-        activeOpacity={0.7}
-      >
-        <Ionicons
-          name="search-outline"
-          size={18}
-          color={
-            currentMode === "sender"
-              ? Colors.text.inverse
-              : Colors.text.secondary
-          }
-        />
-        <Text
+    <View style={styles.headerContainer}>
+      <View style={styles.container}>
+        <TouchableOpacity
           style={[
-            styles.buttonText,
-            currentMode === "sender" && styles.buttonTextActive,
+            styles.button,
+            currentMode === "sender" && styles.buttonActive,
           ]}
+          onPress={() => handleModeSwitch("sender")}
+          activeOpacity={0.7}
         >
-          Sender
-        </Text>
-      </TouchableOpacity>
+          <Ionicons
+            name="search-outline"
+            size={18}
+            color={
+              currentMode === "sender"
+                ? Colors.text.inverse
+                : Colors.text.secondary
+            }
+          />
+          <Text
+            style={[
+              styles.buttonText,
+              currentMode === "sender" && styles.buttonTextActive,
+            ]}
+          >
+            Sender
+          </Text>
+        </TouchableOpacity>
 
-      <TouchableOpacity
-        style={[
-          styles.button,
-          styles.buttonRight,
-          currentMode === "traveller" && styles.buttonActive,
-        ]}
-        onPress={() => handleModeSwitch("traveller")}
-        activeOpacity={0.7}
-      >
-        <Ionicons
-          name="airplane-outline"
-          size={18}
-          color={
-            currentMode === "traveller"
-              ? Colors.text.inverse
-              : Colors.text.secondary
-          }
-        />
-        <Text
+        <TouchableOpacity
           style={[
-            styles.buttonText,
-            currentMode === "traveller" && styles.buttonTextActive,
+            styles.button,
+            currentMode === "traveller" && styles.buttonActive,
           ]}
+          onPress={() => handleModeSwitch("traveller")}
+          activeOpacity={0.7}
         >
-          Traveller
-        </Text>
-      </TouchableOpacity>
+          <Ionicons
+            name="airplane-outline"
+            size={18}
+            color={
+              currentMode === "traveller"
+                ? Colors.text.inverse
+                : Colors.text.secondary
+            }
+          />
+          <Text
+            style={[
+              styles.buttonText,
+              currentMode === "traveller" && styles.buttonTextActive,
+            ]}
+          >
+            Traveller
+          </Text>
+        </TouchableOpacity>
+      </View>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
+  headerContainer: {
+    marginRight: Spacing.md,
+  },
   container: {
     flexDirection: "row",
     backgroundColor: Colors.background.secondary,
@@ -91,12 +103,6 @@ const styles = StyleSheet.create({
     gap: Spacing.xs,
     borderRadius: BorderRadius.sm,
     minWidth: 100,
-  },
-  buttonLeft: {
-    // No additional styles needed
-  },
-  buttonRight: {
-    // No additional styles needed
   },
   buttonActive: {
     backgroundColor: Colors.primary,
