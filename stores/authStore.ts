@@ -1,7 +1,9 @@
+// stores/authStore.ts
 import { supabase } from "@/lib/supabase";
 import { Database } from "@/types/database.types";
 import { Session, User } from "@supabase/supabase-js";
 import { create } from "zustand";
+import { useProfileStore } from "./profileStore";
 
 // Type for profile from database
 type Profile = Database["public"]["Tables"]["profiles"]["Row"];
@@ -20,7 +22,6 @@ interface AuthState {
   // State
   session: Session | null;
   user: User | null;
-  profile: Profile | null;
   loading: boolean;
   pendingVerification: {
     email: string;
@@ -35,7 +36,6 @@ interface AuthState {
   verifyEmailOtp: (email: string, otp: string) => Promise<void>;
   resendEmailOtp: (email: string) => Promise<void>;
   signOut: () => Promise<void>;
-  refreshProfile: () => Promise<void>;
   resetPassword: (email: string) => Promise<void>;
   verifyResetOtp: (email: string, otp: string) => Promise<void>;
   updatePassword: (newPassword: string) => Promise<void>;
@@ -65,7 +65,6 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   // Initial state
   session: null,
   user: null,
-  profile: null,
   loading: true,
   pendingVerification: null,
 
@@ -88,10 +87,12 @@ export const useAuthStore = create<AuthState>((set, get) => ({
 
         if (profileError) throw profileError;
 
+        // Sync profile to profileStore
+        useProfileStore.getState().setProfile(profile);
+
         set({
           session,
           user: session.user,
-          profile,
           loading: false,
         });
       } else {
@@ -111,17 +112,23 @@ export const useAuthStore = create<AuthState>((set, get) => ({
             .eq("id", session.user.id)
             .single();
 
+          // Sync profile to profileStore
+          if (profile) {
+            useProfileStore.getState().setProfile(profile);
+          }
+
           set({
             session,
             user: session.user,
-            profile,
             loading: false,
           });
         } else if (event === "SIGNED_OUT") {
+          // Clear profile from profileStore
+          useProfileStore.getState().setProfile(null);
+
           set({
             session: null,
             user: null,
-            profile: null,
             loading: false,
           });
         } else if (event === "TOKEN_REFRESHED" && session) {
@@ -201,10 +208,12 @@ export const useAuthStore = create<AuthState>((set, get) => ({
 
       if (profileError) throw profileError;
 
+      // Sync profile to profileStore
+      useProfileStore.getState().setProfile(profile);
+
       set({
         session: data.session,
         user: data.user,
-        profile,
       });
 
       // CRITICAL: Clear failed login attempts after successful login
@@ -306,10 +315,12 @@ export const useAuthStore = create<AuthState>((set, get) => ({
           );
         }
 
+        // Sync profile to profileStore
+        useProfileStore.getState().setProfile(profile);
+
         set({
           session: data.session,
           user: data.user,
-          profile: profile,
           pendingVerification: null,
         });
       }
@@ -349,34 +360,15 @@ export const useAuthStore = create<AuthState>((set, get) => ({
         log.info("Failed login attempts cleared on logout");
       }
 
+      // Clear profile from profileStore
+      useProfileStore.getState().setProfile(null);
+
       set({
         session: null,
         user: null,
-        profile: null,
       });
     } catch (error) {
       log.error("Sign out failed", error);
-      throw error;
-    }
-  },
-
-  // Refresh profile data
-  refreshProfile: async () => {
-    try {
-      const currentUser = get().user;
-      if (!currentUser) return;
-
-      const { data: profile, error } = await supabase
-        .from("profiles")
-        .select("*")
-        .eq("id", currentUser.id)
-        .single();
-
-      if (error) throw error;
-
-      set({ profile });
-    } catch (error) {
-      log.error("Refresh profile failed", error);
       throw error;
     }
   },
@@ -438,7 +430,10 @@ export const useAuthStore = create<AuthState>((set, get) => ({
           .eq("id", currentUser.id)
           .single();
 
-        set({ profile });
+        // Sync profile to profileStore
+        if (profile) {
+          useProfileStore.getState().setProfile(profile);
+        }
 
         // Clear failed login attempts after successful password reset
         if (currentUser.email) {

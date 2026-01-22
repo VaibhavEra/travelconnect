@@ -1,6 +1,7 @@
 // app/index.tsx
 import { haptics } from "@/lib/utils/haptics";
 import { useAuthStore } from "@/stores/authStore";
+import { useProfileStore } from "@/stores/profileStore";
 import { BorderRadius, Colors, Spacing, Typography } from "@/styles";
 import { Ionicons } from "@expo/vector-icons";
 import { useState } from "react";
@@ -14,7 +15,8 @@ import {
 } from "react-native";
 
 export default function Index() {
-  const { session, user, profile, loading, signOut } = useAuthStore();
+  const { session, user, loading, signOut } = useAuthStore();
+  const profile = useProfileStore((state) => state.profile);
   const [signingOut, setSigningOut] = useState(false);
 
   const handleSignOut = async () => {
@@ -54,7 +56,7 @@ export default function Index() {
 
   return (
     <View style={styles.container}>
-      <Text style={styles.title}>TravelConnect</Text>
+      <Text style={styles.title}>ShelfScore</Text>
 
       {session ? (
         <View style={styles.authContainer}>
