@@ -1,5 +1,6 @@
-import FormInput from "@/components/FormInput";
-import OfflineNotice from "@/components/OfflineNotice";
+// app/(auth)/forgot-password.tsx
+import FormInput from "@/components/auth/FormInput";
+import OfflineNotice from "@/components/shared/OfflineNotice";
 import { haptics } from "@/lib/utils/haptics";
 import { useNetworkStatus } from "@/lib/utils/network";
 import { rateLimitConfigs, rateLimiter } from "@/lib/utils/rateLimit";
@@ -9,6 +10,7 @@ import {
   forgotPasswordSchema,
 } from "@/lib/validations/auth";
 import { useAuthStore } from "@/stores/authStore";
+import { BorderRadius, Colors, Spacing, Typography } from "@/styles";
 import { Ionicons } from "@expo/vector-icons";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Link, router } from "expo-router";
@@ -132,7 +134,7 @@ export default function ForgotPasswordScreen() {
         <OfflineNotice />
         <View style={styles.content}>
           <View style={styles.successContainer}>
-            <Ionicons name="mail-outline" size={64} color="#007AFF" />
+            <Ionicons name="mail-outline" size={64} color={Colors.primary} />
             <Text style={styles.successTitle}>Check Your Email</Text>
             <Text style={styles.successMessage}>
               We've sent a verification code to:
@@ -201,7 +203,7 @@ export default function ForgotPasswordScreen() {
               haptics.light();
             }}
           >
-            <Ionicons name="arrow-back" size={24} color="#000" />
+            <Ionicons name="arrow-back" size={24} color={Colors.text.primary} />
           </TouchableOpacity>
 
           {/* Header */}
@@ -248,7 +250,7 @@ export default function ForgotPasswordScreen() {
               activeOpacity={0.8}
             >
               {loading ? (
-                <ActivityIndicator color="#fff" />
+                <ActivityIndicator color={Colors.text.inverse} />
               ) : (
                 <Text style={styles.buttonText}>Send Reset Code</Text>
               )}
@@ -276,7 +278,7 @@ export default function ForgotPasswordScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#fff",
+    backgroundColor: Colors.background.primary,
   },
   scrollContent: {
     flexGrow: 1,
@@ -284,46 +286,46 @@ const styles = StyleSheet.create({
   content: {
     flex: 1,
     justifyContent: "center",
-    padding: 24,
+    padding: Spacing.lg,
     paddingTop: 60,
   },
   backButton: {
     position: "absolute",
     top: 60,
-    left: 24,
+    left: Spacing.lg,
     zIndex: 1,
   },
   header: {
-    marginBottom: 40,
+    marginBottom: Spacing.xxl - 8,
   },
   title: {
-    fontSize: 32,
-    fontWeight: "bold",
-    color: "#000",
-    marginBottom: 8,
+    fontSize: Typography.sizes.xxxl,
+    fontWeight: Typography.weights.bold,
+    color: Colors.text.primary,
+    marginBottom: Spacing.sm,
   },
   subtitle: {
-    fontSize: 16,
-    color: "#666",
+    fontSize: Typography.sizes.md,
+    color: Colors.text.secondary,
     lineHeight: 22,
   },
   form: {
-    marginBottom: 24,
+    marginBottom: Spacing.lg,
   },
   button: {
-    backgroundColor: "#007AFF",
-    padding: 16,
-    borderRadius: 8,
+    backgroundColor: Colors.primary,
+    padding: Spacing.md,
+    borderRadius: BorderRadius.md,
     alignItems: "center",
-    marginTop: 8,
+    marginTop: Spacing.sm,
   },
   buttonDisabled: {
     opacity: 0.6,
   },
   buttonText: {
-    color: "#fff",
-    fontSize: 16,
-    fontWeight: "600",
+    color: Colors.text.inverse,
+    fontSize: Typography.sizes.md,
+    fontWeight: Typography.weights.semibold,
   },
   footer: {
     flexDirection: "row",
@@ -331,51 +333,51 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   footerText: {
-    color: "#666",
-    fontSize: 14,
+    color: Colors.text.secondary,
+    fontSize: Typography.sizes.sm,
   },
   link: {
-    color: "#007AFF",
-    fontSize: 14,
-    fontWeight: "600",
+    color: Colors.primary,
+    fontSize: Typography.sizes.sm,
+    fontWeight: Typography.weights.semibold,
   },
   successContainer: {
     alignItems: "center",
-    paddingVertical: 40,
+    paddingVertical: Spacing.xxl - 8,
   },
   successTitle: {
-    fontSize: 28,
-    fontWeight: "bold",
-    color: "#000",
-    marginTop: 24,
-    marginBottom: 12,
+    fontSize: Typography.sizes.xxl - 4,
+    fontWeight: Typography.weights.bold,
+    color: Colors.text.primary,
+    marginTop: Spacing.lg,
+    marginBottom: Spacing.sm + 4,
   },
   successMessage: {
-    fontSize: 16,
-    color: "#666",
+    fontSize: Typography.sizes.md,
+    color: Colors.text.secondary,
     textAlign: "center",
-    marginBottom: 8,
+    marginBottom: Spacing.sm,
   },
   email: {
-    fontSize: 16,
-    fontWeight: "600",
-    color: "#007AFF",
-    marginBottom: 16,
+    fontSize: Typography.sizes.md,
+    fontWeight: Typography.weights.semibold,
+    color: Colors.primary,
+    marginBottom: Spacing.md,
   },
   successSubtext: {
-    fontSize: 14,
-    color: "#999",
+    fontSize: Typography.sizes.sm,
+    color: Colors.text.tertiary,
     textAlign: "center",
     lineHeight: 20,
-    marginBottom: 24,
+    marginBottom: Spacing.lg,
   },
   resendButton: {
-    marginTop: 16,
-    padding: 8,
+    marginTop: Spacing.md,
+    padding: Spacing.sm,
   },
   resendText: {
-    color: "#007AFF",
-    fontSize: 14,
-    fontWeight: "600",
+    color: Colors.primary,
+    fontSize: Typography.sizes.sm,
+    fontWeight: Typography.weights.semibold,
   },
 });

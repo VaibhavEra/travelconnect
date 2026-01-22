@@ -1,11 +1,13 @@
-import FormInput from "@/components/FormInput";
-import OfflineNotice from "@/components/OfflineNotice";
+// app/(auth)/login.tsx
+import FormInput from "@/components/auth/FormInput";
+import OfflineNotice from "@/components/shared/OfflineNotice";
 import { haptics } from "@/lib/utils/haptics";
 import { useNetworkStatus } from "@/lib/utils/network";
 import { parseSupabaseError } from "@/lib/utils/parseSupabaseError";
 import { sanitize } from "@/lib/utils/sanitize";
 import { LoginFormData, loginSchema } from "@/lib/validations/auth";
 import { useAuthStore } from "@/stores/authStore";
+import { BorderRadius, Colors, Spacing, Typography } from "@/styles";
 import { Ionicons } from "@expo/vector-icons";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Link, router } from "expo-router";
@@ -209,7 +211,7 @@ export default function LoginScreen() {
                       <Ionicons
                         name={showPassword ? "eye-off-outline" : "eye-outline"}
                         size={24}
-                        color="#666"
+                        color={Colors.text.secondary}
                       />
                     </TouchableOpacity>
                   }
@@ -238,7 +240,7 @@ export default function LoginScreen() {
               activeOpacity={0.8}
             >
               {loading ? (
-                <ActivityIndicator color="#fff" />
+                <ActivityIndicator color={Colors.text.inverse} />
               ) : (
                 <Text style={styles.buttonText}>Login</Text>
               )}
@@ -266,7 +268,7 @@ export default function LoginScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#fff",
+    backgroundColor: Colors.background.primary,
   },
   scrollContent: {
     flexGrow: 1,
@@ -274,50 +276,50 @@ const styles = StyleSheet.create({
   content: {
     flex: 1,
     justifyContent: "center",
-    padding: 24,
+    padding: Spacing.lg,
     paddingTop: 60,
     paddingBottom: 40,
   },
   header: {
-    marginBottom: 32,
+    marginBottom: Spacing.xl,
   },
   title: {
-    fontSize: 32,
-    fontWeight: "bold",
-    color: "#000",
-    marginBottom: 8,
+    fontSize: Typography.sizes.xxxl,
+    fontWeight: Typography.weights.bold,
+    color: Colors.text.primary,
+    marginBottom: Spacing.sm,
   },
   subtitle: {
-    fontSize: 16,
-    color: "#666",
+    fontSize: Typography.sizes.md,
+    color: Colors.text.secondary,
   },
   form: {
-    marginBottom: 24,
+    marginBottom: Spacing.lg,
   },
   forgotPassword: {
     alignSelf: "flex-end",
-    marginTop: -8,
-    marginBottom: 16,
+    marginTop: -Spacing.sm,
+    marginBottom: Spacing.md,
   },
   forgotPasswordText: {
-    color: "#007AFF",
-    fontSize: 14,
-    fontWeight: "600",
+    color: Colors.primary,
+    fontSize: Typography.sizes.sm,
+    fontWeight: Typography.weights.semibold,
   },
   button: {
-    backgroundColor: "#007AFF",
-    padding: 16,
-    borderRadius: 8,
+    backgroundColor: Colors.primary,
+    padding: Spacing.md,
+    borderRadius: BorderRadius.md,
     alignItems: "center",
-    marginTop: 8,
+    marginTop: Spacing.sm,
   },
   buttonDisabled: {
     opacity: 0.6,
   },
   buttonText: {
-    color: "#fff",
-    fontSize: 16,
-    fontWeight: "600",
+    color: Colors.text.inverse,
+    fontSize: Typography.sizes.md,
+    fontWeight: Typography.weights.semibold,
   },
   footer: {
     flexDirection: "row",
@@ -325,12 +327,12 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   footerText: {
-    color: "#666",
-    fontSize: 14,
+    color: Colors.text.secondary,
+    fontSize: Typography.sizes.sm,
   },
   link: {
-    color: "#007AFF",
-    fontSize: 14,
-    fontWeight: "600",
+    color: Colors.primary,
+    fontSize: Typography.sizes.sm,
+    fontWeight: Typography.weights.semibold,
   },
 });

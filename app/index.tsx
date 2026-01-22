@@ -1,5 +1,7 @@
+// app/index.tsx
 import { haptics } from "@/lib/utils/haptics";
 import { useAuthStore } from "@/stores/authStore";
+import { BorderRadius, Colors, Spacing, Typography } from "@/styles";
 import { Ionicons } from "@expo/vector-icons";
 import { useState } from "react";
 import {
@@ -44,7 +46,7 @@ export default function Index() {
   if (loading) {
     return (
       <View style={styles.container}>
-        <ActivityIndicator size="large" color="#007AFF" />
+        <ActivityIndicator size="large" color={Colors.primary} />
         <Text style={styles.text}>Loading auth state...</Text>
       </View>
     );
@@ -57,31 +59,51 @@ export default function Index() {
       {session ? (
         <View style={styles.authContainer}>
           <View style={styles.statusBadge}>
-            <Ionicons name="checkmark-circle" size={32} color="#34C759" />
+            <Ionicons
+              name="checkmark-circle"
+              size={32}
+              color={Colors.success}
+            />
           </View>
 
           <Text style={styles.success}>Logged In</Text>
 
           <View style={styles.infoCard}>
             <View style={styles.infoRow}>
-              <Ionicons name="mail-outline" size={20} color="#666" />
+              <Ionicons
+                name="mail-outline"
+                size={20}
+                color={Colors.text.secondary}
+              />
               <Text style={styles.info}>{user?.email}</Text>
             </View>
 
             {profile && (
               <>
                 <View style={styles.infoRow}>
-                  <Ionicons name="person-outline" size={20} color="#666" />
+                  <Ionicons
+                    name="person-outline"
+                    size={20}
+                    color={Colors.text.secondary}
+                  />
                   <Text style={styles.info}>{profile.full_name}</Text>
                 </View>
 
                 <View style={styles.infoRow}>
-                  <Ionicons name="at-outline" size={20} color="#666" />
+                  <Ionicons
+                    name="at-outline"
+                    size={20}
+                    color={Colors.text.secondary}
+                  />
                   <Text style={styles.info}>@{profile.username}</Text>
                 </View>
 
                 <View style={styles.infoRow}>
-                  <Ionicons name="call-outline" size={20} color="#666" />
+                  <Ionicons
+                    name="call-outline"
+                    size={20}
+                    color={Colors.text.secondary}
+                  />
                   <Text style={styles.info}>{profile.phone}</Text>
                 </View>
 
@@ -90,7 +112,7 @@ export default function Index() {
                     <Ionicons
                       name="shield-checkmark-outline"
                       size={20}
-                      color="#666"
+                      color={Colors.text.secondary}
                     />
                     <Text style={styles.info}>{profile.roles.join(", ")}</Text>
                   </View>
@@ -106,10 +128,14 @@ export default function Index() {
             activeOpacity={0.8}
           >
             {signingOut ? (
-              <ActivityIndicator color="#fff" size="small" />
+              <ActivityIndicator color={Colors.text.inverse} size="small" />
             ) : (
               <>
-                <Ionicons name="log-out-outline" size={20} color="#fff" />
+                <Ionicons
+                  name="log-out-outline"
+                  size={20}
+                  color={Colors.text.inverse}
+                />
                 <Text style={styles.signOutText}>Sign Out</Text>
               </>
             )}
@@ -118,7 +144,7 @@ export default function Index() {
       ) : (
         <View style={styles.authContainer}>
           <View style={styles.statusBadge}>
-            <Ionicons name="close-circle" size={32} color="#FF3B30" />
+            <Ionicons name="close-circle" size={32} color={Colors.error} />
           </View>
           <Text style={styles.notLoggedIn}>Not Logged In</Text>
           <Text style={styles.subtitle}>Auth store is working!</Text>
@@ -133,14 +159,14 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: "center",
     alignItems: "center",
-    backgroundColor: "#fff",
-    padding: 20,
+    backgroundColor: Colors.background.primary,
+    padding: Spacing.lg,
   },
   title: {
-    fontSize: 32,
-    fontWeight: "bold",
-    marginBottom: 40,
-    color: "#000",
+    fontSize: Typography.sizes.xxxl,
+    fontWeight: Typography.weights.bold,
+    marginBottom: Spacing.xxl - 8,
+    color: Colors.text.primary,
   },
   authContainer: {
     alignItems: "center",
@@ -148,65 +174,65 @@ const styles = StyleSheet.create({
     maxWidth: 400,
   },
   statusBadge: {
-    marginBottom: 16,
+    marginBottom: Spacing.md,
   },
   text: {
-    fontSize: 16,
-    color: "#666",
-    marginTop: 16,
+    fontSize: Typography.sizes.md,
+    color: Colors.text.secondary,
+    marginTop: Spacing.md,
   },
   success: {
-    fontSize: 24,
-    fontWeight: "600",
-    color: "#34C759",
-    marginBottom: 24,
+    fontSize: Typography.sizes.xl,
+    fontWeight: Typography.weights.semibold,
+    color: Colors.success,
+    marginBottom: Spacing.lg,
   },
   notLoggedIn: {
-    fontSize: 24,
-    fontWeight: "600",
-    color: "#FF3B30",
-    marginBottom: 8,
+    fontSize: Typography.sizes.xl,
+    fontWeight: Typography.weights.semibold,
+    color: Colors.error,
+    marginBottom: Spacing.sm,
   },
   infoCard: {
     width: "100%",
-    backgroundColor: "#F9F9F9",
-    borderRadius: 12,
-    padding: 20,
-    gap: 16,
-    marginBottom: 24,
+    backgroundColor: Colors.background.tertiary,
+    borderRadius: BorderRadius.lg,
+    padding: Spacing.lg,
+    gap: Spacing.md,
+    marginBottom: Spacing.lg,
   },
   infoRow: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 12,
+    gap: Spacing.sm + 4,
   },
   info: {
-    fontSize: 16,
-    color: "#333",
+    fontSize: Typography.sizes.md,
+    color: Colors.text.primary,
     flex: 1,
   },
   subtitle: {
-    fontSize: 14,
-    color: "#666",
-    marginTop: 8,
+    fontSize: Typography.sizes.sm,
+    color: Colors.text.secondary,
+    marginTop: Spacing.sm,
   },
   signOutButton: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
-    backgroundColor: "#FF3B30",
-    paddingVertical: 14,
-    paddingHorizontal: 32,
-    borderRadius: 8,
-    gap: 8,
+    backgroundColor: Colors.error,
+    paddingVertical: Spacing.sm + 6,
+    paddingHorizontal: Spacing.xl,
+    borderRadius: BorderRadius.md,
+    gap: Spacing.sm,
     width: "100%",
   },
   buttonDisabled: {
     opacity: 0.6,
   },
   signOutText: {
-    color: "#fff",
-    fontSize: 16,
-    fontWeight: "600",
+    color: Colors.text.inverse,
+    fontSize: Typography.sizes.md,
+    fontWeight: Typography.weights.semibold,
   },
 });

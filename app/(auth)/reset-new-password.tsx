@@ -1,8 +1,10 @@
-import FormInput from "@/components/FormInput";
+// app/(auth)/reset-new-password.tsx
+import FormInput from "@/components/auth/FormInput";
 import { haptics } from "@/lib/utils/haptics";
 import { parseSupabaseError } from "@/lib/utils/parseSupabaseError";
 import { NewPasswordFormData, newPasswordSchema } from "@/lib/validations/auth";
 import { useAuthStore } from "@/stores/authStore";
+import { BorderRadius, Colors, Spacing, Typography } from "@/styles";
 import { Ionicons } from "@expo/vector-icons";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { router } from "expo-router";
@@ -59,8 +61,8 @@ export default function ResetNewPasswordScreen() {
     pass: string,
   ): { text: string; color: string } => {
     if (!pass) return { text: "", color: "" };
-    if (pass.length < 6) return { text: "Weak", color: "#FF3B30" };
-    if (pass.length < 8) return { text: "Fair", color: "#FF9500" };
+    if (pass.length < 6) return { text: "Weak", color: Colors.error };
+    if (pass.length < 8) return { text: "Fair", color: Colors.warning };
 
     const hasUpper = /[A-Z]/.test(pass);
     const hasLower = /[a-z]/.test(pass);
@@ -71,8 +73,8 @@ export default function ResetNewPasswordScreen() {
       Boolean,
     ).length;
 
-    if (strength >= 3) return { text: "Strong", color: "#34C759" };
-    return { text: "Fair", color: "#FF9500" };
+    if (strength >= 3) return { text: "Strong", color: Colors.success };
+    return { text: "Fair", color: Colors.warning };
   };
 
   const passwordStrength = getPasswordStrength(password);
@@ -113,7 +115,11 @@ export default function ResetNewPasswordScreen() {
       >
         <View style={styles.content}>
           <View style={styles.header}>
-            <Ionicons name="lock-closed-outline" size={64} color="#007AFF" />
+            <Ionicons
+              name="lock-closed-outline"
+              size={64}
+              color={Colors.primary}
+            />
             <Text style={styles.title}>Create New Password</Text>
             <Text style={styles.subtitle}>Enter your new password below</Text>
           </View>
@@ -151,7 +157,7 @@ export default function ResetNewPasswordScreen() {
                             showPassword ? "eye-off-outline" : "eye-outline"
                           }
                           size={24}
-                          color="#666"
+                          color={Colors.text.secondary}
                         />
                       </TouchableOpacity>
                     }
@@ -204,7 +210,7 @@ export default function ResetNewPasswordScreen() {
                             : "eye-outline"
                         }
                         size={24}
-                        color="#666"
+                        color={Colors.text.secondary}
                       />
                     </TouchableOpacity>
                   }
@@ -222,7 +228,7 @@ export default function ResetNewPasswordScreen() {
               activeOpacity={0.8}
             >
               {loading ? (
-                <ActivityIndicator color="#fff" />
+                <ActivityIndicator color={Colors.text.inverse} />
               ) : (
                 <Text style={styles.buttonText}>Update Password</Text>
               )}
@@ -233,7 +239,7 @@ export default function ResetNewPasswordScreen() {
             <Ionicons
               name="information-circle-outline"
               size={20}
-              color="#666"
+              color={Colors.text.secondary}
             />
             <Text style={styles.infoText}>
               Password must be at least 8 characters with uppercase, lowercase,
@@ -249,7 +255,7 @@ export default function ResetNewPasswordScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#fff",
+    backgroundColor: Colors.background.primary,
   },
   scrollContent: {
     flexGrow: 1,
@@ -257,61 +263,61 @@ const styles = StyleSheet.create({
   content: {
     flex: 1,
     justifyContent: "center",
-    padding: 24,
+    padding: Spacing.lg,
     paddingTop: 60,
   },
   header: {
     alignItems: "center",
-    marginBottom: 40,
+    marginBottom: Spacing.xxl - 8,
   },
   title: {
-    fontSize: 28,
-    fontWeight: "bold",
-    color: "#000",
-    marginTop: 16,
-    marginBottom: 8,
+    fontSize: Typography.sizes.xxl - 4,
+    fontWeight: Typography.weights.bold,
+    color: Colors.text.primary,
+    marginTop: Spacing.md,
+    marginBottom: Spacing.sm,
   },
   subtitle: {
-    fontSize: 16,
-    color: "#666",
+    fontSize: Typography.sizes.md,
+    color: Colors.text.secondary,
     textAlign: "center",
   },
   form: {
-    marginBottom: 24,
+    marginBottom: Spacing.lg,
   },
   strengthText: {
-    fontSize: 12,
-    fontWeight: "600",
-    marginTop: -12,
-    marginBottom: 8,
+    fontSize: Typography.sizes.xs,
+    fontWeight: Typography.weights.semibold,
+    marginTop: -Spacing.sm - 4,
+    marginBottom: Spacing.sm,
   },
   button: {
-    backgroundColor: "#007AFF",
-    padding: 16,
-    borderRadius: 8,
+    backgroundColor: Colors.primary,
+    padding: Spacing.md,
+    borderRadius: BorderRadius.md,
     alignItems: "center",
-    marginTop: 8,
+    marginTop: Spacing.sm,
   },
   buttonDisabled: {
     opacity: 0.6,
   },
   buttonText: {
-    color: "#fff",
-    fontSize: 16,
-    fontWeight: "600",
+    color: Colors.text.inverse,
+    fontSize: Typography.sizes.md,
+    fontWeight: Typography.weights.semibold,
   },
   infoBox: {
     flexDirection: "row",
     alignItems: "flex-start",
-    backgroundColor: "#F5F5F5",
-    padding: 12,
-    borderRadius: 8,
-    gap: 8,
+    backgroundColor: Colors.background.secondary,
+    padding: Spacing.sm + 4,
+    borderRadius: BorderRadius.md,
+    gap: Spacing.sm,
   },
   infoText: {
     flex: 1,
-    fontSize: 12,
-    color: "#666",
+    fontSize: Typography.sizes.xs,
+    color: Colors.text.secondary,
     lineHeight: 18,
   },
 });

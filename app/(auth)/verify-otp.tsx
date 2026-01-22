@@ -1,7 +1,9 @@
-import OtpInput from "@/components/OtpInput";
+// app/(auth)/verify-otp.tsx
+import OtpInput from "@/components/auth/OtpInput";
 import { haptics } from "@/lib/utils/haptics";
 import { parseSupabaseError } from "@/lib/utils/parseSupabaseError";
 import { useAuthStore } from "@/stores/authStore";
+import { BorderRadius, Colors, Spacing, Typography } from "@/styles";
 import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
 import { useEffect, useState } from "react";
@@ -139,7 +141,7 @@ export default function VerifyOtpScreen() {
       <View style={styles.container}>
         {/* Header */}
         <View style={styles.header}>
-          <Ionicons name="mail-outline" size={64} color="#007AFF" />
+          <Ionicons name="mail-outline" size={64} color={Colors.primary} />
           <Text style={styles.title}>Verify Your Email</Text>
           <Text style={styles.subtitle}>
             We've sent a 6-digit verification code to
@@ -168,7 +170,7 @@ export default function VerifyOtpScreen() {
           activeOpacity={0.8}
         >
           {loading ? (
-            <ActivityIndicator color="#fff" />
+            <ActivityIndicator color={Colors.text.inverse} />
           ) : (
             <Text style={styles.buttonText}>Verify Email</Text>
           )}
@@ -190,7 +192,11 @@ export default function VerifyOtpScreen() {
 
         {/* Info */}
         <View style={styles.infoBox}>
-          <Ionicons name="information-circle-outline" size={20} color="#666" />
+          <Ionicons
+            name="information-circle-outline"
+            size={20}
+            color={Colors.text.secondary}
+          />
           <Text style={styles.infoText}>
             Check your spam folder if you don't see the email
           </Text>
@@ -206,80 +212,80 @@ const styles = StyleSheet.create({
   },
   container: {
     flex: 1,
-    padding: 24,
+    padding: Spacing.lg,
     paddingTop: 60,
-    backgroundColor: "#fff",
+    backgroundColor: Colors.background.primary,
   },
   header: {
     alignItems: "center",
-    marginBottom: 40,
+    marginBottom: Spacing.xxl - 8,
   },
   title: {
-    fontSize: 28,
-    fontWeight: "bold",
-    color: "#000",
-    marginTop: 16,
-    marginBottom: 8,
+    fontSize: Typography.sizes.xxl - 4,
+    fontWeight: Typography.weights.bold,
+    color: Colors.text.primary,
+    marginTop: Spacing.md,
+    marginBottom: Spacing.sm,
   },
   subtitle: {
-    fontSize: 16,
-    color: "#666",
+    fontSize: Typography.sizes.md,
+    color: Colors.text.secondary,
     textAlign: "center",
   },
   email: {
-    fontSize: 16,
-    fontWeight: "600",
-    color: "#007AFF",
-    marginTop: 8,
+    fontSize: Typography.sizes.md,
+    fontWeight: Typography.weights.semibold,
+    color: Colors.primary,
+    marginTop: Spacing.sm,
   },
   otpContainer: {
-    marginBottom: 24,
+    marginBottom: Spacing.lg,
   },
   verifyButton: {
-    backgroundColor: "#007AFF",
-    padding: 16,
-    borderRadius: 8,
+    backgroundColor: Colors.primary,
+    padding: Spacing.md,
+    borderRadius: BorderRadius.md,
     alignItems: "center",
-    marginBottom: 24,
+    marginBottom: Spacing.lg,
   },
   buttonDisabled: {
     opacity: 0.6,
   },
   buttonText: {
-    color: "#fff",
-    fontSize: 16,
-    fontWeight: "600",
+    color: Colors.text.inverse,
+    fontSize: Typography.sizes.md,
+    fontWeight: Typography.weights.semibold,
   },
   resendSection: {
     alignItems: "center",
-    marginBottom: 24,
+    marginBottom: Spacing.lg,
   },
   resendText: {
-    fontSize: 14,
-    color: "#666",
-    marginBottom: 8,
+    fontSize: Typography.sizes.sm,
+    color: Colors.text.secondary,
+    marginBottom: Spacing.sm,
   },
   resendLink: {
-    color: "#007AFF",
-    fontSize: 16,
-    fontWeight: "600",
+    color: Colors.primary,
+    fontSize: Typography.sizes.md,
+    fontWeight: Typography.weights.semibold,
   },
   timerText: {
-    fontSize: 14,
-    color: "#999",
+    fontSize: Typography.sizes.sm,
+    color: Colors.text.tertiary,
   },
   infoBox: {
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: "#F5F5F5",
-    padding: 12,
-    borderRadius: 8,
-    gap: 8,
+    backgroundColor: Colors.background.secondary,
+    padding: Spacing.sm + 4,
+    borderRadius: BorderRadius.md,
+    gap: Spacing.sm,
   },
   infoText: {
     flex: 1,
-    fontSize: 14,
-    color: "#666",
+    fontSize: Typography.sizes.sm,
+    color: Colors.text.secondary,
     lineHeight: 20,
   },
 });
