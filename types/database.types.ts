@@ -108,13 +108,6 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
-            foreignKeyName: "packages_sender_id_fkey"
-            columns: ["sender_id"]
-            isOneToOne: false
-            referencedRelation: "public_profiles"
-            referencedColumns: ["id"]
-          },
-          {
             foreignKeyName: "packages_trip_id_fkey"
             columns: ["trip_id"]
             isOneToOne: false
@@ -181,13 +174,6 @@ export type Database = {
             referencedRelation: "profiles"
             referencedColumns: ["id"]
           },
-          {
-            foreignKeyName: "payments_sender_id_fkey"
-            columns: ["sender_id"]
-            isOneToOne: false
-            referencedRelation: "public_profiles"
-            referencedColumns: ["id"]
-          },
         ]
       }
       profiles: {
@@ -196,12 +182,9 @@ export type Database = {
           email: string
           full_name: string
           id: string
-          kyc_docs: Json | null
-          kyc_status: string | null
           phone: string
           rating: number | null
           rating_count: number | null
-          roles: string[] | null
           updated_at: string | null
           username: string
         }
@@ -210,12 +193,9 @@ export type Database = {
           email: string
           full_name: string
           id: string
-          kyc_docs?: Json | null
-          kyc_status?: string | null
           phone: string
           rating?: number | null
           rating_count?: number | null
-          roles?: string[] | null
           updated_at?: string | null
           username: string
         }
@@ -224,12 +204,9 @@ export type Database = {
           email?: string
           full_name?: string
           id?: string
-          kyc_docs?: Json | null
-          kyc_status?: string | null
           phone?: string
           rating?: number | null
           rating_count?: number | null
-          roles?: string[] | null
           updated_at?: string | null
           username?: string
         }
@@ -237,56 +214,62 @@ export type Database = {
       }
       trips: {
         Row: {
+          allowed_categories: string[] | null
           arrival_date: string
+          arrival_time: string
           available_slots: number | null
-          capacity: number | null
           created_at: string | null
           departure_date: string
+          departure_time: string
           destination: string
-          drop_location: string
           id: string
-          meetup_location: string
-          mode: string
+          notes: string | null
+          pnr_number: string
           source: string
           status: string | null
-          stay_duration: string | null
-          transport_number: string | null
+          ticket_file_url: string | null
+          total_slots: number | null
+          transport_mode: string
           traveller_id: string
           updated_at: string | null
         }
         Insert: {
+          allowed_categories?: string[] | null
           arrival_date: string
+          arrival_time: string
           available_slots?: number | null
-          capacity?: number | null
           created_at?: string | null
           departure_date: string
+          departure_time: string
           destination: string
-          drop_location: string
           id?: string
-          meetup_location: string
-          mode: string
+          notes?: string | null
+          pnr_number: string
           source: string
           status?: string | null
-          stay_duration?: string | null
-          transport_number?: string | null
+          ticket_file_url?: string | null
+          total_slots?: number | null
+          transport_mode: string
           traveller_id: string
           updated_at?: string | null
         }
         Update: {
+          allowed_categories?: string[] | null
           arrival_date?: string
+          arrival_time?: string
           available_slots?: number | null
-          capacity?: number | null
           created_at?: string | null
           departure_date?: string
+          departure_time?: string
           destination?: string
-          drop_location?: string
           id?: string
-          meetup_location?: string
-          mode?: string
+          notes?: string | null
+          pnr_number?: string
           source?: string
           status?: string | null
-          stay_duration?: string | null
-          transport_number?: string | null
+          ticket_file_url?: string | null
+          total_slots?: number | null
+          transport_mode?: string
           traveller_id?: string
           updated_at?: string | null
         }
@@ -298,47 +281,11 @@ export type Database = {
             referencedRelation: "profiles"
             referencedColumns: ["id"]
           },
-          {
-            foreignKeyName: "trips_traveller_id_fkey"
-            columns: ["traveller_id"]
-            isOneToOne: false
-            referencedRelation: "public_profiles"
-            referencedColumns: ["id"]
-          },
         ]
       }
     }
     Views: {
-      public_profiles: {
-        Row: {
-          created_at: string | null
-          full_name: string | null
-          id: string | null
-          kyc_status: string | null
-          rating: number | null
-          rating_count: number | null
-          username: string | null
-        }
-        Insert: {
-          created_at?: string | null
-          full_name?: string | null
-          id?: string | null
-          kyc_status?: string | null
-          rating?: number | null
-          rating_count?: number | null
-          username?: string | null
-        }
-        Update: {
-          created_at?: string | null
-          full_name?: string | null
-          id?: string | null
-          kyc_status?: string | null
-          rating?: number | null
-          rating_count?: number | null
-          username?: string | null
-        }
-        Relationships: []
-      }
+      [_ in never]: never
     }
     Functions: {
       check_email_available: { Args: { check_email: string }; Returns: boolean }
