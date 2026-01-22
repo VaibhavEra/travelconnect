@@ -47,7 +47,7 @@ export default function VerifyResetOtpScreen() {
     // Rate limit check
     const rateCheck = rateLimiter.check(
       `verify-reset-otp:${email}`,
-      rateLimitConfigs.login,
+      rateLimitConfigs.passwordReset,
     );
     if (!rateCheck.allowed) {
       haptics.error();

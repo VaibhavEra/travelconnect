@@ -1,3 +1,5 @@
+// components/FormInput.tsx
+import { BorderRadius, Colors, Spacing, Typography } from "@/styles";
 import { forwardRef, useState } from "react";
 import {
   StyleSheet,
@@ -32,7 +34,7 @@ const FormInput = forwardRef<TextInput, FormInputProps>(
             ]}
             onFocus={() => setIsFocused(true)}
             onBlur={() => setIsFocused(false)}
-            placeholderTextColor="#999"
+            placeholderTextColor={Colors.text.placeholder}
             {...props}
           />
           {rightIcon && <View style={styles.rightIcon}>{rightIcon}</View>}
@@ -49,40 +51,41 @@ export default FormInput;
 
 const styles = StyleSheet.create({
   container: {
-    marginBottom: 16,
+    marginBottom: Spacing.md,
   },
   label: {
-    fontSize: 14,
-    fontWeight: "600",
-    color: "#333",
-    marginBottom: 8,
+    fontSize: Typography.sizes.sm,
+    fontWeight: Typography.weights.semibold,
+    color: Colors.text.primary,
+    marginBottom: Spacing.sm,
   },
   inputContainer: {
     position: "relative",
   },
   input: {
     borderWidth: 1,
-    borderColor: "#ddd",
-    borderRadius: 8,
-    padding: 16,
-    fontSize: 16,
-    backgroundColor: "#fff",
+    borderColor: Colors.border.default,
+    borderRadius: BorderRadius.md,
+    padding: Spacing.md,
+    fontSize: Typography.sizes.md,
+    backgroundColor: Colors.background.primary,
+    color: Colors.text.primary,
   },
   inputFocused: {
-    borderColor: "#007AFF",
+    borderColor: Colors.border.focus,
     borderWidth: 2,
   },
   inputError: {
-    borderColor: "#FF3B30",
+    borderColor: Colors.border.error,
   },
   rightIcon: {
     position: "absolute",
-    right: 16,
-    top: 16,
+    right: Spacing.md,
+    top: Spacing.md,
   },
   errorText: {
-    color: "#FF3B30",
-    fontSize: 12,
-    marginTop: 4,
+    color: Colors.error,
+    fontSize: Typography.sizes.xs,
+    marginTop: Spacing.xs,
   },
 });

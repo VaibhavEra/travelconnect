@@ -1,3 +1,5 @@
+// components/OtpInput.tsx
+import { BorderRadius, Colors, Spacing, Typography } from "@/styles";
 import { useRef, useState } from "react";
 import { StyleSheet, TextInput, View } from "react-native";
 
@@ -70,23 +72,23 @@ const styles = StyleSheet.create({
   container: {
     flexDirection: "row",
     justifyContent: "space-between",
-    gap: 12,
+    gap: Spacing.sm + 4,
   },
   input: {
     flex: 1,
     height: 56,
     borderWidth: 1,
-    borderColor: "#ddd",
-    borderRadius: 8,
+    borderColor: Colors.border.default,
+    borderRadius: BorderRadius.md,
     textAlign: "center",
-    fontSize: 24,
-    fontWeight: "600",
+    fontSize: Typography.sizes.xl,
+    fontWeight: Typography.weights.semibold,
   },
   inputFocused: {
-    borderColor: "#007AFF",
+    borderColor: Colors.primary,
     borderWidth: 2,
   },
   inputFilled: {
-    borderColor: "#34C759",
+    borderColor: Colors.success,
   },
 });

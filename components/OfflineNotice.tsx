@@ -1,4 +1,6 @@
+// components/OfflineNotice.tsx
 import { useNetworkStatus } from "@/lib/utils/network";
+import { Colors, Spacing, Typography } from "@/styles";
 import { Ionicons } from "@expo/vector-icons";
 import { StyleSheet, Text, View } from "react-native";
 
@@ -9,7 +11,11 @@ export default function OfflineNotice() {
 
   return (
     <View style={styles.container}>
-      <Ionicons name="cloud-offline-outline" size={16} color="#fff" />
+      <Ionicons
+        name="cloud-offline-outline"
+        size={16}
+        color={Colors.text.inverse}
+      />
       <Text style={styles.text}>No internet connection</Text>
     </View>
   );
@@ -17,17 +23,17 @@ export default function OfflineNotice() {
 
 const styles = StyleSheet.create({
   container: {
-    backgroundColor: "#FF3B30",
+    backgroundColor: Colors.error,
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
-    paddingVertical: 8,
-    paddingHorizontal: 16,
-    gap: 8,
+    paddingVertical: Spacing.sm,
+    paddingHorizontal: Spacing.md,
+    gap: Spacing.sm,
   },
   text: {
-    color: "#fff",
-    fontSize: 14,
-    fontWeight: "600",
+    color: Colors.text.inverse,
+    fontSize: Typography.sizes.sm,
+    fontWeight: Typography.weights.semibold,
   },
 });
