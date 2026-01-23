@@ -227,7 +227,7 @@ export type Database = {
           pnr_number: string
           source: string
           status: string | null
-          ticket_file_url: string | null
+          ticket_file_url: string
           total_slots: number | null
           transport_mode: string
           traveller_id: string
@@ -247,7 +247,7 @@ export type Database = {
           pnr_number: string
           source: string
           status?: string | null
-          ticket_file_url?: string | null
+          ticket_file_url: string
           total_slots?: number | null
           transport_mode: string
           traveller_id: string
@@ -267,7 +267,7 @@ export type Database = {
           pnr_number?: string
           source?: string
           status?: string | null
-          ticket_file_url?: string | null
+          ticket_file_url?: string
           total_slots?: number | null
           transport_mode?: string
           traveller_id?: string
