@@ -28,6 +28,11 @@ export default function RootLayout() {
       segments[1] === "verify-reset-otp" ||
       segments[1] === "reset-new-password";
 
+    // Check if on dynamic route by converting to string
+    const firstSegment = String(segments[0] || "");
+    const isOnDynamicRoute =
+      firstSegment === "trip" || firstSegment.startsWith("trip-");
+
     if (!session && !inAuthGroup) {
       // No session and not in auth screens → redirect to login
       router.replace("/(auth)/login");
@@ -40,10 +45,16 @@ export default function RootLayout() {
       }
 
       // Redirect to tabs (mode-based)
-      router.replace("/(tabs)/explore");
-    } else if (session && !inTabsGroup && segments[0] !== "(auth)") {
-      // Has session but not in tabs (e.g., on /index) → redirect to tabs
-      router.replace("/(tabs)/explore");
+      router.replace("/(tabs)/my-trips");
+    } else if (
+      session &&
+      !inTabsGroup &&
+      !inAuthGroup &&
+      !isOnDynamicRoute &&
+      segments.length > 0
+    ) {
+      // Has session but not in tabs/auth/dynamic routes → redirect to tabs
+      router.replace("/(tabs)/my-trips");
     }
   }, [session, authLoading, modeLoading, segments]);
 

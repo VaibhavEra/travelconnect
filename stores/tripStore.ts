@@ -4,20 +4,45 @@ import { formatTripForDatabase, TripFormData } from "@/lib/validations/trip";
 import { Database } from "@/types/database.types";
 import { create } from "zustand";
 
-// Type for trip from database
-type Trip = Database["public"]["Tables"]["trips"]["Row"];
+// Type for trip from database (with proper non-null assertions)
+type DbTrip = Database["public"]["Tables"]["trips"]["Row"];
+
+// Refined Trip type with guaranteed non-null values
+export type Trip = {
+  id: string;
+  traveller_id: string;
+  source: string;
+  destination: string;
+  transport_mode: "train" | "bus" | "flight" | "car";
+  departure_date: string;
+  departure_time: string;
+  arrival_date: string;
+  arrival_time: string;
+  total_slots: number;
+  available_slots: number;
+  allowed_categories: string[];
+  pnr_number: string;
+  ticket_file_url: string;
+  notes: string | null;
+  status: "open" | "in_progress" | "completed" | "cancelled";
+  created_at: string;
+  updated_at: string;
+};
 
 // Trip store state interface
 interface TripState {
   // State
   trips: Trip[];
+  currentTrip: Trip | null;
   loading: boolean;
   error: string | null;
 
   // Actions
   createTrip: (data: TripFormData, userId: string) => Promise<Trip>;
   getMyTrips: (userId: string) => Promise<void>;
-  updateTrip: (tripId: string, updates: Partial<Trip>) => Promise<void>;
+  getTripById: (tripId: string) => Promise<Trip | null>;
+  updateTrip: (tripId: string, updates: Partial<DbTrip>) => Promise<void>;
+  updateTripStatus: (tripId: string, status: Trip["status"]) => Promise<void>;
   deleteTrip: (tripId: string) => Promise<void>;
   clearError: () => void;
 }
@@ -33,9 +58,37 @@ const log = {
   },
 };
 
+// Helper to convert DbTrip to Trip (handle nulls)
+const normalizeTrip = (dbTrip: DbTrip): Trip => {
+  // Ensure status is valid
+  const validStatus = dbTrip.status as Trip["status"];
+
+  return {
+    id: dbTrip.id,
+    traveller_id: dbTrip.traveller_id,
+    source: dbTrip.source,
+    destination: dbTrip.destination,
+    transport_mode: dbTrip.transport_mode as Trip["transport_mode"],
+    departure_date: dbTrip.departure_date,
+    departure_time: dbTrip.departure_time,
+    arrival_date: dbTrip.arrival_date,
+    arrival_time: dbTrip.arrival_time,
+    total_slots: dbTrip.total_slots ?? 0,
+    available_slots: dbTrip.available_slots ?? 0,
+    allowed_categories: dbTrip.allowed_categories ?? [],
+    pnr_number: dbTrip.pnr_number,
+    ticket_file_url: dbTrip.ticket_file_url,
+    notes: dbTrip.notes,
+    status: validStatus ?? "open",
+    created_at: dbTrip.created_at ?? new Date().toISOString(),
+    updated_at: dbTrip.updated_at ?? new Date().toISOString(),
+  };
+};
+
 export const useTripStore = create<TripState>((set, get) => ({
   // Initial state
   trips: [],
+  currentTrip: null,
   loading: false,
   error: null,
 
@@ -54,14 +107,16 @@ export const useTripStore = create<TripState>((set, get) => ({
 
       if (error) throw error;
 
+      const normalizedTrip = normalizeTrip(trip);
+
       // Add to local state
       set((state) => ({
-        trips: [trip, ...state.trips],
+        trips: [normalizedTrip, ...state.trips],
         loading: false,
       }));
 
-      log.info("Trip created successfully", trip.id);
-      return trip;
+      log.info("Trip created successfully", normalizedTrip.id);
+      return normalizedTrip;
     } catch (error: any) {
       const errorMessage = parseSupabaseError(error);
       log.error("Create trip failed", error);
@@ -79,12 +134,15 @@ export const useTripStore = create<TripState>((set, get) => ({
         .from("trips")
         .select("*")
         .eq("traveller_id", userId)
-        .order("created_at", { ascending: false });
+        .order("departure_date", { ascending: true })
+        .order("departure_time", { ascending: true });
 
       if (error) throw error;
 
-      set({ trips: trips || [], loading: false });
-      log.info("Fetched trips", trips?.length || 0);
+      const normalizedTrips = (trips || []).map(normalizeTrip);
+
+      set({ trips: normalizedTrips, loading: false });
+      log.info("Fetched trips", normalizedTrips.length);
     } catch (error: any) {
       const errorMessage = parseSupabaseError(error);
       log.error("Fetch trips failed", error);
@@ -92,8 +150,34 @@ export const useTripStore = create<TripState>((set, get) => ({
     }
   },
 
+  // Get single trip by ID
+  getTripById: async (tripId: string) => {
+    try {
+      set({ loading: true, error: null });
+
+      const { data: trip, error } = await supabase
+        .from("trips")
+        .select("*")
+        .eq("id", tripId)
+        .single();
+
+      if (error) throw error;
+
+      const normalizedTrip = normalizeTrip(trip);
+
+      set({ currentTrip: normalizedTrip, loading: false });
+      log.info("Fetched trip", tripId);
+      return normalizedTrip;
+    } catch (error: any) {
+      const errorMessage = parseSupabaseError(error);
+      log.error("Get trip failed", error);
+      set({ loading: false, error: errorMessage, currentTrip: null });
+      return null;
+    }
+  },
+
   // Update existing trip
-  updateTrip: async (tripId: string, updates: Partial<Trip>) => {
+  updateTrip: async (tripId: string, updates: Partial<DbTrip>) => {
     try {
       set({ loading: true, error: null });
 
@@ -106,16 +190,55 @@ export const useTripStore = create<TripState>((set, get) => ({
 
       if (error) throw error;
 
+      const normalizedTrip = normalizeTrip(trip);
+
       // Update local state
       set((state) => ({
-        trips: state.trips.map((t) => (t.id === tripId ? trip : t)),
+        trips: state.trips.map((t) => (t.id === tripId ? normalizedTrip : t)),
         loading: false,
       }));
+
+      // Update currentTrip if it's the same trip
+      if (get().currentTrip?.id === tripId) {
+        set({ currentTrip: normalizedTrip });
+      }
 
       log.info("Trip updated", tripId);
     } catch (error: any) {
       const errorMessage = parseSupabaseError(error);
       log.error("Update trip failed", error);
+      set({ loading: false, error: errorMessage });
+      throw new Error(errorMessage);
+    }
+  },
+
+  // Update trip status (convenience method)
+  updateTripStatus: async (tripId: string, status: Trip["status"]) => {
+    try {
+      set({ loading: true, error: null });
+
+      const { error } = await supabase
+        .from("trips")
+        .update({ status, updated_at: new Date().toISOString() })
+        .eq("id", tripId);
+
+      if (error) throw error;
+
+      // Update local state
+      set((state) => ({
+        trips: state.trips.map((t) => (t.id === tripId ? { ...t, status } : t)),
+        loading: false,
+      }));
+
+      // Update currentTrip if it's the same trip
+      if (get().currentTrip?.id === tripId) {
+        set({ currentTrip: { ...get().currentTrip!, status } });
+      }
+
+      log.info("Trip status updated", tripId, status);
+    } catch (error: any) {
+      const errorMessage = parseSupabaseError(error);
+      log.error("Update trip status failed", error);
       set({ loading: false, error: errorMessage });
       throw new Error(errorMessage);
     }
@@ -133,13 +256,15 @@ export const useTripStore = create<TripState>((set, get) => ({
 
       if (error) throw error;
 
-      // Remove from local state or update status
+      // Update status in local state instead of removing
       set((state) => ({
-        trips: state.trips.filter((t) => t.id !== tripId),
+        trips: state.trips.map((t) =>
+          t.id === tripId ? { ...t, status: "cancelled" as const } : t,
+        ),
         loading: false,
       }));
 
-      log.info("Trip deleted", tripId);
+      log.info("Trip cancelled", tripId);
     } catch (error: any) {
       const errorMessage = parseSupabaseError(error);
       log.error("Delete trip failed", error);
