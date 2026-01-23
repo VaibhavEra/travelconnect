@@ -11,10 +11,6 @@ export const PACKAGE_CATEGORIES = [
   "clothing",
   "medicines",
   "books",
-  "electronics",
-  "food",
-  "cosmetics",
-  "accessories",
   "small_items",
 ] as const;
 
@@ -54,25 +50,14 @@ export const tripSchema = z
     // Categories
     allowed_categories: z
       .array(z.enum(PACKAGE_CATEGORIES))
-      .min(1, "Select at least one category")
-      .default(["documents", "clothing", "medicines", "books", "small_items"]),
-
+      .min(1, "Select at least one category"),
     pnr_number: z
       .string()
       .min(1, "PNR number is required")
-      .regex(
-        /^[A-Z0-9]+$/i,
-        "PNR should be alphanumeric (letters and numbers only)",
-      )
+      .regex(/^[A-Z0-9]+$/i, "PNR should be alphanumeric")
       .min(3, "PNR must be at least 3 characters")
       .max(20, "PNR must be less than 20 characters"),
-
-    ticket_file_url: z
-      .string()
-      .min(1, "Ticket file is required")
-      .url("Invalid ticket file URL"),
-
-    // Optional notes
+    ticket_file_url: z.string().min(1, "Ticket file is required").pipe(z.url()),
     notes: z
       .string()
       .max(500, "Notes are too long")
