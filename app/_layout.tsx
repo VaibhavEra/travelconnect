@@ -31,7 +31,9 @@ export default function RootLayout() {
     // Check if on dynamic route by converting to string
     const firstSegment = String(segments[0] || "");
     const isOnDynamicRoute =
-      firstSegment === "trip" || firstSegment.startsWith("trip-");
+      firstSegment === "trip" ||
+      firstSegment.startsWith("trip-") ||
+      firstSegment === "request-form";
 
     if (!session && !inAuthGroup) {
       // No session and not in auth screens → redirect to login

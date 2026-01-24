@@ -52,9 +52,10 @@ export default function TripPreviewScreen() {
   };
 
   const handleRequestParcel = () => {
-    // Will implement in Phase 7
-    console.log("Request parcel for trip:", id);
-    // TODO: Navigate to parcel request form
+    router.push({
+      pathname: "/request-form/[id]" as any,
+      params: { id: id },
+    });
   };
 
   if (loading || !currentTrip) {

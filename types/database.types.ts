@@ -116,6 +116,87 @@ export type Database = {
           },
         ]
       }
+      parcel_requests: {
+        Row: {
+          category: string
+          created_at: string | null
+          delivery_address: string | null
+          delivery_contact_name: string
+          delivery_contact_phone: string
+          id: string
+          item_description: string
+          parcel_photos: string[] | null
+          pickup_address: string | null
+          pickup_contact_name: string | null
+          pickup_contact_phone: string | null
+          rejection_reason: string | null
+          sender_id: string
+          sender_notes: string | null
+          size: string
+          status: string
+          traveller_notes: string | null
+          trip_id: string
+          updated_at: string | null
+        }
+        Insert: {
+          category: string
+          created_at?: string | null
+          delivery_address?: string | null
+          delivery_contact_name: string
+          delivery_contact_phone: string
+          id?: string
+          item_description: string
+          parcel_photos?: string[] | null
+          pickup_address?: string | null
+          pickup_contact_name?: string | null
+          pickup_contact_phone?: string | null
+          rejection_reason?: string | null
+          sender_id: string
+          sender_notes?: string | null
+          size: string
+          status?: string
+          traveller_notes?: string | null
+          trip_id: string
+          updated_at?: string | null
+        }
+        Update: {
+          category?: string
+          created_at?: string | null
+          delivery_address?: string | null
+          delivery_contact_name?: string
+          delivery_contact_phone?: string
+          id?: string
+          item_description?: string
+          parcel_photos?: string[] | null
+          pickup_address?: string | null
+          pickup_contact_name?: string | null
+          pickup_contact_phone?: string | null
+          rejection_reason?: string | null
+          sender_id?: string
+          sender_notes?: string | null
+          size?: string
+          status?: string
+          traveller_notes?: string | null
+          trip_id?: string
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "parcel_requests_sender_id_fkey"
+            columns: ["sender_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "parcel_requests_trip_id_fkey"
+            columns: ["trip_id"]
+            isOneToOne: false
+            referencedRelation: "trips"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       payments: {
         Row: {
           amount: number
