@@ -1,6 +1,4 @@
-// app/_layout.tsx (UPDATE)
 import { useAuthStore } from "@/stores/authStore";
-import { useModeStore } from "@/stores/modeStore";
 import { Colors } from "@/styles";
 import { Slot, useRouter, useSegments } from "expo-router";
 import { useEffect } from "react";
@@ -10,15 +8,13 @@ export default function RootLayout() {
   const router = useRouter();
   const segments = useSegments();
   const { session, loading: authLoading, initialize } = useAuthStore();
-  const { initialize: initializeMode, loading: modeLoading } = useModeStore();
 
   useEffect(() => {
     initialize();
-    initializeMode();
-  }, [initialize, initializeMode]);
+  }, [initialize]);
 
   useEffect(() => {
-    if (authLoading || modeLoading) return;
+    if (authLoading) return;
 
     const inAuthGroup = segments[0] === "(auth)";
     const inTabsGroup = segments[0] === "(tabs)";
@@ -33,7 +29,8 @@ export default function RootLayout() {
     const isOnDynamicRoute =
       firstSegment === "trip" ||
       firstSegment.startsWith("trip-") ||
-      firstSegment === "request-form";
+      firstSegment === "request-form" ||
+      firstSegment === "request-details";
 
     if (!session && !inAuthGroup) {
       // No session and not in auth screens → redirect to login
@@ -46,7 +43,7 @@ export default function RootLayout() {
         return;
       }
 
-      // Redirect to tabs (mode-based)
+      // Redirect to tabs
       router.replace("/(tabs)/my-trips");
     } else if (
       session &&
@@ -58,9 +55,9 @@ export default function RootLayout() {
       // Has session but not in tabs/auth/dynamic routes → redirect to tabs
       router.replace("/(tabs)/my-trips");
     }
-  }, [session, authLoading, modeLoading, segments]);
+  }, [session, authLoading, segments]);
 
-  if (authLoading || modeLoading) {
+  if (authLoading) {
     return (
       <View style={styles.loadingContainer}>
         <ActivityIndicator size="large" color={Colors.primary} />

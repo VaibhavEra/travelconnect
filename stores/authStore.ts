@@ -99,7 +99,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
         set({ loading: false });
       }
 
-      // FIXED: Store subscription to clean up later
+      // Store subscription to clean up later
       const {
         data: { subscription },
       } = supabase.auth.onAuthStateChange(async (event, session) => {
@@ -216,7 +216,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
         user: data.user,
       });
 
-      // CRITICAL: Clear failed login attempts after successful login
+      // Clear failed login attempts after successful login
       await get().clearFailedAttempts(email);
       log.info("Failed login attempts cleared after successful login");
     } catch (error: any) {
@@ -416,7 +416,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   updatePassword: async (newPassword: string) => {
     try {
       const { error } = await supabase.auth.updateUser({
-        password: newPassword.trim(), // ADDED: Trim whitespace
+        password: newPassword.trim(),
       });
 
       if (error) throw error;

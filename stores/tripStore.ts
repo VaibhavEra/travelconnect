@@ -40,6 +40,7 @@ interface TripState {
   // Actions
   createTrip: (data: TripFormData, userId: string) => Promise<Trip>;
   getMyTrips: (userId: string) => Promise<void>;
+  getAvailableTrips: () => Promise<void>;
   getTripById: (tripId: string) => Promise<Trip | null>;
   updateTrip: (tripId: string, updates: Partial<DbTrip>) => Promise<void>;
   updateTripStatus: (tripId: string, status: Trip["status"]) => Promise<void>;
@@ -147,6 +148,35 @@ export const useTripStore = create<TripState>((set, get) => ({
       const errorMessage = parseSupabaseError(error);
       log.error("Fetch trips failed", error);
       set({ loading: false, error: errorMessage });
+    }
+  },
+
+  // Get all available trips (for senders to browse)
+  getAvailableTrips: async () => {
+    try {
+      set({ loading: true, error: null });
+
+      const today = new Date().toISOString().split("T")[0];
+
+      const { data: trips, error } = await supabase
+        .from("trips")
+        .select("*")
+        .eq("status", "open")
+        .gte("departure_date", today)
+        .gt("available_slots", 0)
+        .order("departure_date", { ascending: true })
+        .order("departure_time", { ascending: true });
+
+      if (error) throw error;
+
+      const normalizedTrips = (trips || []).map(normalizeTrip);
+
+      set({ trips: normalizedTrips, loading: false });
+      log.info("Fetched available trips", normalizedTrips.length);
+    } catch (error: any) {
+      const errorMessage = parseSupabaseError(error);
+      log.error("Fetch available trips failed", error);
+      set({ loading: false, error: errorMessage, trips: [] });
     }
   },
 

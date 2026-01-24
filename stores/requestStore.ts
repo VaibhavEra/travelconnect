@@ -37,6 +37,7 @@ interface RequestState {
   // State
   myRequests: ParcelRequest[];
   incomingRequests: ParcelRequest[];
+  acceptedRequests: ParcelRequest[];
   currentRequest: ParcelRequest | null;
   loading: boolean;
   error: string | null;
@@ -45,6 +46,7 @@ interface RequestState {
   createRequest: (data: CreateRequestData, senderId: string) => Promise<void>;
   getMyRequests: (senderId: string) => Promise<void>;
   getIncomingRequests: (travellerId: string) => Promise<void>;
+  getAcceptedRequests: (travellerId: string) => Promise<void>;
   getRequestById: (requestId: string) => Promise<ParcelRequest | null>;
   acceptRequest: (requestId: string, travellerNotes?: string) => Promise<void>;
   rejectRequest: (requestId: string, reason: string) => Promise<void>;
@@ -71,6 +73,7 @@ export const useRequestStore = create<RequestState>((set, get) => ({
   // Initial state
   myRequests: [],
   incomingRequests: [],
+  acceptedRequests: [],
   currentRequest: null,
   loading: false,
   error: null,
@@ -161,6 +164,38 @@ export const useRequestStore = create<RequestState>((set, get) => ({
       const errorMessage = parseSupabaseError(error);
       log.error("Fetch incoming requests failed", error);
       set({ loading: false, error: errorMessage, incomingRequests: [] });
+    }
+  },
+
+  // Get traveller's accepted requests (active deliveries)
+  getAcceptedRequests: async (travellerId: string) => {
+    try {
+      set({ loading: true, error: null });
+
+      const { data: requests, error } = await supabase
+        .from("parcel_requests")
+        .select(
+          `
+          *,
+          trip:trips!inner(source, destination, departure_date, departure_time, transport_mode),
+          sender:profiles!parcel_requests_sender_id_fkey(full_name, phone)
+        `,
+        )
+        .eq("trip.traveller_id", travellerId)
+        .in("status", ["accepted", "picked_up", "delivered"])
+        .order("created_at", { ascending: false });
+
+      if (error) throw error;
+
+      set({
+        acceptedRequests: (requests || []) as ParcelRequest[],
+        loading: false,
+      });
+      log.info("Fetched accepted requests", requests?.length || 0);
+    } catch (error: any) {
+      const errorMessage = parseSupabaseError(error);
+      log.error("Fetch accepted requests failed", error);
+      set({ loading: false, error: errorMessage, acceptedRequests: [] });
     }
   },
 
@@ -323,12 +358,15 @@ export const useRequestStore = create<RequestState>((set, get) => ({
 
       if (error) throw error;
 
-      // Update both local states
+      // Update all local states
       set((state) => ({
         myRequests: state.myRequests.map((req) =>
           req.id === requestId ? { ...req, status } : req,
         ),
         incomingRequests: state.incomingRequests.map((req) =>
+          req.id === requestId ? { ...req, status } : req,
+        ),
+        acceptedRequests: state.acceptedRequests.map((req) =>
           req.id === requestId ? { ...req, status } : req,
         ),
         loading: false,
