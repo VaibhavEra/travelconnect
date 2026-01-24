@@ -219,7 +219,11 @@ export default function RequestsScreen() {
             ) : (
               <View style={styles.requestsList}>
                 {filteredRequests.map((request) => (
-                  <RequestCard key={request.id} request={request} />
+                  <RequestCard
+                    key={request.id}
+                    request={request}
+                    variant="traveller"
+                  />
                 ))}
               </View>
             )}

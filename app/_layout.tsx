@@ -30,7 +30,8 @@ export default function RootLayout() {
       firstSegment === "trip" ||
       firstSegment.startsWith("trip-") ||
       firstSegment === "request-form" ||
-      firstSegment === "request-details";
+      firstSegment === "request-details" ||
+      firstSegment === "incoming-request-details";
 
     if (!session && !inAuthGroup) {
       // No session and not in auth screens → redirect to login

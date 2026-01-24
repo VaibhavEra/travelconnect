@@ -1,11 +1,12 @@
 import { ParcelRequest } from "@/stores/requestStore";
 import { BorderRadius, Colors, Spacing, Typography } from "@/styles";
 import { Ionicons } from "@expo/vector-icons";
-import { router } from "expo-router";
+import { useRouter } from "expo-router";
 import { Image, Pressable, StyleSheet, Text, View } from "react-native";
 
 interface RequestCardProps {
   request: ParcelRequest;
+  variant?: "sender" | "traveller"; // Add variant prop
 }
 
 type RequestStatus =
@@ -34,7 +35,12 @@ const STATUS_LABELS: Record<RequestStatus, string> = {
   cancelled: "Cancelled",
 };
 
-export default function RequestCard({ request }: RequestCardProps) {
+export default function RequestCard({
+  request,
+  variant = "traveller",
+}: RequestCardProps) {
+  const router = useRouter();
+
   const formatDate = (date: string) => {
     const d = new Date(date);
     return d.toLocaleDateString("en-US", {
@@ -44,10 +50,19 @@ export default function RequestCard({ request }: RequestCardProps) {
   };
 
   const handlePress = () => {
-    router.push({
-      pathname: "/request-details/[id]" as any,
-      params: { id: request.id },
-    });
+    if (variant === "sender") {
+      // Sender viewing their own requests - navigate to request-details
+      router.push({
+        pathname: "/request-details/[id]" as any,
+        params: { id: request.id },
+      });
+    } else {
+      // Traveller viewing incoming requests - navigate to incoming-request-details
+      router.push({
+        pathname: "/incoming-request-details/[id]" as any,
+        params: { id: request.id },
+      });
+    }
   };
 
   const status = request.status as RequestStatus;
@@ -100,7 +115,11 @@ export default function RequestCard({ request }: RequestCardProps) {
 
           <View style={styles.meta}>
             <View style={styles.metaItem}>
-              <Ionicons name="cube" size={14} color={Colors.text.secondary} />
+              <Ionicons
+                name="cube-outline"
+                size={14}
+                color={Colors.text.secondary}
+              />
               <Text style={styles.metaText}>
                 {request.size.charAt(0).toUpperCase() + request.size.slice(1)}
               </Text>
@@ -108,7 +127,7 @@ export default function RequestCard({ request }: RequestCardProps) {
 
             <View style={styles.metaItem}>
               <Ionicons
-                name="pricetag"
+                name="pricetag-outline"
                 size={14}
                 color={Colors.text.secondary}
               />
@@ -124,7 +143,11 @@ export default function RequestCard({ request }: RequestCardProps) {
       <View style={styles.footer}>
         {request.trip && (
           <View style={styles.tripDate}>
-            <Ionicons name="calendar" size={14} color={Colors.text.tertiary} />
+            <Ionicons
+              name="calendar-outline"
+              size={14}
+              color={Colors.text.tertiary}
+            />
             <Text style={styles.tripDateText}>
               {formatDate(request.trip.departure_date)}
             </Text>
@@ -132,7 +155,11 @@ export default function RequestCard({ request }: RequestCardProps) {
         )}
 
         <View style={styles.receiver}>
-          <Ionicons name="person" size={14} color={Colors.text.tertiary} />
+          <Ionicons
+            name="person-outline"
+            size={14}
+            color={Colors.text.tertiary}
+          />
           <Text style={styles.receiverText}>
             {request.delivery_contact_name}
           </Text>
