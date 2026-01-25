@@ -1,4 +1,6 @@
 import DeliveryCard from "@/components/delivery/DeliveryCard";
+import VerifyDeliveryOtpModal from "@/components/modals/VerifyDeliveryOtpModal";
+import VerifyPickupOtpModal from "@/components/modals/VerifyPickupOtpModal";
 import RequestCard from "@/components/request/RequestCard";
 import { useAuthStore } from "@/stores/authStore";
 import { useModeStore } from "@/stores/modeStore";
@@ -9,6 +11,7 @@ import { useFocusEffect } from "expo-router";
 import { useCallback, useState } from "react";
 import {
   ActivityIndicator,
+  Alert,
   RefreshControl,
   ScrollView,
   StyleSheet,
@@ -29,11 +32,22 @@ export default function RequestsScreen() {
     loading,
     getIncomingRequests,
     getAcceptedRequests,
+    verifyPickupOtp,
+    verifyDeliveryOtp,
   } = useRequestStore();
   const [requestFilter, setRequestFilter] = useState<RequestFilter>("all");
   const [deliveryFilter, setDeliveryFilter] = useState<DeliveryFilter>("all");
   const [refreshing, setRefreshing] = useState(false);
   const [viewMode, setViewMode] = useState<ViewMode>("incoming");
+
+  // OTP Modal states
+  const [pickupOtpModalVisible, setPickupOtpModalVisible] = useState(false);
+  const [deliveryOtpModalVisible, setDeliveryOtpModalVisible] = useState(false);
+  const [selectedRequestId, setSelectedRequestId] = useState<string>("");
+  const [selectedRequestSender, setSelectedRequestSender] =
+    useState<string>("");
+  const [selectedRequestReceiver, setSelectedRequestReceiver] =
+    useState<string>("");
 
   useFocusEffect(
     useCallback(() => {
@@ -88,6 +102,56 @@ export default function RequestsScreen() {
       return acceptedRequests.filter((r) => r.status === "delivered").length;
     }
     return 0;
+  };
+
+  // Handle mark as picked up
+  const handleMarkPickup = (requestId: string) => {
+    const request = acceptedRequests.find((r) => r.id === requestId);
+    if (request) {
+      setSelectedRequestId(requestId);
+      setSelectedRequestSender(request.sender?.full_name || "Sender");
+      setPickupOtpModalVisible(true);
+    }
+  };
+
+  // Handle mark as delivered
+  const handleMarkDelivery = (requestId: string) => {
+    const request = acceptedRequests.find((r) => r.id === requestId);
+    if (request) {
+      setSelectedRequestId(requestId);
+      setSelectedRequestReceiver(request.delivery_contact_name);
+      setDeliveryOtpModalVisible(true);
+    }
+  };
+
+  // Verify pickup OTP
+  const handleVerifyPickup = async (otp: string) => {
+    try {
+      const isValid = await verifyPickupOtp(selectedRequestId, otp);
+      if (isValid && user) {
+        Alert.alert("Success", "Parcel marked as picked up!");
+        await getAcceptedRequests(user.id);
+      }
+      return isValid; // Return true/false, let modal handle error display
+    } catch (error) {
+      console.error("Verify pickup failed:", error);
+      throw error; // Throw so modal can catch and display error
+    }
+  };
+
+  // Verify delivery OTP
+  const handleVerifyDelivery = async (otp: string) => {
+    try {
+      const isValid = await verifyDeliveryOtp(selectedRequestId, otp);
+      if (isValid && user) {
+        Alert.alert("Success", "Parcel marked as delivered!");
+        await getAcceptedRequests(user.id);
+      }
+      return isValid; // Return true/false, let modal handle error display
+    } catch (error) {
+      console.error("Verify delivery failed:", error);
+      throw error; // Throw so modal can catch and display error
+    }
   };
 
   if (loading && !refreshing) {
@@ -278,7 +342,12 @@ export default function RequestsScreen() {
             ) : (
               <View style={styles.deliveriesList}>
                 {filteredDeliveries.map((request) => (
-                  <DeliveryCard key={request.id} request={request} />
+                  <DeliveryCard
+                    key={request.id}
+                    request={request}
+                    onMarkPickup={handleMarkPickup}
+                    onMarkDelivery={handleMarkDelivery}
+                  />
                 ))}
               </View>
             )}
@@ -287,6 +356,21 @@ export default function RequestsScreen() {
 
         <View style={{ height: Spacing.xxxl }} />
       </ScrollView>
+
+      {/* OTP Verification Modals */}
+      <VerifyPickupOtpModal
+        visible={pickupOtpModalVisible}
+        onClose={() => setPickupOtpModalVisible(false)}
+        onVerify={handleVerifyPickup}
+        senderName={selectedRequestSender}
+      />
+
+      <VerifyDeliveryOtpModal
+        visible={deliveryOtpModalVisible}
+        onClose={() => setDeliveryOtpModalVisible(false)}
+        onVerify={handleVerifyDelivery}
+        receiverName={selectedRequestReceiver}
+      />
     </View>
   );
 }

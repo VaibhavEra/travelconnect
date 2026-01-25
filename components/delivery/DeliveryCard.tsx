@@ -1,28 +1,48 @@
 import { ParcelRequest } from "@/stores/requestStore";
 import { BorderRadius, Colors, Spacing, Typography } from "@/styles";
 import { Ionicons } from "@expo/vector-icons";
-import { router } from "expo-router";
+import { useRouter } from "expo-router";
 import { Image, Pressable, StyleSheet, Text, View } from "react-native";
 
 interface DeliveryCardProps {
   request: ParcelRequest;
+  onMarkPickup?: (requestId: string) => void;
+  onMarkDelivery?: (requestId: string) => void;
 }
 
-type RequestStatus = "accepted" | "picked_up" | "delivered";
+type RequestStatus =
+  | "pending"
+  | "accepted"
+  | "rejected"
+  | "picked_up"
+  | "delivered"
+  | "cancelled";
 
 const STATUS_COLORS: Record<RequestStatus, string> = {
-  accepted: Colors.warning,
+  pending: Colors.warning,
+  accepted: Colors.success,
+  rejected: Colors.error,
   picked_up: Colors.primary,
   delivered: Colors.success,
+  cancelled: Colors.text.tertiary,
 };
 
 const STATUS_LABELS: Record<RequestStatus, string> = {
-  accepted: "Ready to Pick Up",
+  pending: "Pending",
+  accepted: "Ready for Pickup",
+  rejected: "Rejected",
   picked_up: "In Transit",
   delivered: "Delivered",
+  cancelled: "Cancelled",
 };
 
-export default function DeliveryCard({ request }: DeliveryCardProps) {
+export default function DeliveryCard({
+  request,
+  onMarkPickup,
+  onMarkDelivery,
+}: DeliveryCardProps) {
+  const router = useRouter();
+
   const formatDate = (date: string) => {
     const d = new Date(date);
     return d.toLocaleDateString("en-US", {
@@ -32,8 +52,9 @@ export default function DeliveryCard({ request }: DeliveryCardProps) {
   };
 
   const handlePress = () => {
+    // Navigate to incoming request details
     router.push({
-      pathname: "/delivery-details/[id]" as any,
+      pathname: "/incoming-request-details/[id]" as any,
       params: { id: request.id },
     });
   };
@@ -42,101 +63,139 @@ export default function DeliveryCard({ request }: DeliveryCardProps) {
   const statusColor = STATUS_COLORS[status] || Colors.text.secondary;
   const statusLabel = STATUS_LABELS[status] || request.status;
 
+  const showPickupButton = status === "accepted";
+  const showDeliveryButton = status === "picked_up";
+
   return (
-    <Pressable style={styles.card} onPress={handlePress}>
-      <View style={styles.header}>
-        <View style={styles.routeInfo}>
-          <Text style={styles.cityText}>{request.trip?.source}</Text>
-          <Ionicons
-            name="arrow-forward"
-            size={14}
-            color={Colors.text.secondary}
-          />
-          <Text style={styles.cityText}>{request.trip?.destination}</Text>
-        </View>
-        <View
-          style={[styles.statusBadge, { backgroundColor: statusColor + "20" }]}
-        >
-          <Text style={[styles.statusText, { color: statusColor }]}>
-            {statusLabel}
-          </Text>
-        </View>
-      </View>
-
-      <View style={styles.body}>
-        <View style={styles.photoSection}>
-          {request.parcel_photos && request.parcel_photos.length > 0 && (
-            <Image
-              source={{ uri: request.parcel_photos[0] }}
-              style={styles.thumbnail}
+    <View style={styles.card}>
+      <Pressable onPress={handlePress}>
+        <View style={styles.header}>
+          <View style={styles.routeInfo}>
+            <Text style={styles.cityText}>{request.trip?.source}</Text>
+            <Ionicons
+              name="arrow-forward"
+              size={14}
+              color={Colors.text.secondary}
             />
-          )}
-        </View>
-
-        <View style={styles.details}>
-          <Text style={styles.description} numberOfLines={2}>
-            {request.item_description}
-          </Text>
-
-          <View style={styles.meta}>
-            <View style={styles.metaItem}>
-              <Ionicons name="cube" size={14} color={Colors.text.secondary} />
-              <Text style={styles.metaText}>
-                {request.size.charAt(0).toUpperCase() + request.size.slice(1)}
-              </Text>
-            </View>
-
-            <View style={styles.metaItem}>
-              <Ionicons
-                name="pricetag"
-                size={14}
-                color={Colors.text.secondary}
-              />
-              <Text style={styles.metaText}>
-                {request.category.charAt(0).toUpperCase() +
-                  request.category.slice(1)}
-              </Text>
-            </View>
+            <Text style={styles.cityText}>{request.trip?.destination}</Text>
           </View>
-        </View>
-      </View>
-
-      <View style={styles.footer}>
-        {request.trip && (
-          <View style={styles.tripDate}>
-            <Ionicons name="calendar" size={14} color={Colors.text.tertiary} />
-            <Text style={styles.tripDateText}>
-              {formatDate(request.trip.departure_date)}
+          <View
+            style={[
+              styles.statusBadge,
+              { backgroundColor: statusColor + "20" },
+            ]}
+          >
+            <Text style={[styles.statusText, { color: statusColor }]}>
+              {statusLabel}
             </Text>
           </View>
-        )}
-
-        <View style={styles.sender}>
-          <Ionicons name="person" size={14} color={Colors.text.tertiary} />
-          <Text style={styles.senderText}>
-            {request.sender?.full_name || "Sender"}
-          </Text>
         </View>
-      </View>
 
-      {status === "accepted" && (
-        <View style={styles.actionHint}>
-          <Ionicons
-            name="information-circle"
-            size={16}
-            color={Colors.primary}
-          />
-          <Text style={styles.actionHintText}>Tap to mark as picked up</Text>
+        <View style={styles.body}>
+          <View style={styles.photoSection}>
+            {request.parcel_photos && request.parcel_photos.length > 0 && (
+              <Image
+                source={{ uri: request.parcel_photos[0] }}
+                style={styles.thumbnail}
+              />
+            )}
+            {request.parcel_photos && request.parcel_photos.length > 1 && (
+              <View style={styles.photoCount}>
+                <Ionicons name="images" size={12} color={Colors.text.inverse} />
+                <Text style={styles.photoCountText}>
+                  {request.parcel_photos.length}
+                </Text>
+              </View>
+            )}
+          </View>
+
+          <View style={styles.details}>
+            <Text style={styles.description} numberOfLines={2}>
+              {request.item_description}
+            </Text>
+
+            <View style={styles.meta}>
+              <View style={styles.metaItem}>
+                <Ionicons
+                  name="cube-outline"
+                  size={14}
+                  color={Colors.text.secondary}
+                />
+                <Text style={styles.metaText}>
+                  {request.size.charAt(0).toUpperCase() + request.size.slice(1)}
+                </Text>
+              </View>
+
+              <View style={styles.metaItem}>
+                <Ionicons
+                  name="person-outline"
+                  size={14}
+                  color={Colors.text.secondary}
+                />
+                <Text style={styles.metaText}>
+                  {request.sender?.full_name || "Sender"}
+                </Text>
+              </View>
+            </View>
+          </View>
+        </View>
+
+        <View style={styles.footer}>
+          {request.trip && (
+            <View style={styles.tripDate}>
+              <Ionicons
+                name="calendar-outline"
+                size={14}
+                color={Colors.text.tertiary}
+              />
+              <Text style={styles.tripDateText}>
+                {formatDate(request.trip.departure_date)}
+              </Text>
+            </View>
+          )}
+
+          <View style={styles.receiver}>
+            <Ionicons
+              name="location-outline"
+              size={14}
+              color={Colors.text.tertiary}
+            />
+            <Text style={styles.receiverText}>
+              {request.delivery_contact_name}
+            </Text>
+          </View>
+        </View>
+      </Pressable>
+
+      {/* Action Buttons */}
+      {(showPickupButton || showDeliveryButton) && (
+        <View style={styles.actionContainer}>
+          {showPickupButton && onMarkPickup && (
+            <Pressable
+              style={[styles.actionButton, styles.pickupButton]}
+              onPress={() => onMarkPickup(request.id)}
+            >
+              <Ionicons name="cube" size={18} color={Colors.text.inverse} />
+              <Text style={styles.actionButtonText}>Mark as Picked Up</Text>
+            </Pressable>
+          )}
+
+          {showDeliveryButton && onMarkDelivery && (
+            <Pressable
+              style={[styles.actionButton, styles.deliveryButton]}
+              onPress={() => onMarkDelivery(request.id)}
+            >
+              <Ionicons
+                name="checkmark-done"
+                size={18}
+                color={Colors.text.inverse}
+              />
+              <Text style={styles.actionButtonText}>Mark as Delivered</Text>
+            </Pressable>
+          )}
         </View>
       )}
-
-      {status === "picked_up" && (
-        <View style={styles.actionHint}>
-          <Ionicons name="checkmark-circle" size={16} color={Colors.success} />
-          <Text style={styles.actionHintText}>Tap to mark as delivered</Text>
-        </View>
-      )}
-    </Pressable>
+    </View>
   );
 }
 
@@ -189,6 +248,23 @@ const styles = StyleSheet.create({
     borderRadius: BorderRadius.md,
     backgroundColor: Colors.background.primary,
   },
+  photoCount: {
+    position: "absolute",
+    bottom: 4,
+    right: 4,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 2,
+    backgroundColor: "rgba(0,0,0,0.7)",
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: BorderRadius.sm,
+  },
+  photoCountText: {
+    fontSize: 10,
+    fontWeight: Typography.weights.semibold,
+    color: Colors.text.inverse,
+  },
   details: {
     flex: 1,
     justifyContent: "space-between",
@@ -229,27 +305,39 @@ const styles = StyleSheet.create({
     fontSize: Typography.sizes.xs,
     color: Colors.text.tertiary,
   },
-  sender: {
+  receiver: {
     flexDirection: "row",
     alignItems: "center",
     gap: Spacing.xs,
   },
-  senderText: {
+  receiverText: {
     fontSize: Typography.sizes.xs,
     color: Colors.text.tertiary,
   },
-  actionHint: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: Spacing.xs,
+  actionContainer: {
     marginTop: Spacing.sm,
     paddingTop: Spacing.sm,
     borderTopWidth: 1,
     borderTopColor: Colors.border.light,
   },
-  actionHintText: {
-    fontSize: Typography.sizes.xs,
-    color: Colors.text.secondary,
-    fontStyle: "italic",
+  actionButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: Spacing.xs,
+    paddingVertical: Spacing.sm,
+    borderRadius: BorderRadius.md,
+    marginTop: Spacing.xs,
+  },
+  pickupButton: {
+    backgroundColor: Colors.primary,
+  },
+  deliveryButton: {
+    backgroundColor: Colors.success,
+  },
+  actionButtonText: {
+    fontSize: Typography.sizes.sm,
+    fontWeight: Typography.weights.semibold,
+    color: Colors.text.inverse,
   },
 });

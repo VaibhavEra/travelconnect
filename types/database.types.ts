@@ -120,15 +120,21 @@ export type Database = {
         Row: {
           category: string
           created_at: string | null
+          delivered_at: string | null
           delivery_address: string | null
           delivery_contact_name: string
           delivery_contact_phone: string
+          delivery_otp: string | null
+          delivery_otp_expires_at: string | null
           id: string
           item_description: string
           parcel_photos: string[] | null
+          picked_up_at: string | null
           pickup_address: string | null
           pickup_contact_name: string | null
           pickup_contact_phone: string | null
+          pickup_otp: string | null
+          pickup_otp_expires_at: string | null
           rejection_reason: string | null
           sender_id: string
           sender_notes: string | null
@@ -141,15 +147,21 @@ export type Database = {
         Insert: {
           category: string
           created_at?: string | null
+          delivered_at?: string | null
           delivery_address?: string | null
           delivery_contact_name: string
           delivery_contact_phone: string
+          delivery_otp?: string | null
+          delivery_otp_expires_at?: string | null
           id?: string
           item_description: string
           parcel_photos?: string[] | null
+          picked_up_at?: string | null
           pickup_address?: string | null
           pickup_contact_name?: string | null
           pickup_contact_phone?: string | null
+          pickup_otp?: string | null
+          pickup_otp_expires_at?: string | null
           rejection_reason?: string | null
           sender_id: string
           sender_notes?: string | null
@@ -162,15 +174,21 @@ export type Database = {
         Update: {
           category?: string
           created_at?: string | null
+          delivered_at?: string | null
           delivery_address?: string | null
           delivery_contact_name?: string
           delivery_contact_phone?: string
+          delivery_otp?: string | null
+          delivery_otp_expires_at?: string | null
           id?: string
           item_description?: string
           parcel_photos?: string[] | null
+          picked_up_at?: string | null
           pickup_address?: string | null
           pickup_contact_name?: string | null
           pickup_contact_phone?: string | null
+          pickup_otp?: string | null
+          pickup_otp_expires_at?: string | null
           rejection_reason?: string | null
           sender_id?: string
           sender_notes?: string | null
@@ -380,10 +398,24 @@ export type Database = {
         Returns: undefined
       }
       generate_otp: { Args: never; Returns: string }
+      generate_pickup_otp: {
+        Args: { request_id: string }
+        Returns: {
+          otp: string
+        }[]
+      }
       is_account_locked: { Args: { user_email: string }; Returns: boolean }
       record_failed_login: {
         Args: { user_email: string; user_ip?: string }
         Returns: undefined
+      }
+      verify_delivery_otp: {
+        Args: { otp_code: string; request_id: string }
+        Returns: boolean
+      }
+      verify_pickup_otp: {
+        Args: { otp_code: string; request_id: string }
+        Returns: boolean
       }
     }
     Enums: {

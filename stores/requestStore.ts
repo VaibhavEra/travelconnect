@@ -55,6 +55,14 @@ interface RequestState {
     requestId: string,
     status: DbParcelRequest["status"],
   ) => Promise<void>;
+
+  // OTP Methods
+  generatePickupOtp: (requestId: string) => Promise<string>;
+  verifyPickupOtp: (requestId: string, otp: string) => Promise<boolean>;
+  verifyDeliveryOtp: (requestId: string, otp: string) => Promise<boolean>;
+  getPickupOtp: (requestId: string) => Promise<string | null>;
+  getDeliveryOtp: (requestId: string) => Promise<string | null>;
+
   clearError: () => void;
 }
 
@@ -230,12 +238,13 @@ export const useRequestStore = create<RequestState>((set, get) => ({
     }
   },
 
-  // Accept request
+  // Accept request (also generates pickup OTP)
   acceptRequest: async (requestId: string, travellerNotes?: string) => {
     try {
       set({ loading: true, error: null });
 
-      const { error } = await supabase
+      // First update the request status
+      const { error: updateError } = await supabase
         .from("parcel_requests")
         .update({
           status: "accepted",
@@ -244,9 +253,13 @@ export const useRequestStore = create<RequestState>((set, get) => ({
         })
         .eq("id", requestId);
 
-      if (error) throw error;
+      if (updateError) throw updateError;
 
-      // Update local state
+      // Generate pickup OTP
+      const pickupOtp = await get().generatePickupOtp(requestId);
+      log.info("Pickup OTP generated", pickupOtp);
+
+      // Refresh incoming and accepted requests
       set((state) => ({
         incomingRequests: state.incomingRequests.map((req) =>
           req.id === requestId
@@ -378,6 +391,142 @@ export const useRequestStore = create<RequestState>((set, get) => ({
       log.error("Update status failed", error);
       set({ loading: false, error: errorMessage });
       throw new Error(errorMessage);
+    }
+  },
+
+  // Generate pickup OTP (called when accepting request)
+  generatePickupOtp: async (requestId: string) => {
+    try {
+      const { data, error } = await supabase.rpc("generate_pickup_otp", {
+        request_id: requestId,
+      });
+
+      if (error) throw error;
+
+      // data is an array with one object containing otp
+      const otp = data && data.length > 0 ? data[0].otp : "";
+      return otp;
+    } catch (error) {
+      log.error("Generate pickup OTP failed", error);
+      throw error;
+    }
+  },
+
+  // Verify pickup OTP and mark as picked up
+  verifyPickupOtp: async (requestId: string, otp: string) => {
+    try {
+      set({ loading: true, error: null });
+
+      const { data, error } = await supabase.rpc("verify_pickup_otp", {
+        request_id: requestId,
+        otp_code: otp,
+      });
+
+      if (error) throw error;
+
+      const isValid = data as boolean;
+
+      if (isValid) {
+        // Refresh current request if it's the one being updated
+        if (get().currentRequest?.id === requestId) {
+          await get().getRequestById(requestId);
+        }
+
+        // Refresh accepted requests list
+        set((state) => ({
+          acceptedRequests: state.acceptedRequests.map((req) =>
+            req.id === requestId
+              ? { ...req, status: "picked_up" as const }
+              : req,
+          ),
+          loading: false,
+        }));
+      } else {
+        set({ loading: false });
+      }
+
+      return isValid;
+    } catch (error: any) {
+      const errorMessage = parseSupabaseError(error);
+      log.error("Verify pickup OTP failed", error);
+      set({ loading: false, error: errorMessage });
+      throw new Error(errorMessage);
+    }
+  },
+
+  // Verify delivery OTP and mark as delivered
+  verifyDeliveryOtp: async (requestId: string, otp: string) => {
+    try {
+      set({ loading: true, error: null });
+
+      const { data, error } = await supabase.rpc("verify_delivery_otp", {
+        request_id: requestId,
+        otp_code: otp,
+      });
+
+      if (error) throw error;
+
+      const isValid = data as boolean;
+
+      if (isValid) {
+        // Refresh current request if it's the one being updated
+        if (get().currentRequest?.id === requestId) {
+          await get().getRequestById(requestId);
+        }
+
+        // Refresh accepted requests list
+        set((state) => ({
+          acceptedRequests: state.acceptedRequests.map((req) =>
+            req.id === requestId
+              ? { ...req, status: "delivered" as const }
+              : req,
+          ),
+          loading: false,
+        }));
+      } else {
+        set({ loading: false });
+      }
+
+      return isValid;
+    } catch (error: any) {
+      const errorMessage = parseSupabaseError(error);
+      log.error("Verify delivery OTP failed", error);
+      set({ loading: false, error: errorMessage });
+      throw new Error(errorMessage);
+    }
+  },
+
+  // Get pickup OTP for display (sender needs to see it)
+  getPickupOtp: async (requestId: string) => {
+    try {
+      const { data, error } = await supabase
+        .from("parcel_requests")
+        .select("pickup_otp")
+        .eq("id", requestId)
+        .single();
+
+      if (error) throw error;
+      return data?.pickup_otp || null;
+    } catch (error) {
+      log.error("Get pickup OTP failed", error);
+      return null;
+    }
+  },
+
+  // Get delivery OTP for display (receiver needs to see it)
+  getDeliveryOtp: async (requestId: string) => {
+    try {
+      const { data, error } = await supabase
+        .from("parcel_requests")
+        .select("delivery_otp")
+        .eq("id", requestId)
+        .single();
+
+      if (error) throw error;
+      return data?.delivery_otp || null;
+    } catch (error) {
+      log.error("Get delivery OTP failed", error);
+      return null;
     }
   },
 
