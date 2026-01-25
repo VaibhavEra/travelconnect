@@ -24,9 +24,8 @@ When users open the app, they choose their current role (can be switched anytime
 - Filter by transportation mode, date, weight capacity
 - View traveller profiles with ratings and completed trips
 - Create parcel request with photos and details
-- Pay upfront (fake payment in MVP)
-- Enter receiver details after traveller accepts
 - Track delivery status with OTP verification
+- Rate traveller after delivery
 
 **2. Traveller Mode**
 
@@ -34,15 +33,15 @@ When users open the app, they choose their current role (can be switched anytime
 - Specify luggage capacity (max 5 parcel slots)
 - Upload ticket/PNR for trust verification
 - Review incoming package requests from senders
-- Accept requests (automatic slot allocation)
-- Coordinate pickup and delivery via phone/WhatsApp
-- Confirm handoffs with OTP and photo uploads
-- Receive payout after delivery
+- Accept/reject requests (automatic slot allocation)
+- Verify pickup with sender's OTP
+- Verify delivery with receiver's OTP
+- Receive rating from sender
 
 **3. Receiver (No App Required)**
 
 - Receiver doesn't install the app
-- Sender shares details via WhatsApp (traveller name, phone, delivery OTP)
+- Sender shares delivery OTP via WhatsApp/SMS
 - Receiver meets traveller and provides OTP to confirm delivery
 - Simple, no-friction experience
 
@@ -66,36 +65,22 @@ When users open the app, they choose their current role (can be switched anytime
 - **No Declared Value Field** in MVP (reduces complexity and liability)
 - **Max 5 parcels per trip** (per traveller)
 
-**Payment & Pricing:**
-
-- **Platform-set pricing**: Calculated from distance + transport mode
-- **20% platform fee** (fixed for MVP)
-- **Payment at request time**: Sender pays when creating request (before traveller accepts)
-- **Auto-refund on rejection**: Full refund if traveller rejects (5-7 day processing)
-- **Fake payments in MVP**: No real money, simulated flow only
-
 **Trust & Safety:**
 
 - **No KYC in MVP**: Name and phone only, no identity documents
 - **No deposits**: Travellers don't pay upfront to create trips
-- **OTP verification**: 6-digit codes for pickup and delivery
-- **Photo uploads**: Multiple parcel photos + size reference tip
+- **OTP verification**: 6-digit codes for pickup and delivery with expiry times
+- **Photo uploads**: Multiple parcel photos required
 - **Ticket upload**: Required for train/bus/flight, optional for car
 - **PNR masking**: Only last 4 digits shown to sender (e.g., \*\*\*\*4567)
 
 **Request & Trip Policies:**
 
-- **Request expiry**: 48 hours OR trip departure (whichever comes first)
-- **Sender cancellation**: Allowed before acceptance (full refund)
+- **Request flow**: Sender creates request → Traveller accepts → OTP verification at pickup → OTP verification at delivery
+- **Sender cancellation**: Allowed before acceptance
 - **Trip cancellation**: Allowed anytime (refunds all packages, rating penalty)
 - **No trip edits**: Cannot edit trip after creation
 - **1 parcel per request**: Sender can make multiple requests, but each is separate
-
-**Closed Beta:**
-
-- Manual user approval (if needed)
-- Limited rollout to test core flows
-- Focus on Delhi-Mumbai corridor initially
 
 ---
 
@@ -113,7 +98,7 @@ When users open the app, they choose their current role (can be switched anytime
 
 **Key Libraries:**
 
-- **Zustand**: Lightweight state management for auth and profile
+- **Zustand**: Lightweight state management (authStore, profileStore, modeStore, requestStore)
 - **React Hook Form + Zod**: Type-safe form validation with real-time feedback
 - **Centralized Styling System**: Design tokens (Colors, Spacing, Typography, BorderRadius) in `styles/`
 - **AsyncStorage + SecureStore**: Local storage for session persistence and secure token storage
@@ -135,10 +120,9 @@ When users open the app, they choose their current role (can be switched anytime
 
 **Database Schema:**
 
-- `profiles`: User information with roles array (sender/traveller), rating, completed trips
-- `trips`: Traveller trip listings with capacity, transport details, meetup/drop locations, stay duration
-- `packages`: Package requests with status tracking, OTPs, photos array, timestamp tracking
-- `payments`: Payment records with gateway details and settlement tracking
+- `profiles`: User information (name, username, phone, email, rating). **Sender vs traveller handled client-side via modeStore** (no roles column in MVP).
+- `trips`: Traveller trip listings with capacity, transport details, ticket verification
+- `parcel_requests`: Package requests with status tracking, OTPs with expiry, photos array, timestamp tracking
 - `failed_login_attempts`: Account lockout protection (5 attempts, 15-min auto-expiry)
 
 ### Future Integrations (Post-MVP)
@@ -156,23 +140,23 @@ When users open the app, they choose their current role (can be switched anytime
 This repository contains comprehensive documentation:
 
 - **[README.md](README.md)** (this file) - Project overview and MVP specifications
-- **[ROADMAP.md](ROADMAP.md)** - Post-MVP expansion plans and feature roadmap
-- **[docs/BACKEND.md](docs/BACKEND.md)** - Database schema, RPC functions, triggers, RLS policies
 - **[docs/AUTH.md](docs/AUTH.md)** - Authentication system architecture and security
+- **[docs/BACKEND.md](docs/BACKEND.md)** - Database schema, RPC functions, triggers, RLS policies
 - **[docs/FRONTEND.md](docs/FRONTEND.md)** - Component structure, state management, UI patterns
+- **[docs/DELIVERY-FLOW.md](docs/DELIVERY-FLOW.md)** - Complete OTP-based delivery workflow
 
 ---
 
 ## Current Implementation Status
 
-### Completed: Authentication & Security (Phase 1, Week 1)
+### ✅ Phase 1: Authentication & Security (COMPLETE)
 
 **Full Authentication Flow:**
 
 - User registration with email, username, phone, password
 - Email OTP verification (6-digit code)
 - Login with database-side account lockout protection (5 attempts, 15-minute auto-expiry cooldown)
-- **Complete password reset flow**: forgot-password → verify-reset-otp → reset-new-password
+- Complete password reset flow: forgot-password → verify-reset-otp → reset-new-password
 - Session persistence and automatic token refresh
 - Secure logout with cleanup
 - Auto-login after successful password reset
@@ -181,7 +165,7 @@ This repository contains comprehensive documentation:
 
 - Password requirements: 8+ chars, uppercase, lowercase, number, special character
 - Password strength indicator during registration and reset
-- **Database-side account lockout** (auto-expires after 15 minutes, cleared on successful login/logout/password reset)
+- Database-side account lockout (auto-expires after 15 minutes, cleared on successful login/logout/password reset)
 - Email enumeration prevention (generic error messages)
 - Real-time availability checking (username, email, phone) with debounced RPC calls
 - Client-side rate limiting on OTP resend and password reset requests
@@ -190,225 +174,226 @@ This repository contains comprehensive documentation:
 
 **Database & Profile Management:**
 
-- **Dual-store architecture**: Separate `authStore` and `profileStore` with automatic sync
+- Dual-store architecture: Separate `authStore` and `profileStore` with automatic sync
 - Automatic profile creation via database trigger on signup
-- **Profiles table with roles array**: Users can be both sender and traveller
+- Profiles table with no roles column (sender/traveller handled by client-side `modeStore`)
 - Row Level Security (RLS) policies for all tables
 - Comprehensive indexes for performance
 - Foreign key constraints with CASCADE rules
 - Unique constraints on username, email, phone
 
-**Form Validation:**
+### ✅ Phase 2-5: Trips & Requests (COMPLETE)
 
-- Zod schemas with TypeScript type safety
-- Real-time validation on blur (not on every keystroke)
-- Debounced availability checks (500ms delay)
-- Client-side and server-side validation
-- Consistent error messaging with `parseSupabaseError()` utility
+**Trip Management:**
 
-**UI/UX:**
+- Create trip with route, date, transport mode, capacity
+- Upload ticket photo with PNR number
+- Specify allowed parcel categories
+- View own trips (active, completed)
+- Trip auto-completion when all parcels delivered
 
-- Clean, minimal auth screens (register, login, verify-otp, forgot-password, verify-reset-otp, reset-new-password)
-- Reusable components: `FormInput`, `OtpInput` (6-box design)
-- Loading states and disabled buttons during API calls
-- Password visibility toggle with haptic feedback
-- Offline detection with banner notification
-- Accessibility support (proper labels, keyboard navigation, hit slop for touch targets)
-- **Centralized design system**: Colors, Spacing, Typography, BorderRadius tokens
+**Request Flow:**
 
-**Developer Experience:**
+- Search trips by origin, destination, date
+- Filter by transport mode and available slots
+- Create parcel request with multiple photos
+- Category selection and size specification
+- Receiver details collection (name, phone) – exact locations coordinated via phone in MVP
+- Request sent to traveller for review
 
-- Comprehensive logging system (dev-only console logs)
-- Type-safe database queries with auto-generated types
-- Error parsing utility for user-friendly messages
-- Network status detection and handling
-- Input sanitization utilities (email, username, phone, name, text)
+**Traveller Actions:**
 
----
+- View incoming requests with sender details
+- See parcel photos and specifications
+- Accept request → calls `generate_pickup_otp()` RPC
+- Reject request with optional reason
+- View all accepted requests (active deliveries)
 
-### In Progress: Foundation & Profiles (Phase 2, Week 2)
+### ✅ Phase 6-9: OTP Delivery Flow (COMPLETE)
 
-**Database Setup:**
+**OTP System:**
 
-- Cities table (5 metros with coordinates)
-- City distances matrix (pre-calculated for pricing)
-- Parcel categories table
-- Profile management with roles array
-- Storage buckets (ticket-images, parcel-photos, pickup-photos, delivery-photos)
+- Pickup OTP generated via `generate_pickup_otp()` RPC on acceptance (24-hour expiry)
+- Delivery OTP generated by `verify_pickup_otp()` RPC after pickup (72-hour expiry)
+- Database-stored OTPs with expiry timestamps
+- `verify_pickup_otp()` and `verify_delivery_otp()` RPCs return boolean
+- Auto-clear OTPs after successful verification
 
-**Frontend:**
+**Pickup Verification:**
 
-- Profile viewing screen (name, phone, rating, completed trips, roles)
-- Edit profile screen (minimal: name, phone only)
-- Role management (users can have multiple roles simultaneously)
-- Dynamic UI based on active role
-- City and category dropdowns (data-driven from database)
+- Traveller initiates "Mark as Picked Up"
+- Modal opens requesting sender's pickup OTP
+- `verify_pickup_otp()` RPC → status → `picked_up`, generates delivery OTP
+- Pickup OTP cleared from database
 
-**Utils:**
+**Delivery Verification:**
 
-- Pricing calculator (distance × transport mode multiplier × base rate)
-- Distance calculation (haversine formula or pre-calculated matrix)
-- Image upload utilities with compression
-- Date/time helpers for trip search (±7 days)
+- Traveller initiates "Mark as Delivered"
+- Modal opens requesting receiver's delivery OTP
+- `verify_delivery_otp()` RPC → status → `delivered`
+- Delivery OTP cleared from database
+- Trigger auto-completes trip if all parcels delivered
 
-**Goal:** Users can manage profile, view their roles, see role-specific UI.
+**Request Status Tracking:**
 
----
+- `pending`: Initial state when created
+- `accepted`: Traveller accepted request
+- `rejected`: Traveller rejected request
+- `picked_up`: Traveller verified pickup with OTP
+- `delivered`: Traveller verified delivery with OTP
+- Timeline tracking with timestamps for each transition
 
-### Next Up: Trip Creation & Listing (Phase 3, Week 3)
+**UI Components:**
 
-**Traveller Flow:**
-
-- Create Trip form (multi-step: route, date, transport, ticket, capacity, pricing)
-- My Trips list (active, completed)
-- Trip details screen (with edit/cancel options if no packages accepted)
-
-**Sender Flow:**
-
-- Find Trips screen (search with filters: origin, destination, date, weight)
-- Trip listing with traveller info, ratings, price breakdown
-- Trip details screen (sender view) with "Send Parcel" button
-
-**Goal:** Travellers create trips with platform-set pricing, senders search and view trips.
+- DeliveryCard with action buttons based on status
+- VerifyPickupOtpModal for pickup OTP entry
+- VerifyDeliveryOtpModal for delivery OTP entry
+- Loading states and error handling
+- Success alerts on verification
+- Request filtering by status (all, ready, in transit, completed)
 
 ---
 
-### Upcoming: Request & Payment (Phase 4, Week 4)
+### 🚧 In Progress: Phase 10 - Polish & Edge Cases
 
-**Sender Flow:**
+**Next Steps:**
 
-- Create Parcel Request form (category, weight, description, multiple photos)
-- Fake payment screen (simulate UPI/Card)
-- My Packages list (status tracking)
-- Package details with timeline
-
-**Traveller Flow:**
-
-- Requests tab (incoming requests)
-- Request details (view parcel info, sender rating)
-- Accept/Reject actions (slot management)
-
-**Policies Implemented:**
-
-- Payment at request time (fake in MVP)
-- Request auto-expiry (48hrs or departure)
-- Auto-refund on rejection
-- Sender cancellation before acceptance
-
-**Goal:** Complete request → payment → acceptance → details exchange flow.
+- Error handling improvements throughout app
+- Loading states and skeleton loaders
+- Empty state designs with helpful CTAs
+- Image compression and optimization
+- Better offline handling
 
 ---
 
-### Upcoming: Pickup & Delivery (Phase 5, Days 29-35)
+## Project Structure
 
-**Handoff Verification:**
+```
 
-- Pickup: Traveller enters OTP (from sender) + uploads photo
-- Delivery: Traveller enters OTP (from receiver) + uploads photo
-- Status transitions: requested → accepted → picked → delivered
+travelconnect/
+├── app/ # Expo Router file-based routing
+│ ├── (auth)/ # Auth screens (login, register, OTP, password reset)
+│ │ ├── \_layout.tsx # Auth stack navigation
+│ │ ├── login.tsx
+│ │ ├── register.tsx
+│ │ ├── verify-otp.tsx
+│ │ ├── forgot-password.tsx
+│ │ ├── verify-reset-otp.tsx
+│ │ └── reset-new-password.tsx
+│ ├── (tabs)/ # Main app tabs (protected routes)
+│ │ ├── \_layout.tsx # Tab bar layout
+│ │ ├── index.tsx # Home/trips screen
+│ │ ├── explore.tsx # Search trips (sender mode)
+│ │ ├── requests.tsx # Request management (traveller mode)
+│ │ └── profile.tsx # User profile
+│ ├── \_layout.tsx # Root layout with auth guard
+│ └── index.tsx # Landing/redirect screen
+├── components/ # Reusable UI components
+│ ├── auth/ # Auth-specific components
+│ │ ├── FormInput.tsx # Text input with validation
+│ │ └── OtpInput.tsx # 6-box OTP input
+│ ├── delivery/ # Delivery flow components
+│ │ └── DeliveryCard.tsx # Active delivery card with OTP actions
+│ ├── modals/ # Modal components
+│ │ ├── VerifyPickupOtpModal.tsx # Pickup OTP verification
+│ │ └── VerifyDeliveryOtpModal.tsx # Delivery OTP verification
+│ ├── request/ # Request components
+│ │ └── RequestCard.tsx # Parcel request card
+│ ├── shared/ # Shared components
+│ │ └── OfflineNotice.tsx # Network status banner
+│ └── trip/ # Trip components
+│ └── TripCard.tsx # Trip listing card
+├── lib/ # Utilities and configurations
+│ ├── supabase.ts # Supabase client setup
+│ ├── utils/ # Helper functions
+│ │ ├── availabilityCheck.ts # RPC function wrappers
+│ │ ├── haptics.ts # Haptic feedback
+│ │ ├── network.ts # Network status hook
+│ │ ├── parseSupabaseError.ts # Error message parser
+│ │ ├── rateLimit.ts # Client-side rate limiter
+│ │ └── sanitize.ts # Input sanitization
+│ └── validations/ # Zod schemas
+│ └── auth.ts # Auth validation schemas
+├── stores/ # Zustand state management
+│ ├── authStore.ts # Auth state (session, user, actions)
+│ ├── profileStore.ts # Profile state (synced with authStore)
+│ ├── modeStore.ts # User mode (sender/traveller toggle)
+│ └── requestStore.ts # Request state (trips, requests, OTP actions)
+├── styles/ # Centralized design system
+│ ├── theme.ts # Design tokens (Colors, Spacing, Typography)
+│ ├── commonStyles.ts # Reusable StyleSheet styles
+│ └── index.ts # Barrel export
+├── types/ # TypeScript types
+│ └── database.types.ts # Auto-generated from Supabase
+├── docs/ # Documentation
+│ ├── AUTH.md # Authentication architecture
+│ ├── BACKEND.md # Database schema, RLS, triggers
+│ ├── FRONTEND.md # Component structure, state management
+│ └── DELIVERY-FLOW.md # Complete delivery workflow
+├── supabase/ # Supabase configuration
+│ └── migrations/ # SQL migrations
+└── README.md # This file
 
-**Receiver Communication:**
-
-- Sender shares details via WhatsApp (traveller name, phone, delivery OTP)
-- Pre-filled message generator in app
-
-**Trip Completion:**
-
-- Auto-complete when: (departure_date + 1 day) AND all packages delivered
-- Payout released to traveller (fake in MVP)
-
-**Goal:** Full pickup → transit → delivery flow with OTP verification.
+```
 
 ---
 
-### Upcoming: Ratings & Polish (Phase 6, Days 36-42)
+## MVP Development Timeline
 
-**Ratings System:**
-
-- Post-delivery rating prompt (7-day window)
-- 5-star + tags (on-time, careful-handling, good-communication) + comment
-- Both parties rate each other (sender rates traveller, traveller rates sender)
-- Average rating calculation via database trigger
-
-**Notifications:**
-
-- Push notifications (Expo)
-- In-app notification center (bell icon)
-- Status updates (request accepted, in transit, delivered)
-
-**Support:**
-
-- In-app support form (issue type + description + package ID)
-- Emails sent to developer for manual resolution
-
-**Polish:**
-
-- Loading states and skeletons
-- Error handling and retry logic
-- Empty states (no trips found, no packages)
-- Onboarding tooltips
-
-**Goal:** Complete MVP with ratings, notifications, support ready for closed beta.
-
----
-
-## MVP Development Timeline (6 Weeks)
-
-### Week 1: Authentication & Security (COMPLETED)
+### ✅ Week 1: Authentication & Security (COMPLETE)
 
 - User registration with email/phone/username/password
 - Email OTP verification
-- Login with database-side account lockout protection (5 attempts, 15-min cooldown)
+- Login with database-side account lockout protection (5 attempts, 15-minute cooldown)
 - Complete password reset flow (forgot-password → verify-reset-otp → reset-new-password)
 - Session management and persistence
 - Real-time field availability checking
 - Security: rate limiting, failed attempt tracking, email enumeration prevention
 - Dual-store architecture (authStore + profileStore with sync)
 
-### Week 2: Foundation & Profiles (CURRENT)
+### ✅ Week 2-3: Trips & Requests (COMPLETE)
 
-- Database setup (cities, categories, distances)
+- Database setup (trips, parcel_requests tables)
 - Profile management (view, edit)
-- Role management (roles array: sender/traveller)
-- Dynamic UI based on roles
-- Storage buckets and image upload utilities
+- Mode management (sender/traveller toggle with modeStore)
+- Trip creation with ticket upload
+- Trip listing and search (sender view)
+- Request creation with multiple photos
+- Request acceptance/rejection (traveller view)
+- Slot management (auto-decrement on acceptance)
 
-### Week 3: Trip Creation & Listing
+### ✅ Week 4: OTP Delivery Flow (COMPLETE)
 
-- Traveller: Create trip with transport details, ticket upload, pricing
-- Sender: Search trips with filters (origin, destination, date, weight)
-- Trip details screens (both views)
-- Pricing calculator implementation
+- Pickup OTP generation via `generate_pickup_otp()` RPC on request acceptance
+- Pickup verification with VerifyPickupOtpModal
+- Delivery OTP generated automatically after pickup verification
+- Delivery verification with VerifyDeliveryOtpModal
+- Status transitions (pending → accepted → picked_up → delivered)
+- Trip auto-completion when all parcels delivered
+- DeliveryCard component with action buttons
+- Request filtering by status
 
-### Week 4: Request & Payment Flow
+### 🚧 Week 5: Polish & Edge Cases (IN PROGRESS - Phase 10)
 
-- Sender: Create parcel request with multiple photos
-- Fake payment implementation
-- Traveller: View and accept/reject requests
-- Request expiry logic (scheduled function)
-- Auto-refund on rejection
+- Error handling improvements
+- Loading states and skeleton loaders
+- Empty states with helpful CTAs
+- Image compression and optimization
+- Better offline handling
 
-### Week 5: Pickup & Delivery
-
-- OTP generation (6-digit for pickup, delivery)
-- Photo uploads at each handoff
-- Status tracking (requested → in_transit → delivered)
-- Trip auto-completion logic
-- Receiver message generator (WhatsApp share)
-
-### Week 6: Ratings & Launch Prep
+### 📅 Week 6: Ratings & Launch Prep (UPCOMING - Phase 11-14)
 
 - Post-delivery ratings (5-star + tags + comment)
 - Notifications center (in-app + push)
 - Support form
-- Loading states, error handling, empty states
+- Onboarding tooltips
 - EAS builds for TestFlight/Play Store internal testing
 
 ---
 
-## Out of Scope for MVP (See ROADMAP.md)
+## Out of Scope for MVP
 
-**Phase 2 Features (Post-Launch):**
+**Post-Launch Features:**
 
 - Real payment processing (Razorpay integration)
 - KYC verification (DigiLocker API)
@@ -416,24 +401,12 @@ This repository contains comprehensive documentation:
 - Traveller deposits (reduces no-shows)
 - In-app chat (sender ↔ traveller)
 - SMS notifications for receiver
-
-**Phase 3 Features (Growth):**
-
 - Rating filters and traveller badges
 - Insurance integration for high-value parcels
 - Route recommendations (AI-based matching)
 - Bulk sender accounts (small businesses)
 - Referral program
 - Multi-parcel bundling (same trip, single payment)
-
-**Phase 4 Features (Scale):**
-
-- Pan-India expansion (tier-2/tier-3 cities)
-- Live location tracking during delivery
-- Dispute resolution workflows
-- In-app support chat
-- Receiver user accounts (optional)
-- Automated fraud detection
 
 ---
 
@@ -443,76 +416,16 @@ This repository contains comprehensive documentation:
 Every feature decision asks: "Does this unblock real user value?" Advanced features like auto-KYC, live tracking, and in-app chat are deferred until core flows (trip creation, request, handoff) are validated with real users.
 
 **Security by Design:**
-Authentication and security were built first and properly, not bolted on later. Database-side account lockout, email enumeration prevention, and session management are foundational, not afterthoughts.
+Authentication and security were built first and properly, not bolted on later. Database-side account lockout, email enumeration prevention, OTP expiry, and session management are foundational, not afterthoughts.
+
 **Trust Without Complexity:**
 Instead of heavy KYC upfront (which slows onboarding), we use lightweight trust signals: OTPs, photos, ratings, and ticket verification. Post-MVP, DigiLocker integration will unlock higher-value parcels.
 
 **Offline-Resilient:**
 Travellers may have poor connectivity on trains/buses. The app caches trips and allows offline viewing, syncing changes when connected. Critical actions (OTP entry, photo upload) queue for retry.
 
-**Closed Beta Validation:**
-MVP launches as closed beta in Delhi-Mumbai corridor first. This allows us to:
-
-- Manually onboard initial users
-- Test full delivery flows in controlled environment
-- Gather feedback before wider rollout
-- Validate pricing model and unit economics
-
 **Developer Velocity:**
 The stack choice (Expo + Supabase) minimizes infrastructure work, letting a single developer focus on product logic rather than server management, API boilerplate, or platform-specific code. No backend deployment, no API versioning, no Docker configs in MVP.
-
----
-
-## Project Structure
-
-```
-travelconnect/
-├── app/                      # Expo Router file-based routing
-│   ├── (auth)/              # Auth screens (login, register, OTP, password reset)
-│   │   ├── _layout.tsx      # Auth stack navigation
-│   │   ├── login.tsx
-│   │   ├── register.tsx
-│   │   ├── verify-otp.tsx
-│   │   ├── forgot-password.tsx
-│   │   ├── verify-reset-otp.tsx
-│   │   └── reset-new-password.tsx
-│   ├── _layout.tsx          # Root layout with auth guard
-│   └── index.tsx            # Landing/home screen
-├── components/              # Reusable UI components
-│   ├── auth/               # Auth-specific components
-│   │   ├── FormInput.tsx   # Text input with validation
-│   │   └── OtpInput.tsx    # 6-box OTP input
-│   └── shared/             # Shared components
-│       └── OfflineNotice.tsx # Network status banner
-├── lib/                     # Utilities and configurations
-│   ├── supabase.ts         # Supabase client setup
-│   ├── utils/              # Helper functions
-│   │   ├── availabilityCheck.ts  # RPC function wrappers
-│   │   ├── haptics.ts            # Haptic feedback
-│   │   ├── network.ts            # Network status hook
-│   │   ├── parseSupabaseError.ts # Error message parser
-│   │   ├── rateLimit.ts          # Client-side rate limiter
-│   │   └── sanitize.ts           # Input sanitization
-│   └── validations/        # Zod schemas
-│       └── auth.ts         # Auth validation schemas
-├── stores/                  # Zustand state management
-│   ├── authStore.ts        # Auth state (session, user, actions)
-│   └── profileStore.ts     # Profile state (synced with authStore)
-├── styles/                  # Centralized design system
-│   ├── theme.ts            # Design tokens (Colors, Spacing, Typography)
-│   ├── commonStyles.ts     # Reusable StyleSheet styles
-│   └── index.ts            # Barrel export
-├── types/                   # TypeScript types
-│   └── database.types.ts   # Auto-generated from Supabase
-├── docs/                    # Documentation
-│   ├── BACKEND.md          # Database schema, RLS, triggers
-│   ├── AUTH.md             # Authentication architecture
-│   └── FRONTEND.md         # Component structure, state management
-├── supabase/               # Supabase configuration
-│   └── migrations/         # SQL migrations
-│       └── 20260120230702_remote_schema.sql
-└── README.md               # This file
-```
 
 ---
 
@@ -561,7 +474,11 @@ npm run web
 
 ### Database Setup
 
-The migration file `supabase/migrations/20260120230702_remote_schema.sql` contains the complete database schema. Apply it via Supabase dashboard SQL editor.
+Apply the migration files via Supabase dashboard SQL editor in order:
+
+1. Initial schema (profiles, trips, parcel_requests)
+2. OTP columns and functions
+3. RLS policies
 
 **Note:** You may need to manually create the trigger on `auth.users` table for profile auto-creation:
 

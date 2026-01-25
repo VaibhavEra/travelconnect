@@ -28,6 +28,8 @@ TravelConnect implements a **secure, production-ready authentication system** wi
 - Rate limiting on sensitive operations
 - **Dual-store architecture** (authStore + profileStore)
 
+**Note:** Role (sender vs traveller) is handled **client-side** via `modeStore` and is **not** stored in the `profiles` table for MVP.
+
 **Design Philosophy:** Security first, UX second. Every auth decision prioritizes preventing attacks over convenience, but maintains good UX through clear feedback and fast responses.
 
 ---
@@ -40,7 +42,7 @@ TravelConnect implements a **secure, production-ready authentication system** wi
 
 User fills form → Client validation → Availability checks (debounced) → Submit
 ↓
-Supabase creates auth.users → Trigger creates profile (roles: ['sender'])
+Supabase creates auth.users → Trigger creates profile
 ↓
 OTP sent to email ← User sees OTP screen (60s resend timer)
 ↓
@@ -149,7 +151,7 @@ await useProfileStore.getState().syncProfile();
 
 - Cleaner separation of concerns
 - Profile can be refetched without re-auth
-- Easier to add role-based UI (traveller vs sender)
+- Easier to add role-based UI (traveller vs sender via modeStore)
 - Profile creation via trigger can have delay (retry logic handles it)
 
 ---
@@ -224,7 +226,6 @@ $$ LANGUAGE plpgsql SECURITY DEFINER;
 **Why This Works:**
 
 - **Auto-expires**: Checks only last 15 minutes (no cron job needed)
-- **No manual unlock**: Old attempts automatically ignored
 - **Cross-device**: Works across devices (server-side enforcement)
 - **Cannot be bypassed**: Client-side rate limiter removed for login
 
@@ -410,13 +411,6 @@ const resetPassword = async (email: string) => {
 
 - 3 attempts per hour per email
 - Key: `reset-password:${email}`
-- Applied to both initial request and resend
-
-**Success screen shows:**
-
-1. "Enter Code" button → navigate to verify-reset-otp (with email param)
-2. "Resend code" button → calls resetPasswordForEmail again
-3. "Use different email" → back to form
 
 ### Phase 2: Verify OTP (verify-reset-otp.tsx)
 
@@ -450,26 +444,12 @@ const verifyResetOtp = async (email: string, otp: string) => {
 **On success:**
 
 - Creates **recovery session** (limited permissions)
-- Session stored in authStore (user + session)
-- Navigate to reset-new-password screen (replace, no back)
-
-**Recovery session characteristics:**
-
-- Can ONLY update password (not full access)
-- Expires after password update
-- Converted to regular session after successful password change
+- Navigate to reset-new-password (replace, no back)
 
 **Rate limiting:**
 
-- Verify attempts: 3 per hour (passwordReset config)
-- Resend attempts: 3 per 5 minutes (otpResend config)
-- Different keys: `verify-reset-otp:${email}` vs `resend-reset-otp:${email}`
-
-**Resend functionality:**
-
-- Calls `resetPasswordForEmail` again
-- Shows "Code Resent" alert
-- User can go back to forgot-password screen (back button enabled)
+- Verify attempts: 3 per hour
+- Resend attempts: 3 per 5 minutes
 
 ### Phase 3: Set New Password (reset-new-password.tsx)
 
@@ -509,52 +489,21 @@ const updatePassword = async (newPassword: string) => {
 
 **On success:**
 
-- Recovery session automatically converted to regular session by Supabase
+- Recovery session → regular session
 - Failed login attempts cleared
-- User is now logged in
-- Navigate to home with Alert: "Your password has been successfully reset. You're now logged in."
+- Auto-login to home
 
-**Password requirements:**
+**Navigation Protection**
 
-- Same as registration (8+ chars, uppercase, lowercase, number, special char)
-- Password strength indicator shown
-- Both password and confirm password fields with separate toggles
-
-### Navigation Protection
-
-**Root layout (\_layout.tsx) handles recovery session:**
+Root layout handles recovery session:
 
 ```typescript
-useEffect(() => {
-  if (loading) return;
-
-  const inAuthGroup = segments === "(auth)";
-  const isOnPasswordResetFlow =
-    segments === "verify-reset-otp" || segments === "reset-new-password";
-
-  if (!session && !inAuthGroup) {
-    // No session and not in auth screens → redirect to login
-    router.replace("/(auth)/login");
-  } else if (session && inAuthGroup) {
-    // Has session and in auth screens
-
-    // CRITICAL: Don't redirect if user is resetting password
-    if (isOnPasswordResetFlow) {
-      // Let them complete password reset flow
-      return;
-    }
-
-    // Otherwise redirect to home (they're logged in)
-    router.replace("/");
-  }
-}, [session, loading]);
+// CRITICAL: Don't redirect if user is resetting password
+if (isOnPasswordResetFlow) {
+  // Let them complete password reset flow
+  return;
+}
 ```
-
-**Why This Matters:**
-
-- Recovery session looks like regular session to auth guard
-- Without this check, user would be redirected to home mid-reset
-- Segments check prevents premature redirect
 
 ---
 
@@ -607,48 +556,7 @@ export const registerSchema = z
   });
 ```
 
-**Login:**
-
-```typescript
-export const loginSchema = z.object({
-  email: z.string().email("Invalid email address"),
-  password: z.string().min(1, "Password is required"),
-});
-```
-
-**Password Reset (New Password):**
-
-```typescript
-export const newPasswordSchema = z
-  .object({
-    password: z
-      .string()
-      .min(8, "Password must be at least 8 characters")
-      .regex(/[A-Z]/, "Must contain at least one uppercase letter")
-      .regex(/[a-z]/, "Must contain at least one lowercase letter")
-      .regex(/[0-9]/, "Must contain at least one number")
-      .regex(
-        /[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]/,
-        "Must contain at least one special character",
-      ),
-    confirmPassword: z.string(),
-  })
-  .refine((data) => data.password === data.confirmPassword, {
-    message: "Passwords don't match",
-    path: ["confirmPassword"],
-  });
-```
-
-**OTP Verification:**
-
-```typescript
-export const otpVerificationSchema = z.object({
-  emailOtp: z
-    .string()
-    .length(6, "Code must be 6 digits")
-    .regex(/^\d+$/, "Code must be numeric"),
-});
-```
+**Login, Password Reset, OTP**: Same patterns as shown in validation/auth.ts.
 
 ### Password Strength Indicator
 
@@ -671,8 +579,6 @@ const getPasswordStrength = (pass: string): { text: string; color: string } => {
   return { text: "Fair", color: Colors.warning };
 };
 ```
-
-Displayed in registration and password reset screens below password field.
 
 ---
 
@@ -795,7 +701,9 @@ initialize: async () => {
 
 Called in `app/_layout.tsx` on app launch.
 
-### Profile Sync Logic (profileStore)
+---
+
+## Profile Sync Logic (profileStore)
 
 ```typescript
 syncProfile: async () => {
@@ -805,14 +713,11 @@ syncProfile: async () => {
     return;
   }
 
-
   set({ loading: true });
-
 
   // Retry logic with exponential backoff
   let attempt = 0;
   const maxAttempts = 5;
-
 
   while (attempt < maxAttempts) {
     try {
@@ -822,9 +727,7 @@ syncProfile: async () => {
         .eq('id', user.id)
         .single();
 
-
       if (error) throw error;
-
 
       set({ profile: data, loading: false, error: null });
       return;
@@ -838,7 +741,6 @@ syncProfile: async () => {
         });
         return;
       }
-
 
       // Exponential backoff: 500ms, 1s, 2s, 4s
       await new Promise((resolve) =>
@@ -881,15 +783,6 @@ export const sanitize = {
 };
 ```
 
-**Usage in forms:**
-
-```typescript
-<FormInput
-  value={email}
-  onChangeText={(text) => onChange(sanitize.email(text))}
-/>
-```
-
 ---
 
 ### Rate Limiting (Client-Side)
@@ -916,21 +809,7 @@ export const rateLimitConfigs = {
 };
 ```
 
-**Usage:**
-
-```typescript
-const rateCheck = rateLimiter.check("signup", rateLimitConfigs.signup);
-if (!rateCheck.allowed) {
-  haptics.error();
-  Alert.alert(
-    "Too Many Attempts",
-    `Please wait ${rateCheck.retryAfter} before trying again.`,
-  );
-  return;
-}
-```
-
-**Note:** This is UX protection only, not security. Server-side rate limiting handled by Supabase.
+**Note:** This is UX protection only. Server-side rate limiting handled by Supabase.
 
 ---
 
@@ -952,8 +831,6 @@ export const useNetworkStatus = () => {
 };
 ```
 
-Shows offline banner (OfflineNotice component) and prevents API calls when disconnected.
-
 ---
 
 ### Haptic Feedback
@@ -967,22 +844,6 @@ export const haptics = {
   light: () => Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light),
   selection: () => Haptics.selectionAsync(),
 };
-```
-
-**Usage:**
-
-```typescript
-// On successful login
-haptics.success();
-
-// On error
-haptics.error();
-
-// On button press
-haptics.light();
-
-// On navigation/selection
-haptics.selection();
 ```
 
 ---
@@ -1000,7 +861,7 @@ haptics.selection();
 - [ ] Weak password → Strength indicator shows "Weak"
 - [ ] Strong password → Strength indicator shows "Strong"
 - [ ] Passwords don't match → Error
-- [ ] OTP verification → Profile created with roles: ['sender']
+- [ ] OTP verification → Profile created
 - [ ] Resend OTP → 60-second timer restarts
 - [ ] Profile syncs after verification
 
@@ -1023,7 +884,6 @@ haptics.selection();
 - [ ] Weak password → Errors + strength indicator
 - [ ] Success → Auto-login + "You're now logged in" alert
 - [ ] Check: failed attempts cleared after reset
-- [ ] Resend OTP → Works with rate limiting
 
 **Session Persistence:**
 
@@ -1031,12 +891,6 @@ haptics.selection();
 - [ ] Token refresh happens automatically (after 1 hour)
 - [ ] Logout → Session cleared
 - [ ] Profile syncs on app launch
-
-**Lockout & Cleanup:**
-
-- [ ] 3 failed attempts → Logout → Login → Counter reset (not at 4)
-- [ ] 5 failed attempts → Reset password → Counter cleared
-- [ ] Locked account → Wait 15 min → Counter ignored (auto-expired)
 
 ---
 
@@ -1072,13 +926,8 @@ CREATE TABLE profiles (
   username TEXT NOT NULL UNIQUE,
   phone TEXT NOT NULL UNIQUE,
   full_name TEXT NOT NULL,
-  roles TEXT[] NOT NULL DEFAULT ARRAY['sender']::TEXT[], -- Array of roles
-  rating DECIMAL(3, 2) DEFAULT 0,
-  total_ratings INT DEFAULT 0,
-  trips_completed INT DEFAULT 0,
-  packages_sent INT DEFAULT 0,
-  packages_delivered INT DEFAULT 0,
-  avatar_url TEXT,
+  rating NUMERIC(2,1) DEFAULT 0.0,
+  rating_count INTEGER DEFAULT 0,
   created_at TIMESTAMPTZ DEFAULT NOW(),
   updated_at TIMESTAMPTZ DEFAULT NOW()
 );
@@ -1088,6 +937,8 @@ CREATE INDEX idx_profiles_email ON profiles(email);
 CREATE INDEX idx_profiles_phone ON profiles(phone);
 CREATE INDEX idx_profiles_rating ON profiles(rating DESC);
 ```
+
+**Note:** No `roles` column in MVP. Sender/traveller mode is handled client-side via `modeStore`.
 
 ### failed_login_attempts table
 
@@ -1116,7 +967,6 @@ CREATE INDEX idx_failed_login_attempts_attempt_at ON failed_login_attempts(attem
 -- Check trigger exists
 SELECT trigger_name FROM information_schema.triggers
 WHERE event_object_table = 'users' AND trigger_schema = 'auth';
-
 
 -- Reinstall trigger
 CREATE TRIGGER on_auth_user_created
@@ -1164,22 +1014,3 @@ DELETE FROM failed_login_attempts WHERE email = 'user@example.com';
 ---
 
 **End of Authentication Documentation**
-
-```
-
-***
-
-**Key Changes Made:**
-
-1. Added dual-store architecture section (authStore + profileStore)
-2. Updated password reset flow to 3-screen implementation
-3. Changed account lockout from client-side to database-side
-4. Added recovery session handling details
-5. Updated navigation protection for password reset flow
-6. Added profile sync logic with exponential backoff
-7. Updated failed attempts clearing conditions
-8. Added profiles.roles as TEXT[] array (not boolean flags)
-9. Added rate limiting details for all flows
-10. Updated testing checklist with new scenarios
-11. Fixed project name references (TravelConnect only)
-```
