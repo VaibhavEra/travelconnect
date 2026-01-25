@@ -35,93 +35,12 @@ export type Database = {
         }
         Relationships: []
       }
-      packages: {
+      parcel_requests: {
         Row: {
           accepted_at: string | null
           category: string
-          cost: number
           created_at: string | null
           delivered_at: string | null
-          delivery_otp: string | null
-          delivery_photo: string | null
-          id: string
-          photos: string[] | null
-          picked_at: string | null
-          pickup_otp: string | null
-          pickup_photo: string | null
-          receiver_name: string
-          receiver_phone: string
-          sender_id: string
-          status: string | null
-          trip_id: string
-          updated_at: string | null
-          weight: string
-        }
-        Insert: {
-          accepted_at?: string | null
-          category: string
-          cost: number
-          created_at?: string | null
-          delivered_at?: string | null
-          delivery_otp?: string | null
-          delivery_photo?: string | null
-          id?: string
-          photos?: string[] | null
-          picked_at?: string | null
-          pickup_otp?: string | null
-          pickup_photo?: string | null
-          receiver_name: string
-          receiver_phone: string
-          sender_id: string
-          status?: string | null
-          trip_id: string
-          updated_at?: string | null
-          weight: string
-        }
-        Update: {
-          accepted_at?: string | null
-          category?: string
-          cost?: number
-          created_at?: string | null
-          delivered_at?: string | null
-          delivery_otp?: string | null
-          delivery_photo?: string | null
-          id?: string
-          photos?: string[] | null
-          picked_at?: string | null
-          pickup_otp?: string | null
-          pickup_photo?: string | null
-          receiver_name?: string
-          receiver_phone?: string
-          sender_id?: string
-          status?: string | null
-          trip_id?: string
-          updated_at?: string | null
-          weight?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "packages_sender_id_fkey"
-            columns: ["sender_id"]
-            isOneToOne: false
-            referencedRelation: "profiles"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "packages_trip_id_fkey"
-            columns: ["trip_id"]
-            isOneToOne: false
-            referencedRelation: "trips"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      parcel_requests: {
-        Row: {
-          category: string
-          created_at: string | null
-          delivered_at: string | null
-          delivery_address: string | null
           delivery_contact_name: string
           delivery_contact_phone: string
           delivery_otp: string | null
@@ -130,11 +49,9 @@ export type Database = {
           item_description: string
           parcel_photos: string[] | null
           picked_up_at: string | null
-          pickup_address: string | null
-          pickup_contact_name: string | null
-          pickup_contact_phone: string | null
           pickup_otp: string | null
           pickup_otp_expires_at: string | null
+          rejected_at: string | null
           rejection_reason: string | null
           sender_id: string
           sender_notes: string | null
@@ -145,10 +62,10 @@ export type Database = {
           updated_at: string | null
         }
         Insert: {
+          accepted_at?: string | null
           category: string
           created_at?: string | null
           delivered_at?: string | null
-          delivery_address?: string | null
           delivery_contact_name: string
           delivery_contact_phone: string
           delivery_otp?: string | null
@@ -157,11 +74,9 @@ export type Database = {
           item_description: string
           parcel_photos?: string[] | null
           picked_up_at?: string | null
-          pickup_address?: string | null
-          pickup_contact_name?: string | null
-          pickup_contact_phone?: string | null
           pickup_otp?: string | null
           pickup_otp_expires_at?: string | null
+          rejected_at?: string | null
           rejection_reason?: string | null
           sender_id: string
           sender_notes?: string | null
@@ -172,10 +87,10 @@ export type Database = {
           updated_at?: string | null
         }
         Update: {
+          accepted_at?: string | null
           category?: string
           created_at?: string | null
           delivered_at?: string | null
-          delivery_address?: string | null
           delivery_contact_name?: string
           delivery_contact_phone?: string
           delivery_otp?: string | null
@@ -184,11 +99,9 @@ export type Database = {
           item_description?: string
           parcel_photos?: string[] | null
           picked_up_at?: string | null
-          pickup_address?: string | null
-          pickup_contact_name?: string | null
-          pickup_contact_phone?: string | null
           pickup_otp?: string | null
           pickup_otp_expires_at?: string | null
+          rejected_at?: string | null
           rejection_reason?: string | null
           sender_id?: string
           sender_notes?: string | null
@@ -211,66 +124,6 @@ export type Database = {
             columns: ["trip_id"]
             isOneToOne: false
             referencedRelation: "trips"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      payments: {
-        Row: {
-          amount: number
-          created_at: string | null
-          gateway_name: string | null
-          gateway_ref: string | null
-          id: string
-          notes: string | null
-          package_id: string
-          sender_id: string
-          settled_at: string | null
-          settled_to_traveller: boolean | null
-          status: string | null
-          updated_at: string | null
-        }
-        Insert: {
-          amount: number
-          created_at?: string | null
-          gateway_name?: string | null
-          gateway_ref?: string | null
-          id?: string
-          notes?: string | null
-          package_id: string
-          sender_id: string
-          settled_at?: string | null
-          settled_to_traveller?: boolean | null
-          status?: string | null
-          updated_at?: string | null
-        }
-        Update: {
-          amount?: number
-          created_at?: string | null
-          gateway_name?: string | null
-          gateway_ref?: string | null
-          id?: string
-          notes?: string | null
-          package_id?: string
-          sender_id?: string
-          settled_at?: string | null
-          settled_to_traveller?: boolean | null
-          status?: string | null
-          updated_at?: string | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "payments_package_id_fkey"
-            columns: ["package_id"]
-            isOneToOne: false
-            referencedRelation: "packages"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "payments_sender_id_fkey"
-            columns: ["sender_id"]
-            isOneToOne: false
-            referencedRelation: "profiles"
             referencedColumns: ["id"]
           },
         ]
@@ -398,12 +251,7 @@ export type Database = {
         Returns: undefined
       }
       generate_otp: { Args: never; Returns: string }
-      generate_pickup_otp: {
-        Args: { request_id: string }
-        Returns: {
-          otp: string
-        }[]
-      }
+      generate_pickup_otp: { Args: { request_id: string }; Returns: string }
       is_account_locked: { Args: { user_email: string }; Returns: boolean }
       record_failed_login: {
         Args: { user_email: string; user_ip?: string }

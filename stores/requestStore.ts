@@ -396,20 +396,12 @@ export const useRequestStore = create<RequestState>((set, get) => ({
 
   // Generate pickup OTP (called when accepting request)
   generatePickupOtp: async (requestId: string) => {
-    try {
-      const { data, error } = await supabase.rpc("generate_pickup_otp", {
-        request_id: requestId,
-      });
+    const { data, error } = await supabase.rpc("generate_pickup_otp", {
+      request_id: requestId,
+    });
 
-      if (error) throw error;
-
-      // data is an array with one object containing otp
-      const otp = data && data.length > 0 ? data[0].otp : "";
-      return otp;
-    } catch (error) {
-      log.error("Generate pickup OTP failed", error);
-      throw error;
-    }
+    if (error) throw error;
+    return data as string; // NEW - returns string directly
   },
 
   // Verify pickup OTP and mark as picked up
