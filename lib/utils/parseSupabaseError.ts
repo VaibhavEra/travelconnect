@@ -1,3 +1,4 @@
+// lib/utils/parseSupabaseError.ts
 export function parseSupabaseError(error: any): string {
   const message = error?.message || "";
 
@@ -9,16 +10,32 @@ export function parseSupabaseError(error: any): string {
     return "Please verify your email before logging in";
   }
 
+  // OTP-specific errors (NEW)
+  if (message.includes("Token has expired") || message.includes("expired")) {
+    return "Verification code has expired. Please request a new one";
+  }
+
+  if (message.includes("Invalid token") || message.includes("invalid")) {
+    return "Invalid verification code. Please check and try again";
+  }
+
+  if (message.includes("Token already used")) {
+    return "This verification code has already been used. Please request a new one";
+  }
+
   // Auth errors
   if (message.includes("Invalid login credentials")) {
     return "Invalid email or password";
   }
+
   if (message.includes("Email not confirmed")) {
     return "Please verify your email before logging in";
   }
+
   if (message.includes("Email rate limit exceeded")) {
     return "Too many attempts. Please wait a few minutes";
   }
+
   if (message.includes("User already registered")) {
     return "Email already registered. Please login instead";
   }
@@ -37,6 +54,22 @@ export function parseSupabaseError(error: any): string {
     return "This value is already in use";
   }
 
+  // PostgreSQL error codes (for trips and other operations)
+  if (error?.code) {
+    switch (error.code) {
+      case "23503": // Foreign key violation
+        return "Referenced item does not exist";
+      case "23502": // Not null violation
+        return "Required field is missing";
+      case "42501": // Insufficient privilege
+        return "You don't have permission to perform this action";
+      case "22001": // String data right truncation
+        return "Input is too long";
+      case "PGRST116": // No rows returned
+        return "Item not found";
+    }
+  }
+
   // Network errors
   if (
     message.includes("Failed to fetch") ||
@@ -47,6 +80,14 @@ export function parseSupabaseError(error: any): string {
 
   if (message.includes("timeout")) {
     return "Request timed out. Please try again";
+  }
+
+  // Catch-all for unknown Supabase/PostgreSQL errors (NEW)
+  if (
+    error?.code?.startsWith("PGRST") ||
+    message.toLowerCase().includes("supabase")
+  ) {
+    return "An error occurred. Please try again";
   }
 
   // Generic fallback
