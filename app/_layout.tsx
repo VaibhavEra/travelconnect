@@ -1,4 +1,6 @@
+// app/_layout.tsx
 import { useAuthStore } from "@/stores/authStore";
+import { useModeStore } from "@/stores/modeStore";
 import { Colors } from "@/styles";
 import { Slot, useRouter, useSegments } from "expo-router";
 import { useEffect } from "react";
@@ -8,13 +10,21 @@ export default function RootLayout() {
   const router = useRouter();
   const segments = useSegments();
   const { session, loading: authLoading, initialize } = useAuthStore();
+  const {
+    currentMode,
+    loading: modeLoading,
+    initialize: initializeMode,
+  } = useModeStore();
 
+  // Initialize both auth and mode on app start
   useEffect(() => {
     initialize();
-  }, [initialize]);
+    initializeMode();
+  }, [initialize, initializeMode]);
 
   useEffect(() => {
-    if (authLoading) return;
+    // Wait for both auth AND mode to load
+    if (authLoading || modeLoading) return;
 
     const inAuthGroup = segments[0] === "(auth)";
     const inTabsGroup = segments[0] === "(tabs)";
@@ -24,41 +34,35 @@ export default function RootLayout() {
       segments[1] === "verify-reset-otp" ||
       segments[1] === "reset-new-password";
 
-    // Check if on dynamic route by converting to string
+    // Check if on dynamic route
     const firstSegment = String(segments[0] || "");
     const isOnDynamicRoute =
-      firstSegment === "trip" ||
-      firstSegment.startsWith("trip-") ||
+      firstSegment.startsWith("trip") ||
       firstSegment === "request-form" ||
       firstSegment === "request-details" ||
       firstSegment === "incoming-request-details";
 
+    // FIXED: Get default route based on mode
+    const getDefaultRoute = () => {
+      return currentMode === "sender" ? "/(tabs)/explore" : "/(tabs)/my-trips";
+    };
+
+    // Navigation logic
     if (!session && !inAuthGroup) {
-      // No session and not in auth screens → redirect to login
+      // No session → redirect to login
       router.replace("/(auth)/login");
-    } else if (session && inAuthGroup) {
-      // Has session and in auth screens
-
-      // CRITICAL: Don't redirect if user is resetting password
-      if (isOnPasswordResetFlow) {
-        return;
-      }
-
-      // Redirect to tabs
-      router.replace("/(tabs)/my-trips");
-    } else if (
-      session &&
-      !inTabsGroup &&
-      !inAuthGroup &&
-      !isOnDynamicRoute &&
-      segments.length > 0
-    ) {
-      // Has session but not in tabs/auth/dynamic routes → redirect to tabs
-      router.replace("/(tabs)/my-trips");
+    } else if (session && inAuthGroup && !isOnPasswordResetFlow) {
+      // Authenticated user in auth screens (not resetting password) → redirect to tabs
+      router.replace(getDefaultRoute());
+    } else if (session && !inTabsGroup && !inAuthGroup && !isOnDynamicRoute) {
+      // Authenticated user NOT in tabs/auth/dynamic routes → redirect to default tab
+      // This catches any miscellaneous routes including root
+      router.replace(getDefaultRoute());
     }
-  }, [session, authLoading, segments]);
+  }, [session, authLoading, modeLoading, segments, currentMode]);
 
-  if (authLoading) {
+  // Show loading while initializing
+  if (authLoading || modeLoading) {
     return (
       <View style={styles.loadingContainer}>
         <ActivityIndicator size="large" color={Colors.primary} />

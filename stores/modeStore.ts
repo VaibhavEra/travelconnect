@@ -1,3 +1,5 @@
+// stores/modeStore.ts
+import { logger } from "@/lib/utils/logger"; // ADDED
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { create } from "zustand";
 
@@ -32,8 +34,10 @@ export const useModeStore = create<ModeState>((set, get) => ({
         set({ currentMode: "sender", loading: false });
         await AsyncStorage.setItem(MODE_STORAGE_KEY, "sender");
       }
+
+      logger.info("Mode initialized", { mode: get().currentMode }); // ADDED
     } catch (error) {
-      console.error("[ModeStore] Failed to initialize mode:", error);
+      logger.error("Failed to initialize mode", error); // CHANGED
       set({ currentMode: "sender", loading: false });
     }
   },
@@ -43,8 +47,9 @@ export const useModeStore = create<ModeState>((set, get) => ({
     try {
       set({ currentMode: mode });
       await AsyncStorage.setItem(MODE_STORAGE_KEY, mode);
+      logger.info("Mode switched", { mode }); // ADDED
     } catch (error) {
-      console.error("[ModeStore] Failed to switch mode:", error);
+      logger.error("Failed to switch mode", error); // CHANGED
     }
   },
 }));
