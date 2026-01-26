@@ -1,5 +1,6 @@
 // stores/profileStore.ts
 import { supabase } from "@/lib/supabase";
+import { logger } from "@/lib/utils/logger";
 import { Database } from "@/types/database.types";
 import { create } from "zustand";
 
@@ -17,19 +18,7 @@ interface ProfileState {
   setProfile: (profile: Profile | null) => void;
   refreshProfile: (userId: string) => Promise<void>;
   updateProfile: (userId: string, updates: ProfileUpdate) => Promise<void>;
-  // updateAvatar: (userId: string, avatarUrl: string) => Promise<void>; // Commented out until avatar_url is added to DB
 }
-
-// Conditional logging utility
-const isDev = __DEV__;
-const log = {
-  info: (message: string, ...args: any[]) => {
-    if (isDev) console.log(`[Profile] ${message}`, ...args);
-  },
-  error: (message: string, error?: any) => {
-    if (isDev) console.error(`[Profile Error] ${message}`, error);
-  },
-};
 
 export const useProfileStore = create<ProfileState>((set, get) => ({
   // Initial state
@@ -39,7 +28,7 @@ export const useProfileStore = create<ProfileState>((set, get) => ({
   // Set profile directly (used by authStore after login)
   setProfile: (profile) => {
     set({ profile });
-    log.info("Profile set", profile?.username);
+    logger.info("Profile set", { username: profile?.username });
   },
 
   // Refresh profile data from database
@@ -56,9 +45,9 @@ export const useProfileStore = create<ProfileState>((set, get) => ({
       if (error) throw error;
 
       set({ profile, loading: false });
-      log.info("Profile refreshed", profile.username);
+      logger.info("Profile refreshed", { username: profile.username });
     } catch (error) {
-      log.error("Refresh profile failed", error);
+      logger.error("Refresh profile failed", error);
       set({ loading: false });
       throw error;
     }
@@ -79,35 +68,11 @@ export const useProfileStore = create<ProfileState>((set, get) => ({
       if (error) throw error;
 
       set({ profile, loading: false });
-      log.info("Profile updated", updates);
+      logger.info("Profile updated", { updates });
     } catch (error) {
-      log.error("Update profile failed", error);
+      logger.error("Update profile failed", error);
       set({ loading: false });
       throw error;
     }
   },
-
-  // TODO: Uncomment when avatar_url is added to database
-  // Update avatar URL
-  // updateAvatar: async (userId: string, avatarUrl: string) => {
-  //   try {
-  //     set({ loading: true });
-
-  //     const { data: profile, error } = await supabase
-  //       .from("profiles")
-  //       .update({ avatar_url: avatarUrl })
-  //       .eq("id", userId)
-  //       .select()
-  //       .single();
-
-  //     if (error) throw error;
-
-  //     set({ profile, loading: false });
-  //     log.info("Avatar updated", avatarUrl);
-  //   } catch (error) {
-  //     log.error("Update avatar failed", error);
-  //     set({ loading: false });
-  //     throw error;
-  //   }
-  // },
 }));

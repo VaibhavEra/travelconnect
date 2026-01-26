@@ -1,5 +1,6 @@
 // stores/authStore.ts
 import { supabase } from "@/lib/supabase";
+import { logger } from "@/lib/utils/logger";
 import { Database } from "@/types/database.types";
 import { Session, User } from "@supabase/supabase-js";
 import { create } from "zustand";
@@ -17,12 +18,36 @@ interface SignUpData {
   phone: string;
 }
 
+// Auth flow states (NEW)
+export enum AuthFlowState {
+  UNAUTHENTICATED = "unauthenticated",
+  SIGNUP_OTP_SENT = "signup_otp_sent",
+  RESET_OTP_SENT = "reset_otp_sent",
+  RESET_SESSION_ACTIVE = "reset_session_active",
+  AUTHENTICATED = "authenticated",
+}
+
+// Flow context (NEW)
+interface AuthFlowContext {
+  email?: string;
+  phone?: string;
+  userId?: string;
+  otpPurpose?: "signup" | "reset";
+  resetSessionExpiry?: number; // timestamp
+}
+
 // Auth store state interface
 interface AuthState {
   // State
   session: Session | null;
   user: User | null;
   loading: boolean;
+
+  // NEW: Flow state
+  flowState: AuthFlowState;
+  flowContext: AuthFlowContext | null;
+
+  // DEPRECATED: Use flowContext instead
   pendingVerification: {
     email: string;
     phone: string;
@@ -39,34 +64,49 @@ interface AuthState {
   resetPassword: (email: string) => Promise<void>;
   verifyResetOtp: (email: string, otp: string) => Promise<void>;
   updatePassword: (newPassword: string) => Promise<void>;
+
+  // NEW: Flow state management
+  setFlowState: (state: AuthFlowState, context?: AuthFlowContext) => void;
+  clearFlowContext: () => void;
+
+  // DEPRECATED: Use setFlowState instead
   setPendingVerification: (
     data: { email: string; phone: string; userId: string } | null,
   ) => void;
+
+  // Security
   checkAccountLocked: (email: string) => Promise<boolean>;
   recordFailedLogin: (email: string) => Promise<void>;
   clearFailedAttempts: (email: string) => Promise<void>;
 }
 
-// Conditional logging utility
-const isDev = __DEV__;
-const log = {
-  info: (message: string, ...args: any[]) => {
-    if (isDev) console.log(`[Auth] ${message}`, ...args);
-  },
-  error: (message: string, error?: any) => {
-    if (isDev) console.error(`[Auth Error] ${message}`, error);
-  },
-  warn: (message: string, ...args: any[]) => {
-    if (isDev) console.warn(`[Auth Warning] ${message}`, ...args);
-  },
-};
+// Store auth subscription outside store to prevent leaks (FIXED)
+let authSubscription: { unsubscribe: () => void } | null = null;
 
 export const useAuthStore = create<AuthState>((set, get) => ({
   // Initial state
   session: null,
   user: null,
   loading: true,
-  pendingVerification: null,
+  flowState: AuthFlowState.UNAUTHENTICATED,
+  flowContext: null,
+  pendingVerification: null, // DEPRECATED
+
+  // NEW: Set flow state
+  setFlowState: (state: AuthFlowState, context?: AuthFlowContext) => {
+    logger.info("Setting flow state", { state, context });
+    set({ flowState: state, flowContext: context || null });
+  },
+
+  // NEW: Clear flow context
+  clearFlowContext: () => {
+    logger.info("Clearing flow context");
+    set({
+      flowState: AuthFlowState.UNAUTHENTICATED,
+      flowContext: null,
+      pendingVerification: null,
+    });
+  },
 
   // Initialize auth state and listen for changes
   initialize: async () => {
@@ -93,17 +133,23 @@ export const useAuthStore = create<AuthState>((set, get) => ({
         set({
           session,
           user: session.user,
+          flowState: AuthFlowState.AUTHENTICATED,
           loading: false,
         });
       } else {
         set({ loading: false });
       }
 
+      // Clean up previous subscription if exists (FIXED)
+      if (authSubscription) {
+        authSubscription.unsubscribe();
+      }
+
       // Store subscription to clean up later
       const {
         data: { subscription },
       } = supabase.auth.onAuthStateChange(async (event, session) => {
-        log.info("Auth state changed", event);
+        logger.info("Auth state changed", { event });
 
         if (event === "SIGNED_IN" && session) {
           const { data: profile } = await supabase
@@ -120,6 +166,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
           set({
             session,
             user: session.user,
+            flowState: AuthFlowState.AUTHENTICATED,
             loading: false,
           });
         } else if (event === "SIGNED_OUT") {
@@ -129,6 +176,8 @@ export const useAuthStore = create<AuthState>((set, get) => ({
           set({
             session: null,
             user: null,
+            flowState: AuthFlowState.UNAUTHENTICATED,
+            flowContext: null,
             loading: false,
           });
         } else if (event === "TOKEN_REFRESHED" && session) {
@@ -136,10 +185,9 @@ export const useAuthStore = create<AuthState>((set, get) => ({
         }
       });
 
-      // Optional: Return cleanup function if needed
-      // return () => subscription.unsubscribe();
+      authSubscription = subscription;
     } catch (error) {
-      log.error("Initialize auth failed", error);
+      logger.error("Initialize auth failed", error);
       set({ loading: false });
     }
   },
@@ -154,16 +202,24 @@ export const useAuthStore = create<AuthState>((set, get) => ({
 
       // Check for specific error about email confirmation
       if (error) {
-        log.error("Supabase auth error", error);
+        logger.error("Supabase auth error", error);
 
         // Email not confirmed error
         if (error.message.includes("Email not confirmed")) {
-          log.info("Email verification required", email);
+          logger.info("Email verification required", { email });
 
           // Set pending verification with available info
           set({
+            flowState: AuthFlowState.SIGNUP_OTP_SENT,
+            flowContext: {
+              email,
+              phone: "",
+              userId: "",
+              otpPurpose: "signup",
+            },
+            // DEPRECATED: Also set old format for backward compatibility
             pendingVerification: {
-              email: email,
+              email,
               phone: "",
               userId: "",
             },
@@ -181,9 +237,18 @@ export const useAuthStore = create<AuthState>((set, get) => ({
 
       // Successful login - additional verification check (if Supabase allows unverified logins)
       if (data.user && !data.user.email_confirmed_at) {
-        log.warn("User email not verified (backup check)", data.user.email);
+        logger.warn("User email not verified (backup check)", {
+          email: data.user.email,
+        });
 
         set({
+          flowState: AuthFlowState.SIGNUP_OTP_SENT,
+          flowContext: {
+            email: data.user.email!,
+            phone: data.user.user_metadata.phone || "",
+            userId: data.user.id,
+            otpPurpose: "signup",
+          },
           pendingVerification: {
             email: data.user.email!,
             phone: data.user.user_metadata.phone || "",
@@ -214,13 +279,14 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       set({
         session: data.session,
         user: data.user,
+        flowState: AuthFlowState.AUTHENTICATED,
       });
 
       // Clear failed login attempts after successful login
       await get().clearFailedAttempts(email);
-      log.info("Failed login attempts cleared after successful login");
+      logger.info("Failed login attempts cleared after successful login");
     } catch (error: any) {
-      log.error("Sign in failed", error);
+      logger.error("Sign in failed", error);
       throw error;
     }
   },
@@ -254,8 +320,16 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       if (authError) throw authError;
       if (!authData.user) throw new Error("User creation failed");
 
-      // Store pending verification data
+      // Store flow context (NEW)
       set({
+        flowState: AuthFlowState.SIGNUP_OTP_SENT,
+        flowContext: {
+          email,
+          phone: phoneWithCountryCode,
+          userId: authData.user.id,
+          otpPurpose: "signup",
+        },
+        // DEPRECATED: Also set old format for backward compatibility
         pendingVerification: {
           email,
           phone: phoneWithCountryCode,
@@ -263,7 +337,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
         },
       });
     } catch (error) {
-      log.error("Sign up failed", error);
+      logger.error("Sign up failed", error);
       throw error;
     }
   },
@@ -294,12 +368,12 @@ export const useAuthStore = create<AuthState>((set, get) => ({
               .maybeSingle();
 
             if (profile) {
-              log.info("Profile fetched successfully");
+              logger.info("Profile fetched successfully");
               return profile;
             }
 
             if (i < retries - 1) {
-              log.warn(`Profile not found, retry ${i + 1}/${retries}`);
+              logger.warn(`Profile not found, retry ${i + 1}/${retries}`);
               await new Promise((r) => setTimeout(r, delay * Math.pow(2, i)));
             }
           }
@@ -309,7 +383,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
         const profile = await fetchProfile();
 
         if (!profile) {
-          log.error("Profile creation failed after verification");
+          logger.error("Profile creation failed after verification");
           throw new Error(
             "Account created but profile setup incomplete. Please contact support.",
           );
@@ -321,11 +395,13 @@ export const useAuthStore = create<AuthState>((set, get) => ({
         set({
           session: data.session,
           user: data.user,
+          flowState: AuthFlowState.AUTHENTICATED,
+          flowContext: null,
           pendingVerification: null,
         });
       }
     } catch (error) {
-      log.error("Email OTP verification failed", error);
+      logger.error("Email OTP verification failed", error);
       throw error;
     }
   },
@@ -339,9 +415,9 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       });
 
       if (error) throw error;
-      log.info("OTP resent successfully", email);
+      logger.info("OTP resent successfully", { email });
     } catch (error) {
-      log.error("Resend email OTP failed", error);
+      logger.error("Resend email OTP failed", error);
       throw error;
     }
   },
@@ -357,18 +433,28 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       // Clear failed login attempts on logout
       if (currentEmail) {
         await get().clearFailedAttempts(currentEmail);
-        log.info("Failed login attempts cleared on logout");
+        logger.info("Failed login attempts cleared on logout");
+      }
+
+      // Clean up auth subscription (FIXED)
+      if (authSubscription) {
+        authSubscription.unsubscribe();
+        authSubscription = null;
       }
 
       // Clear profile from profileStore
       useProfileStore.getState().setProfile(null);
 
+      // FULL RESET (FIXED)
       set({
         session: null,
         user: null,
+        flowState: AuthFlowState.UNAUTHENTICATED,
+        flowContext: null,
+        pendingVerification: null,
       });
     } catch (error) {
-      log.error("Sign out failed", error);
+      logger.error("Sign out failed", error);
       throw error;
     }
   },
@@ -377,13 +463,23 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   resetPassword: async (email: string) => {
     try {
       const { error } = await supabase.auth.resetPasswordForEmail(email, {
-        redirectTo: "shelfscore://reset-password",
+        redirectTo: "travelconnect://reset-password",
       });
 
       if (error) throw error;
-      log.info("Password recovery OTP sent", email);
+
+      // Set flow state (NEW)
+      set({
+        flowState: AuthFlowState.RESET_OTP_SENT,
+        flowContext: {
+          email,
+          otpPurpose: "reset",
+        },
+      });
+
+      logger.info("Password recovery OTP sent", { email });
     } catch (error) {
-      log.error("Reset password failed", error);
+      logger.error("Reset password failed", error);
       throw error;
     }
   },
@@ -399,15 +495,23 @@ export const useAuthStore = create<AuthState>((set, get) => ({
 
       if (error) throw error;
 
-      // User now has RECOVERY session (limited scope)
+      // User now has RECOVERY session with expiry (NEW)
+      const resetSessionExpiry = Date.now() + 10 * 60 * 1000; // 10 minutes
+
       set({
         session: data.session,
         user: data.user,
+        flowState: AuthFlowState.RESET_SESSION_ACTIVE,
+        flowContext: {
+          email,
+          otpPurpose: "reset",
+          resetSessionExpiry,
+        },
       });
 
-      log.info("Recovery OTP verified successfully");
+      logger.info("Recovery OTP verified successfully");
     } catch (error) {
-      log.error("Recovery OTP verification failed", error);
+      logger.error("Recovery OTP verification failed", error);
       throw error;
     }
   },
@@ -415,8 +519,19 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   // Update password (requires active recovery session)
   updatePassword: async (newPassword: string) => {
     try {
+      // Check if reset session is still valid (NEW)
+      const { flowContext } = get();
+      if (
+        !flowContext?.resetSessionExpiry ||
+        Date.now() > flowContext.resetSessionExpiry
+      ) {
+        throw new Error(
+          "Reset session has expired. Please request a new code.",
+        );
+      }
+
       const { error } = await supabase.auth.updateUser({
-        password: newPassword.trim(),
+        password: newPassword,
       });
 
       if (error) throw error;
@@ -438,19 +553,27 @@ export const useAuthStore = create<AuthState>((set, get) => ({
         // Clear failed login attempts after successful password reset
         if (currentUser.email) {
           await get().clearFailedAttempts(currentUser.email);
-          log.info("Failed login attempts cleared after password reset");
+          logger.info("Failed login attempts cleared after password reset");
         }
       }
 
-      log.info("Password updated successfully");
+      // Update to authenticated state (NEW)
+      set({
+        flowState: AuthFlowState.AUTHENTICATED,
+        flowContext: null,
+      });
+
+      logger.info("Password updated successfully");
     } catch (error) {
-      log.error("Update password failed", error);
+      logger.error("Update password failed", error);
       throw error;
     }
   },
 
-  // Set pending verification data
-  setPendingVerification: (data) => set({ pendingVerification: data }),
+  // DEPRECATED: Use setFlowState instead
+  setPendingVerification: (data) => {
+    set({ pendingVerification: data });
+  },
 
   // Check if account is locked due to failed login attempts
   checkAccountLocked: async (email: string) => {
@@ -460,13 +583,13 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       });
 
       if (error) {
-        log.error("Check account locked failed", error);
+        logger.error("Check account locked failed", error);
         return false; // Fail open - don't block user if check fails
       }
 
       return data as boolean;
     } catch (error) {
-      log.error("Check account locked exception", error);
+      logger.error("Check account locked exception", error);
       return false;
     }
   },
@@ -480,10 +603,10 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       });
 
       if (error) {
-        log.error("Record failed login failed", error);
+        logger.error("Record failed login failed", error);
       }
     } catch (error) {
-      log.error("Record failed login exception", error);
+      logger.error("Record failed login exception", error);
     }
   },
 
@@ -495,10 +618,10 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       });
 
       if (error) {
-        log.error("Clear failed attempts failed", error);
+        logger.error("Clear failed attempts failed", error);
       }
     } catch (error) {
-      log.error("Clear failed attempts exception", error);
+      logger.error("Clear failed attempts exception", error);
     }
   },
 }));
