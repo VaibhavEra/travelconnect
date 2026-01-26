@@ -4,12 +4,12 @@ import { haptics } from "@/lib/utils/haptics";
 import { parseSupabaseError } from "@/lib/utils/parseSupabaseError";
 import { rateLimitConfigs, rateLimiter } from "@/lib/utils/rateLimit";
 import { otpVerificationSchema } from "@/lib/validations/auth";
-import { useAuthStore } from "@/stores/authStore";
+import { AuthFlowState, useAuthStore } from "@/stores/authStore";
 import { BorderRadius, Colors, Spacing, Typography } from "@/styles";
 import { Ionicons } from "@expo/vector-icons";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { router, useLocalSearchParams } from "expo-router";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Controller, useForm } from "react-hook-form";
 import {
   ActivityIndicator,
@@ -31,7 +31,9 @@ export default function VerifyResetOtpScreen() {
   const email = params.email as string;
   const [loading, setLoading] = useState(false);
   const [resending, setResending] = useState(false);
-  const { verifyResetOtp, resetPassword } = useAuthStore();
+  const [resendCooldown, setResendCooldown] = useState(60);
+
+  const { verifyResetOtp, resetPassword, flowState } = useAuthStore();
 
   const {
     control,
@@ -45,10 +47,37 @@ export default function VerifyResetOtpScreen() {
     },
   });
 
+  // FIXED: Validate email param exists
+  useEffect(() => {
+    if (!email || !email.includes("@")) {
+      Alert.alert(
+        "Invalid Request",
+        "Please start from forgot password screen.",
+        [
+          {
+            text: "OK",
+            onPress: () => router.replace("/(auth)/forgot-password"),
+          },
+        ],
+      );
+    }
+  }, [email]);
+
+  // Countdown timer for resend
+  useEffect(() => {
+    if (resendCooldown > 0) {
+      const timer = setTimeout(
+        () => setResendCooldown(resendCooldown - 1),
+        1000,
+      );
+      return () => clearTimeout(timer);
+    }
+  }, [resendCooldown]);
+
   const onSubmit = async (data: OtpFormData) => {
     // Rate limit check
     const rateCheck = rateLimiter.check(
-      `verify-reset-otp:${email}`,
+      `reset-otp-flow:${email}`, // FIXED: Unified key
       rateLimitConfigs.passwordReset,
     );
     if (!rateCheck.allowed) {
@@ -63,9 +92,16 @@ export default function VerifyResetOtpScreen() {
     setLoading(true);
     try {
       await verifyResetOtp(email, data.emailOtp);
+
+      // FIXED: Verify session was established
+      const { flowState: newFlowState } = useAuthStore.getState();
+      if (newFlowState !== AuthFlowState.RESET_SESSION_ACTIVE) {
+        throw new Error("Reset session not established");
+      }
+
       haptics.success();
       // Navigate to new password screen
-      router.replace("./reset-new-password");
+      router.replace("/(auth)/reset-new-password");
     } catch (error: any) {
       haptics.error();
       const errorMessage = parseSupabaseError(error);
@@ -78,7 +114,7 @@ export default function VerifyResetOtpScreen() {
   const handleResend = async () => {
     // Rate limit check
     const rateCheck = rateLimiter.check(
-      `resend-reset-otp:${email}`,
+      `reset-otp-flow:${email}`, // FIXED: Same key as verify
       rateLimitConfigs.otpResend,
     );
     if (!rateCheck.allowed) {
@@ -94,6 +130,7 @@ export default function VerifyResetOtpScreen() {
     try {
       await resetPassword(email);
       haptics.success();
+      setResendCooldown(60);
       Alert.alert(
         "Code Resent",
         "A new verification code has been sent to your email.",
@@ -151,6 +188,7 @@ export default function VerifyResetOtpScreen() {
                   value={value}
                   onChange={onChange}
                   disabled={loading}
+                  error={!!errors.emailOtp}
                 />
               )}
             />
@@ -174,21 +212,25 @@ export default function VerifyResetOtpScreen() {
           </View>
 
           {/* Resend */}
-          <View style={styles.footer}>
-            <Text style={styles.footerText}>Didn't receive the code? </Text>
-            <TouchableOpacity
-              disabled={resending || loading}
-              onPress={handleResend}
-            >
-              <Text
-                style={[
-                  styles.link,
-                  (resending || loading) && styles.linkDisabled,
-                ]}
+          <View style={styles.resendSection}>
+            <Text style={styles.resendText}>Didn't receive the code? </Text>
+            {resendCooldown > 0 ? (
+              <Text style={styles.timerText}>Resend in {resendCooldown}s</Text>
+            ) : (
+              <TouchableOpacity
+                disabled={resending || loading}
+                onPress={handleResend}
               >
-                {resending ? "Sending..." : "Resend"}
-              </Text>
-            </TouchableOpacity>
+                <Text
+                  style={[
+                    styles.resendLink,
+                    (resending || loading) && styles.linkDisabled,
+                  ]}
+                >
+                  {resending ? "Sending..." : "Resend"}
+                </Text>
+              </TouchableOpacity>
+            )}
           </View>
         </View>
       </ScrollView>
@@ -206,58 +248,55 @@ const styles = StyleSheet.create({
   },
   content: {
     flex: 1,
-    justifyContent: "center",
     padding: Spacing.lg,
-    paddingTop: 60,
+    justifyContent: "center",
   },
   backButton: {
     position: "absolute",
-    top: 60,
+    top: Spacing.lg,
     left: Spacing.lg,
     zIndex: 1,
   },
   header: {
     alignItems: "center",
-    marginBottom: Spacing.xxl - 8,
+    marginBottom: Spacing.xl,
   },
   title: {
-    fontSize: Typography.sizes.xxxl,
+    fontSize: Typography.sizes.xxl,
     fontWeight: Typography.weights.bold,
     color: Colors.text.primary,
     marginTop: Spacing.md,
-    marginBottom: Spacing.sm,
+    marginBottom: Spacing.xs,
   },
   subtitle: {
-    fontSize: Typography.sizes.md,
+    fontSize: Typography.sizes.sm,
     color: Colors.text.secondary,
     textAlign: "center",
-    lineHeight: 22,
   },
   email: {
     fontWeight: Typography.weights.semibold,
     color: Colors.primary,
   },
   form: {
-    marginBottom: Spacing.lg,
+    gap: Spacing.md,
   },
   label: {
-    fontSize: Typography.sizes.md,
+    fontSize: Typography.sizes.sm,
     fontWeight: Typography.weights.semibold,
     color: Colors.text.primary,
-    marginBottom: Spacing.sm,
   },
   errorText: {
     color: Colors.error,
     fontSize: Typography.sizes.xs,
-    marginTop: Spacing.sm,
-    marginBottom: Spacing.sm,
+    marginTop: -Spacing.sm,
   },
   button: {
     backgroundColor: Colors.primary,
-    padding: Spacing.md,
+    paddingVertical: Spacing.md + 2,
     borderRadius: BorderRadius.md,
     alignItems: "center",
-    marginTop: Spacing.md,
+    justifyContent: "center",
+    marginTop: Spacing.sm,
   },
   buttonDisabled: {
     opacity: 0.6,
@@ -267,21 +306,27 @@ const styles = StyleSheet.create({
     fontSize: Typography.sizes.md,
     fontWeight: Typography.weights.semibold,
   },
-  footer: {
+  resendSection: {
     flexDirection: "row",
     justifyContent: "center",
     alignItems: "center",
+    marginTop: Spacing.lg,
+    gap: Spacing.xs,
   },
-  footerText: {
+  resendText: {
+    fontSize: Typography.sizes.sm,
     color: Colors.text.secondary,
-    fontSize: Typography.sizes.sm,
   },
-  link: {
-    color: Colors.primary,
+  resendLink: {
     fontSize: Typography.sizes.sm,
+    color: Colors.primary,
     fontWeight: Typography.weights.semibold,
   },
   linkDisabled: {
     opacity: 0.5,
+  },
+  timerText: {
+    fontSize: Typography.sizes.sm,
+    color: Colors.text.tertiary,
   },
 });

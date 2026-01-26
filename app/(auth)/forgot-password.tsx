@@ -66,7 +66,7 @@ export default function ForgotPasswordScreen() {
       haptics.error();
       Alert.alert(
         "Too Many Requests",
-        `Please wait ${rateCheck.retryAfter} seconds before requesting another reset code.`,
+        `Please wait ${rateCheck.retryAfter} before requesting another reset code.`,
       );
       return;
     }
@@ -82,7 +82,7 @@ export default function ForgotPasswordScreen() {
     } catch (error: any) {
       haptics.error();
 
-      // Don't reveal if email doesn't exist (prevents email enumeration)
+      // FIXED: Don't reveal if email doesn't exist (prevents email enumeration)
       // Always show success to user
       setEmailSent(true);
     } finally {
@@ -102,7 +102,7 @@ export default function ForgotPasswordScreen() {
       haptics.error();
       Alert.alert(
         "Too Many Requests",
-        `Please wait ${rateCheck.retryAfter} seconds before requesting another reset code.`,
+        `Please wait ${rateCheck.retryAfter} before requesting another reset code.`,
       );
       return;
     }
@@ -117,11 +117,11 @@ export default function ForgotPasswordScreen() {
         "A new verification code has been sent to your email.",
       );
     } catch (error: any) {
-      // Still show success (don't reveal email existence)
+      // FIXED: Still show success (don't reveal email existence)
       haptics.success();
       Alert.alert(
-        "Code Sent",
-        "If an account exists, you'll receive a verification code.",
+        "Code Resent",
+        "A new verification code has been sent to your email.",
       );
     } finally {
       setLoading(false);
@@ -144,12 +144,11 @@ export default function ForgotPasswordScreen() {
               Enter the 6-digit code to reset your password.
             </Text>
 
-            {/* UPDATED: Navigate to verify-reset-otp */}
             <TouchableOpacity
               style={styles.button}
               onPress={() => {
                 router.push({
-                  pathname: "./verify-reset-otp",
+                  pathname: "/(auth)/verify-reset-otp",
                   params: { email: getValues("email") },
                 });
               }}
@@ -159,23 +158,25 @@ export default function ForgotPasswordScreen() {
             </TouchableOpacity>
 
             <TouchableOpacity
-              style={styles.resendButton}
+              style={styles.secondaryButton}
               onPress={handleResend}
               disabled={loading}
             >
-              <Text style={styles.resendText}>
+              <Text style={styles.secondaryButtonText}>
                 {loading ? "Sending..." : "Resend code"}
               </Text>
             </TouchableOpacity>
 
             <TouchableOpacity
-              style={styles.resendButton}
+              style={styles.secondaryButton}
               onPress={() => {
                 setEmailSent(false);
                 haptics.light();
               }}
             >
-              <Text style={styles.resendText}>Use a different email</Text>
+              <Text style={styles.secondaryButtonText}>
+                Use a different email
+              </Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -285,38 +286,38 @@ const styles = StyleSheet.create({
   },
   content: {
     flex: 1,
-    justifyContent: "center",
     padding: Spacing.lg,
-    paddingTop: 60,
+    justifyContent: "center",
   },
   backButton: {
     position: "absolute",
-    top: 60,
+    top: Spacing.lg,
     left: Spacing.lg,
     zIndex: 1,
   },
   header: {
-    marginBottom: Spacing.xxl - 8,
+    marginBottom: Spacing.xl,
   },
   title: {
     fontSize: Typography.sizes.xxxl,
     fontWeight: Typography.weights.bold,
     color: Colors.text.primary,
-    marginBottom: Spacing.sm,
+    marginBottom: Spacing.xs,
   },
   subtitle: {
-    fontSize: Typography.sizes.md,
+    fontSize: Typography.sizes.sm,
     color: Colors.text.secondary,
-    lineHeight: 22,
+    lineHeight: 20,
   },
   form: {
-    marginBottom: Spacing.lg,
+    gap: Spacing.md,
   },
   button: {
     backgroundColor: Colors.primary,
-    padding: Spacing.md,
+    paddingVertical: Spacing.md + 2,
     borderRadius: BorderRadius.md,
     alignItems: "center",
+    justifyContent: "center",
     marginTop: Spacing.sm,
   },
   buttonDisabled: {
@@ -330,54 +331,54 @@ const styles = StyleSheet.create({
   footer: {
     flexDirection: "row",
     justifyContent: "center",
-    alignItems: "center",
+    marginTop: Spacing.xl,
   },
   footerText: {
-    color: Colors.text.secondary,
     fontSize: Typography.sizes.sm,
+    color: Colors.text.secondary,
   },
   link: {
-    color: Colors.primary,
     fontSize: Typography.sizes.sm,
+    color: Colors.primary,
     fontWeight: Typography.weights.semibold,
   },
   successContainer: {
     alignItems: "center",
-    paddingVertical: Spacing.xxl - 8,
+    paddingTop: Spacing.xxl,
   },
   successTitle: {
-    fontSize: Typography.sizes.xxl - 4,
+    fontSize: Typography.sizes.xxl,
     fontWeight: Typography.weights.bold,
     color: Colors.text.primary,
-    marginTop: Spacing.lg,
-    marginBottom: Spacing.sm + 4,
+    marginTop: Spacing.md,
+    marginBottom: Spacing.xs,
   },
   successMessage: {
-    fontSize: Typography.sizes.md,
+    fontSize: Typography.sizes.sm,
     color: Colors.text.secondary,
     textAlign: "center",
-    marginBottom: Spacing.sm,
+    marginBottom: Spacing.xs,
   },
   email: {
     fontSize: Typography.sizes.md,
     fontWeight: Typography.weights.semibold,
     color: Colors.primary,
-    marginBottom: Spacing.md,
+    textAlign: "center",
+    marginBottom: Spacing.sm,
   },
   successSubtext: {
     fontSize: Typography.sizes.sm,
-    color: Colors.text.tertiary,
+    color: Colors.text.secondary,
     textAlign: "center",
-    lineHeight: 20,
-    marginBottom: Spacing.lg,
+    marginBottom: Spacing.xl,
   },
-  resendButton: {
+  secondaryButton: {
+    paddingVertical: Spacing.sm,
     marginTop: Spacing.md,
-    padding: Spacing.sm,
   },
-  resendText: {
-    color: Colors.primary,
+  secondaryButtonText: {
     fontSize: Typography.sizes.sm,
+    color: Colors.primary,
     fontWeight: Typography.weights.semibold,
   },
 });

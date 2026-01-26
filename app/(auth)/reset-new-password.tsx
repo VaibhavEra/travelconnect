@@ -2,8 +2,9 @@
 import FormInput from "@/components/auth/FormInput";
 import { haptics } from "@/lib/utils/haptics";
 import { parseSupabaseError } from "@/lib/utils/parseSupabaseError";
+import { getPasswordStrength } from "@/lib/utils/passwordStrength";
 import { NewPasswordFormData, newPasswordSchema } from "@/lib/validations/auth";
-import { useAuthStore } from "@/stores/authStore";
+import { AuthFlowState, useAuthStore } from "@/stores/authStore";
 import { BorderRadius, Colors, Spacing, Typography } from "@/styles";
 import { Ionicons } from "@expo/vector-icons";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -26,7 +27,7 @@ export default function ResetNewPasswordScreen() {
   const [loading, setLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
-  const { session, updatePassword } = useAuthStore();
+  const { session, flowState, flowContext, updatePassword } = useAuthStore();
 
   const {
     control,
@@ -44,7 +45,7 @@ export default function ResetNewPasswordScreen() {
 
   const password = watch("password");
 
-  // Check if user has a recovery session
+  // FIXED: Check if user has a valid recovery session
   useEffect(() => {
     if (!session) {
       Alert.alert("Invalid Session", "Please verify your reset code first.", [
@@ -53,30 +54,39 @@ export default function ResetNewPasswordScreen() {
           onPress: () => router.replace("/(auth)/forgot-password"),
         },
       ]);
+      return;
     }
-  }, [session]);
 
-  // Password strength indicator
-  const getPasswordStrength = (
-    pass: string,
-  ): { text: string; color: string } => {
-    if (!pass) return { text: "", color: "" };
-    if (pass.length < 6) return { text: "Weak", color: Colors.error };
-    if (pass.length < 8) return { text: "Fair", color: Colors.warning };
+    // FIXED: Check if reset session has expired
+    if (flowState !== AuthFlowState.RESET_SESSION_ACTIVE) {
+      Alert.alert("Invalid Session", "Please verify your reset code first.", [
+        {
+          text: "OK",
+          onPress: () => router.replace("/(auth)/forgot-password"),
+        },
+      ]);
+      return;
+    }
 
-    const hasUpper = /[A-Z]/.test(pass);
-    const hasLower = /[a-z]/.test(pass);
-    const hasNumber = /[0-9]/.test(pass);
-    const hasSpecial = /[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]/.test(pass);
+    // FIXED: Check expiry timestamp
+    if (
+      flowContext?.resetSessionExpiry &&
+      Date.now() > flowContext.resetSessionExpiry
+    ) {
+      Alert.alert(
+        "Session Expired",
+        "Your reset session has expired. Please request a new code.",
+        [
+          {
+            text: "OK",
+            onPress: () => router.replace("/(auth)/forgot-password"),
+          },
+        ],
+      );
+    }
+  }, [session, flowState, flowContext]);
 
-    const strength = [hasUpper, hasLower, hasNumber, hasSpecial].filter(
-      Boolean,
-    ).length;
-
-    if (strength >= 3) return { text: "Strong", color: Colors.success };
-    return { text: "Fair", color: Colors.warning };
-  };
-
+  // FIXED: Use extracted password strength utility
   const passwordStrength = getPasswordStrength(password);
 
   const onSubmit = async (data: NewPasswordFormData) => {
@@ -121,7 +131,14 @@ export default function ResetNewPasswordScreen() {
               color={Colors.primary}
             />
             <Text style={styles.title}>Create New Password</Text>
-            <Text style={styles.subtitle}>Enter your new password below</Text>
+            <Text style={styles.subtitle}>
+              Enter your new password below
+              {flowContext?.email && (
+                <Text style={styles.email}>
+                  {"\n"}for {flowContext.email}
+                </Text>
+              )}
+            </Text>
           </View>
 
           <View style={styles.form}>
@@ -134,7 +151,7 @@ export default function ResetNewPasswordScreen() {
                     label="New Password"
                     placeholder="Enter new password"
                     value={value}
-                    onChangeText={(text) => onChange(text.trim())}
+                    onChangeText={onChange}
                     onBlur={onBlur}
                     error={errors.password?.message}
                     touched={touchedFields.password}
@@ -184,7 +201,7 @@ export default function ResetNewPasswordScreen() {
                   label="Confirm New Password"
                   placeholder="Confirm new password"
                   value={value}
-                  onChangeText={(text) => onChange(text.trim())}
+                  onChangeText={onChange}
                   onBlur={onBlur}
                   error={errors.confirmPassword?.message}
                   touched={touchedFields.confirmPassword}
@@ -262,40 +279,43 @@ const styles = StyleSheet.create({
   },
   content: {
     flex: 1,
-    justifyContent: "center",
     padding: Spacing.lg,
-    paddingTop: 60,
+    justifyContent: "center",
   },
   header: {
     alignItems: "center",
-    marginBottom: Spacing.xxl - 8,
+    marginBottom: Spacing.xl,
   },
   title: {
-    fontSize: Typography.sizes.xxl - 4,
+    fontSize: Typography.sizes.xxl,
     fontWeight: Typography.weights.bold,
     color: Colors.text.primary,
     marginTop: Spacing.md,
-    marginBottom: Spacing.sm,
+    marginBottom: Spacing.xs,
   },
   subtitle: {
-    fontSize: Typography.sizes.md,
+    fontSize: Typography.sizes.sm,
     color: Colors.text.secondary,
     textAlign: "center",
   },
+  email: {
+    fontWeight: Typography.weights.semibold,
+    color: Colors.primary,
+  },
   form: {
-    marginBottom: Spacing.lg,
+    gap: Spacing.md,
   },
   strengthText: {
     fontSize: Typography.sizes.xs,
-    fontWeight: Typography.weights.semibold,
-    marginTop: -Spacing.sm - 4,
-    marginBottom: Spacing.sm,
+    marginTop: Spacing.xs,
+    fontWeight: Typography.weights.medium,
   },
   button: {
     backgroundColor: Colors.primary,
-    padding: Spacing.md,
+    paddingVertical: Spacing.md + 2,
     borderRadius: BorderRadius.md,
     alignItems: "center",
+    justifyContent: "center",
     marginTop: Spacing.sm,
   },
   buttonDisabled: {
@@ -308,16 +328,17 @@ const styles = StyleSheet.create({
   },
   infoBox: {
     flexDirection: "row",
-    alignItems: "flex-start",
+    alignItems: "center",
     backgroundColor: Colors.background.secondary,
-    padding: Spacing.sm + 4,
+    padding: Spacing.md,
     borderRadius: BorderRadius.md,
     gap: Spacing.sm,
+    marginTop: Spacing.xl,
   },
   infoText: {
     flex: 1,
     fontSize: Typography.sizes.xs,
     color: Colors.text.secondary,
-    lineHeight: 18,
+    lineHeight: 16,
   },
 });
