@@ -2,7 +2,8 @@
 import OtpInput from "@/components/auth/OtpInput";
 import { haptics } from "@/lib/utils/haptics";
 import { parseSupabaseError } from "@/lib/utils/parseSupabaseError";
-import { useAuthStore } from "@/stores/authStore";
+import { rateLimitConfigs, rateLimiter } from "@/lib/utils/rateLimit";
+import { AuthFlowState, useAuthStore } from "@/stores/authStore";
 import { BorderRadius, Colors, Spacing, Typography } from "@/styles";
 import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
@@ -17,47 +18,36 @@ import {
   View,
 } from "react-native";
 
-const isDev = __DEV__;
-
 export default function VerifyOtpScreen() {
   const [otp, setOtp] = useState("");
   const [loading, setLoading] = useState(false);
-  const [resendTimer, setResendTimer] = useState(60);
-  const [canResend, setCanResend] = useState(false);
+  const [resendCooldown, setResendCooldown] = useState(60);
 
-  const { pendingVerification, verifyEmailOtp, resendEmailOtp } =
+  const { flowState, flowContext, verifyEmailOtp, resendEmailOtp } =
     useAuthStore();
+
+  // FIXED: Destructure email with type safety
+  const email = flowContext?.email || "";
 
   // Countdown timer for resend
   useEffect(() => {
-    if (resendTimer > 0) {
-      const timer = setTimeout(() => setResendTimer(resendTimer - 1), 1000);
+    if (resendCooldown > 0) {
+      const timer = setTimeout(
+        () => setResendCooldown(resendCooldown - 1),
+        1000,
+      );
       return () => clearTimeout(timer);
-    } else {
-      setCanResend(true);
     }
-  }, [resendTimer]);
+  }, [resendCooldown]);
 
   // Redirect if no pending verification
   useEffect(() => {
-    if (!pendingVerification) {
-      if (isDev) {
-        console.log(
-          "[VerifyOTP] No pending verification, redirecting to login",
-        );
-      }
+    if (flowState !== AuthFlowState.SIGNUP_OTP_SENT || !email) {
       router.replace("/(auth)/login");
-    } else {
-      if (isDev) {
-        console.log(
-          "[VerifyOTP] Pending verification found:",
-          pendingVerification,
-        );
-      }
     }
-  }, [pendingVerification]);
+  }, [flowState, email]);
 
-  if (!pendingVerification) {
+  if (flowState !== AuthFlowState.SIGNUP_OTP_SENT || !email) {
     return null;
   }
 
@@ -68,32 +58,30 @@ export default function VerifyOtpScreen() {
       return;
     }
 
+    // Rate limit check
+    const rateCheck = rateLimiter.check(
+      `verify-otp:${email}`,
+      rateLimitConfigs.otpResend,
+    );
+    if (!rateCheck.allowed) {
+      haptics.error();
+      Alert.alert(
+        "Too Many Attempts",
+        `Please wait ${rateCheck.retryAfter} before trying again.`,
+      );
+      return;
+    }
+
     setLoading(true);
     try {
-      if (isDev) {
-        console.log(
-          "[VerifyOTP] Verifying OTP for:",
-          pendingVerification.email,
-        );
-      }
-
-      await verifyEmailOtp(pendingVerification.email, otp);
+      await verifyEmailOtp(email, otp);
       haptics.success();
-
-      if (isDev) {
-        console.log("[VerifyOTP] Email verified successfully");
-      }
 
       Alert.alert("Success!", "Your email has been verified successfully.", [
         { text: "OK", onPress: () => router.replace("/") },
       ]);
     } catch (error: any) {
       haptics.error();
-
-      if (isDev) {
-        console.log("[VerifyOTP] Verification failed:", error);
-      }
-
       const errorMessage = parseSupabaseError(error);
       Alert.alert("Verification Failed", errorMessage);
     } finally {
@@ -102,29 +90,29 @@ export default function VerifyOtpScreen() {
   };
 
   const handleResend = async () => {
+    // Rate limit check
+    const rateCheck = rateLimiter.check(
+      `resend-otp:${email}`,
+      rateLimitConfigs.otpResend,
+    );
+    if (!rateCheck.allowed) {
+      haptics.error();
+      Alert.alert(
+        "Too Many Requests",
+        `Please wait ${rateCheck.retryAfter} before requesting another code.`,
+      );
+      return;
+    }
+
     setLoading(true);
     try {
-      if (isDev) {
-        console.log("[VerifyOTP] Resending OTP to:", pendingVerification.email);
-      }
-
-      await resendEmailOtp(pendingVerification.email);
+      await resendEmailOtp(email);
       haptics.success();
-      setResendTimer(60);
-      setCanResend(false);
+      setResendCooldown(60);
       setOtp(""); // Clear OTP input
       Alert.alert("Success", "Verification code sent to your email");
-
-      if (isDev) {
-        console.log("[VerifyOTP] OTP resent successfully");
-      }
     } catch (error: any) {
       haptics.error();
-
-      if (isDev) {
-        console.log("[VerifyOTP] Resend failed:", error);
-      }
-
       const errorMessage = parseSupabaseError(error);
       Alert.alert("Error", errorMessage);
     } finally {
@@ -146,7 +134,7 @@ export default function VerifyOtpScreen() {
           <Text style={styles.subtitle}>
             We've sent a 6-digit verification code to
           </Text>
-          <Text style={styles.email}>{pendingVerification.email}</Text>
+          <Text style={styles.email}>{email}</Text>
         </View>
 
         {/* OTP Input */}
@@ -179,14 +167,16 @@ export default function VerifyOtpScreen() {
         {/* Resend Section */}
         <View style={styles.resendSection}>
           <Text style={styles.resendText}>Didn't receive the code?</Text>
-          {canResend ? (
-            <TouchableOpacity onPress={handleResend} disabled={loading}>
-              <Text style={styles.resendLink}>Resend Code</Text>
-            </TouchableOpacity>
-          ) : (
+          {resendCooldown > 0 ? (
             <Text style={styles.timerText}>
-              Resend available in {resendTimer}s
+              Resend available in {resendCooldown}s
             </Text>
+          ) : (
+            <TouchableOpacity onPress={handleResend} disabled={loading}>
+              <Text style={styles.resendLink}>
+                {loading ? "Sending..." : "Resend Code"}
+              </Text>
+            </TouchableOpacity>
           )}
         </View>
 
@@ -213,39 +203,41 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     padding: Spacing.lg,
-    paddingTop: 60,
+    paddingTop: Spacing.xxl,
     backgroundColor: Colors.background.primary,
   },
   header: {
     alignItems: "center",
-    marginBottom: Spacing.xxl - 8,
+    marginBottom: Spacing.xl,
   },
   title: {
-    fontSize: Typography.sizes.xxl - 4,
+    fontSize: Typography.sizes.xxl,
     fontWeight: Typography.weights.bold,
     color: Colors.text.primary,
     marginTop: Spacing.md,
-    marginBottom: Spacing.sm,
+    marginBottom: Spacing.xs,
   },
   subtitle: {
-    fontSize: Typography.sizes.md,
+    fontSize: Typography.sizes.sm,
     color: Colors.text.secondary,
     textAlign: "center",
+    marginBottom: Spacing.xs,
   },
   email: {
     fontSize: Typography.sizes.md,
     fontWeight: Typography.weights.semibold,
     color: Colors.primary,
-    marginTop: Spacing.sm,
+    textAlign: "center",
   },
   otpContainer: {
-    marginBottom: Spacing.lg,
+    marginBottom: Spacing.xl,
   },
   verifyButton: {
     backgroundColor: Colors.primary,
-    padding: Spacing.md,
+    paddingVertical: Spacing.md + 2,
     borderRadius: BorderRadius.md,
     alignItems: "center",
+    justifyContent: "center",
     marginBottom: Spacing.lg,
   },
   buttonDisabled: {
@@ -258,16 +250,16 @@ const styles = StyleSheet.create({
   },
   resendSection: {
     alignItems: "center",
-    marginBottom: Spacing.lg,
+    marginBottom: Spacing.xl,
   },
   resendText: {
     fontSize: Typography.sizes.sm,
     color: Colors.text.secondary,
-    marginBottom: Spacing.sm,
+    marginBottom: Spacing.xs,
   },
   resendLink: {
+    fontSize: Typography.sizes.sm,
     color: Colors.primary,
-    fontSize: Typography.sizes.md,
     fontWeight: Typography.weights.semibold,
   },
   timerText: {
@@ -278,14 +270,13 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     backgroundColor: Colors.background.secondary,
-    padding: Spacing.sm + 4,
+    padding: Spacing.md,
     borderRadius: BorderRadius.md,
     gap: Spacing.sm,
   },
   infoText: {
     flex: 1,
-    fontSize: Typography.sizes.sm,
+    fontSize: Typography.sizes.xs,
     color: Colors.text.secondary,
-    lineHeight: 20,
   },
 });

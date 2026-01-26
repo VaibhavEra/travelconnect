@@ -35,9 +35,6 @@ export default function LoginScreen() {
   const signIn = useAuthStore((state) => state.signIn);
   const checkAccountLocked = useAuthStore((state) => state.checkAccountLocked);
   const recordFailedLogin = useAuthStore((state) => state.recordFailedLogin);
-  const clearFailedAttempts = useAuthStore(
-    (state) => state.clearFailedAttempts,
-  );
   const { isOffline } = useNetworkStatus();
 
   const {
@@ -64,9 +61,6 @@ export default function LoginScreen() {
       return;
     }
 
-    // REMOVED: Client-side rate limiter
-    // Database handles lockout now
-
     setLoading(true);
     const sanitizedEmail = sanitize.email(data.email);
 
@@ -74,7 +68,7 @@ export default function LoginScreen() {
       // Attempt login FIRST
       await signIn(sanitizedEmail, data.password.trim());
 
-      // Login successful - navigate (clearFailedAttempts now in signIn)
+      // Login successful - navigate
       haptics.success();
       router.replace("/");
     } catch (error: any) {
@@ -85,9 +79,9 @@ export default function LoginScreen() {
         error.message === "EMAIL_NOT_VERIFIED" ||
         error.name === "EmailNotVerifiedError"
       ) {
-        const { pendingVerification } = useAuthStore.getState();
+        const { flowContext } = useAuthStore.getState();
 
-        if (pendingVerification) {
+        if (flowContext?.email) {
           Alert.alert(
             "Email Not Verified",
             "Please verify your email to continue.",
@@ -190,7 +184,7 @@ export default function LoginScreen() {
                   label="Password"
                   placeholder="Enter your password"
                   value={value}
-                  onChangeText={(text) => onChange(text.trim())}
+                  onChangeText={onChange}
                   onBlur={onBlur}
                   error={errors.password?.message}
                   touched={touchedFields.password}
@@ -275,10 +269,8 @@ const styles = StyleSheet.create({
   },
   content: {
     flex: 1,
-    justifyContent: "center",
     padding: Spacing.lg,
-    paddingTop: 60,
-    paddingBottom: 40,
+    justifyContent: "center",
   },
   header: {
     marginBottom: Spacing.xl,
@@ -287,30 +279,30 @@ const styles = StyleSheet.create({
     fontSize: Typography.sizes.xxxl,
     fontWeight: Typography.weights.bold,
     color: Colors.text.primary,
-    marginBottom: Spacing.sm,
+    marginBottom: Spacing.xs,
   },
   subtitle: {
     fontSize: Typography.sizes.md,
     color: Colors.text.secondary,
   },
   form: {
-    marginBottom: Spacing.lg,
+    gap: Spacing.md,
   },
   forgotPassword: {
     alignSelf: "flex-end",
-    marginTop: -Spacing.sm,
-    marginBottom: Spacing.md,
+    marginTop: Spacing.xs,
   },
   forgotPasswordText: {
-    color: Colors.primary,
     fontSize: Typography.sizes.sm,
+    color: Colors.primary,
     fontWeight: Typography.weights.semibold,
   },
   button: {
     backgroundColor: Colors.primary,
-    padding: Spacing.md,
+    paddingVertical: Spacing.md + 2,
     borderRadius: BorderRadius.md,
     alignItems: "center",
+    justifyContent: "center",
     marginTop: Spacing.sm,
   },
   buttonDisabled: {
@@ -324,15 +316,15 @@ const styles = StyleSheet.create({
   footer: {
     flexDirection: "row",
     justifyContent: "center",
-    alignItems: "center",
+    marginTop: Spacing.xl,
   },
   footerText: {
-    color: Colors.text.secondary,
     fontSize: Typography.sizes.sm,
+    color: Colors.text.secondary,
   },
   link: {
-    color: Colors.primary,
     fontSize: Typography.sizes.sm,
+    color: Colors.primary,
     fontWeight: Typography.weights.semibold,
   },
 });

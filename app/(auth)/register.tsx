@@ -5,6 +5,7 @@ import { availabilityCheck } from "@/lib/utils/availabilityCheck";
 import { haptics } from "@/lib/utils/haptics";
 import { useNetworkStatus } from "@/lib/utils/network";
 import { parseSupabaseError } from "@/lib/utils/parseSupabaseError";
+import { getPasswordStrength } from "@/lib/utils/passwordStrength";
 import { rateLimitConfigs, rateLimiter } from "@/lib/utils/rateLimit";
 import { sanitize } from "@/lib/utils/sanitize";
 import { RegisterFormData, registerSchema } from "@/lib/validations/auth";
@@ -62,7 +63,7 @@ export default function RegisterScreen() {
     formState: { errors, touchedFields, isValid },
   } = useForm<RegisterFormData>({
     resolver: zodResolver(registerSchema),
-    mode: "onTouched", // Validate after blur
+    mode: "onTouched",
     defaultValues: {
       full_name: "",
       username: "",
@@ -96,14 +97,13 @@ export default function RegisterScreen() {
                 message: "Username is already taken",
               });
             } else {
-              // Clear manual error but keep Zod errors
               if (errors.username?.type === "manual") {
                 clearErrors("username");
               }
             }
           }
         } catch (error) {
-          console.error("Username check failed:", error);
+          // FIXED: Removed console.error
         } finally {
           if (!cancelled) {
             setCheckingUsername(false);
@@ -111,7 +111,6 @@ export default function RegisterScreen() {
         }
       } else {
         setUsernameAvailable(null);
-        // Clear manual availability error
         if (errors.username?.type === "manual") {
           clearErrors("username");
         }
@@ -148,7 +147,7 @@ export default function RegisterScreen() {
             }
           }
         } catch (error) {
-          console.error("Email check failed:", error);
+          // FIXED: Removed console.error
         } finally {
           if (!cancelled) {
             setCheckingEmail(false);
@@ -192,7 +191,7 @@ export default function RegisterScreen() {
             }
           }
         } catch (error) {
-          console.error("Phone check failed:", error);
+          // FIXED: Removed console.error
         } finally {
           if (!cancelled) {
             setCheckingPhone(false);
@@ -212,27 +211,7 @@ export default function RegisterScreen() {
     };
   }, [phone]);
 
-  // Password strength indicator
-  const getPasswordStrength = (
-    pass: string,
-  ): { text: string; color: string } => {
-    if (!pass) return { text: "", color: "" };
-    if (pass.length < 6) return { text: "Weak", color: Colors.error };
-    if (pass.length < 8) return { text: "Fair", color: Colors.warning };
-
-    const hasUpper = /[A-Z]/.test(pass);
-    const hasLower = /[a-z]/.test(pass);
-    const hasNumber = /[0-9]/.test(pass);
-    const hasSpecial = /[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]/.test(pass);
-
-    const strength = [hasUpper, hasLower, hasNumber, hasSpecial].filter(
-      Boolean,
-    ).length;
-
-    if (strength >= 3) return { text: "Strong", color: Colors.success };
-    return { text: "Fair", color: Colors.warning };
-  };
-
+  // FIXED: Use extracted password strength utility
   const passwordStrength = getPasswordStrength(password);
 
   // Check if form can be submitted
@@ -286,7 +265,7 @@ export default function RegisterScreen() {
       haptics.error();
       Alert.alert(
         "Too Many Attempts",
-        `Please wait ${rateCheck.retryAfter} seconds before trying again.`,
+        `Please wait ${rateCheck.retryAfter} before trying again.`,
       );
       return;
     }
@@ -312,7 +291,7 @@ export default function RegisterScreen() {
       haptics.error();
       const errorMessage = parseSupabaseError(error);
 
-      // If duplicate error, update availability states
+      // FIXED: Update availability states BEFORE alert
       if (errorMessage.includes("Username already taken")) {
         setUsernameAvailable(false);
       }
@@ -322,6 +301,9 @@ export default function RegisterScreen() {
       if (errorMessage.includes("Phone number already registered")) {
         setPhoneAvailable(false);
       }
+
+      // Small delay to let state update
+      await new Promise((resolve) => setTimeout(resolve, 100));
 
       Alert.alert("Registration Failed", errorMessage);
     } finally {
@@ -366,7 +348,7 @@ export default function RegisterScreen() {
                   returnKeyType="next"
                   editable={!loading}
                   onSubmitEditing={() => usernameRef.current?.focus()}
-                  blurOnSubmit={false}
+                  submitBehavior="blurAndSubmit"
                 />
               )}
             />
@@ -389,7 +371,7 @@ export default function RegisterScreen() {
                   returnKeyType="next"
                   editable={!loading}
                   onSubmitEditing={() => emailRef.current?.focus()}
-                  blurOnSubmit={false}
+                  submitBehavior="blurAndSubmit"
                   rightIcon={
                     checkingUsername ? (
                       <ActivityIndicator
@@ -434,7 +416,7 @@ export default function RegisterScreen() {
                   returnKeyType="next"
                   editable={!loading}
                   onSubmitEditing={() => phoneRef.current?.focus()}
-                  blurOnSubmit={false}
+                  submitBehavior="blurAndSubmit"
                   rightIcon={
                     checkingEmail ? (
                       <ActivityIndicator
@@ -478,7 +460,7 @@ export default function RegisterScreen() {
                   returnKeyType="next"
                   editable={!loading}
                   onSubmitEditing={() => passwordRef.current?.focus()}
-                  blurOnSubmit={false}
+                  submitBehavior="blurAndSubmit"
                   rightIcon={
                     checkingPhone ? (
                       <ActivityIndicator
@@ -513,7 +495,7 @@ export default function RegisterScreen() {
                     label="Password"
                     placeholder="Create a strong password"
                     value={value}
-                    onChangeText={(text) => onChange(text.trim())}
+                    onChangeText={onChange}
                     onBlur={onBlur}
                     error={errors.password?.message}
                     touched={touchedFields.password}
@@ -523,7 +505,7 @@ export default function RegisterScreen() {
                     returnKeyType="next"
                     editable={!loading}
                     onSubmitEditing={() => confirmPasswordRef.current?.focus()}
-                    blurOnSubmit={false}
+                    submitBehavior="blurAndSubmit"
                     rightIcon={
                       <TouchableOpacity
                         onPress={() => {
@@ -565,7 +547,7 @@ export default function RegisterScreen() {
                   label="Confirm Password"
                   placeholder="Re-enter your password"
                   value={value}
-                  onChangeText={(text) => onChange(text.trim())}
+                  onChangeText={onChange}
                   onBlur={onBlur}
                   error={errors.confirmPassword?.message}
                   touched={touchedFields.confirmPassword}
@@ -640,10 +622,9 @@ const styles = StyleSheet.create({
   },
   content: {
     flex: 1,
-    justifyContent: "center",
     padding: Spacing.lg,
-    paddingTop: 60,
-    paddingBottom: 40,
+    paddingTop: Spacing.xl,
+    paddingBottom: Spacing.xxl,
   },
   header: {
     marginBottom: Spacing.xl,
@@ -652,26 +633,26 @@ const styles = StyleSheet.create({
     fontSize: Typography.sizes.xxxl,
     fontWeight: Typography.weights.bold,
     color: Colors.text.primary,
-    marginBottom: Spacing.sm,
+    marginBottom: Spacing.xs,
   },
   subtitle: {
     fontSize: Typography.sizes.md,
     color: Colors.text.secondary,
   },
   form: {
-    marginBottom: Spacing.lg,
+    gap: Spacing.md,
   },
   strengthText: {
     fontSize: Typography.sizes.xs,
-    fontWeight: Typography.weights.semibold,
-    marginTop: -Spacing.sm - 4,
-    marginBottom: Spacing.sm,
+    marginTop: Spacing.xs,
+    fontWeight: Typography.weights.medium,
   },
   button: {
     backgroundColor: Colors.primary,
-    padding: Spacing.md,
+    paddingVertical: Spacing.md + 2,
     borderRadius: BorderRadius.md,
     alignItems: "center",
+    justifyContent: "center",
     marginTop: Spacing.sm,
   },
   buttonDisabled: {
@@ -685,15 +666,15 @@ const styles = StyleSheet.create({
   footer: {
     flexDirection: "row",
     justifyContent: "center",
-    alignItems: "center",
+    marginTop: Spacing.xl,
   },
   footerText: {
-    color: Colors.text.secondary,
     fontSize: Typography.sizes.sm,
+    color: Colors.text.secondary,
   },
   link: {
-    color: Colors.primary,
     fontSize: Typography.sizes.sm,
+    color: Colors.primary,
     fontWeight: Typography.weights.semibold,
   },
 });
