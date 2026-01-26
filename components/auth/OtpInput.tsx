@@ -1,4 +1,4 @@
-// components/OtpInput.tsx
+// components/auth/OtpInput.tsx
 import { BorderRadius, Colors, Spacing, Typography } from "@/styles";
 import { useRef, useState } from "react";
 import { StyleSheet, TextInput, View } from "react-native";
@@ -8,6 +8,7 @@ interface OtpInputProps {
   value: string;
   onChange: (otp: string) => void;
   disabled?: boolean;
+  error?: boolean; // NEW: Visual error state
 }
 
 export default function OtpInput({
@@ -15,6 +16,7 @@ export default function OtpInput({
   value,
   onChange,
   disabled,
+  error, // NEW
 }: OtpInputProps) {
   const [focusedIndex, setFocusedIndex] = useState(0);
   const inputRefs = useRef<(TextInput | null)[]>([]);
@@ -35,9 +37,22 @@ export default function OtpInput({
     }
   };
 
+  // FIXED: Better backspace handling
   const handleKeyPress = (e: any, index: number) => {
-    if (e.nativeEvent.key === "Backspace" && !value[index] && index > 0) {
-      inputRefs.current[index - 1]?.focus();
+    if (e.nativeEvent.key === "Backspace") {
+      const newOtp = value.split("");
+
+      if (newOtp[index]) {
+        // Current box has value: clear it (onChange will handle)
+        newOtp[index] = "";
+        onChange(newOtp.join(""));
+        // Keep focus on current box
+      } else if (index > 0) {
+        // Current box empty: clear previous and move back
+        newOtp[index - 1] = "";
+        onChange(newOtp.join(""));
+        inputRefs.current[index - 1]?.focus();
+      }
     }
   };
 
@@ -53,6 +68,7 @@ export default function OtpInput({
             styles.input,
             focusedIndex === index && styles.inputFocused,
             value[index] && styles.inputFilled,
+            error && styles.inputError, // NEW: Error state
           ]}
           value={value[index] || ""}
           onChangeText={(text) => handleChange(text, index)}
@@ -83,6 +99,7 @@ const styles = StyleSheet.create({
     textAlign: "center",
     fontSize: Typography.sizes.xl,
     fontWeight: Typography.weights.semibold,
+    color: Colors.text.primary,
   },
   inputFocused: {
     borderColor: Colors.primary,
@@ -90,5 +107,9 @@ const styles = StyleSheet.create({
   },
   inputFilled: {
     borderColor: Colors.success,
+  },
+  inputError: {
+    borderColor: Colors.error,
+    borderWidth: 2,
   },
 });

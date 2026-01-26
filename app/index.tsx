@@ -53,7 +53,7 @@ export default function Index() {
     return (
       <View style={styles.container}>
         <ActivityIndicator size="large" color={Colors.primary} />
-        <Text style={styles.text}>Loading auth state...</Text>
+        {/* REMOVED: Debug text "Loading auth state..." */}
       </View>
     );
   }
@@ -65,7 +65,7 @@ export default function Index() {
 
         {session ? (
           <View style={styles.authContainer}>
-            {/* Mode Switcher - NEW */}
+            {/* Mode Switcher */}
             <View style={styles.modeSwitcherContainer}>
               <Text style={styles.sectionTitle}>Current Mode</Text>
               <ModeSwitcher />
@@ -164,13 +164,7 @@ export default function Index() {
               )}
             </TouchableOpacity>
 
-            {/* Phase 3 Preview */}
-            <View style={styles.phasePreview}>
-              <Text style={styles.phaseText}>
-                Phase 3: Tab navigation will show different screens based on
-                mode
-              </Text>
-            </View>
+            {/* REMOVED: Phase 3 preview box */}
           </View>
         ) : (
           <View style={styles.authContainer}>
@@ -178,7 +172,7 @@ export default function Index() {
               <Ionicons name="close-circle" size={32} color={Colors.error} />
             </View>
             <Text style={styles.notLoggedIn}>Not Logged In</Text>
-            <Text style={styles.subtitle}>Auth store is working!</Text>
+            {/* REMOVED: "Auth store is working!" */}
           </View>
         )}
       </View>
@@ -238,11 +232,6 @@ const styles = StyleSheet.create({
   statusBadge: {
     marginBottom: Spacing.md,
   },
-  text: {
-    fontSize: Typography.sizes.md,
-    color: Colors.text.secondary,
-    marginTop: Spacing.md,
-  },
   success: {
     fontSize: Typography.sizes.xl,
     fontWeight: Typography.weights.semibold,
@@ -273,11 +262,6 @@ const styles = StyleSheet.create({
     color: Colors.text.primary,
     flex: 1,
   },
-  subtitle: {
-    fontSize: Typography.sizes.sm,
-    color: Colors.text.secondary,
-    marginTop: Spacing.sm,
-  },
   signOutButton: {
     flexDirection: "row",
     alignItems: "center",
@@ -296,18 +280,5 @@ const styles = StyleSheet.create({
     color: Colors.text.inverse,
     fontSize: Typography.sizes.md,
     fontWeight: Typography.weights.semibold,
-  },
-  phasePreview: {
-    marginTop: Spacing.lg,
-    padding: Spacing.md,
-    backgroundColor: Colors.background.secondary,
-    borderRadius: BorderRadius.md,
-    width: "100%",
-  },
-  phaseText: {
-    fontSize: Typography.sizes.sm,
-    color: Colors.text.tertiary,
-    textAlign: "center",
-    fontStyle: "italic",
   },
 });

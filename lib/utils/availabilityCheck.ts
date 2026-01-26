@@ -1,3 +1,4 @@
+// lib/utils/availabilityCheck.ts
 import { supabase } from "@/lib/supabase";
 
 export const availabilityCheck = {
@@ -13,13 +14,11 @@ export const availabilityCheck = {
       });
 
       if (error) {
-        console.error("Email check error:", error);
         return { available: true }; // Fail open to not block users
       }
 
       return { available: data as boolean };
     } catch (error) {
-      console.error("Email check exception:", error);
       return { available: true };
     }
   },
@@ -39,13 +38,11 @@ export const availabilityCheck = {
       });
 
       if (error) {
-        console.error("Phone check error:", error);
         return { available: true }; // Fail open
       }
 
       return { available: data as boolean };
     } catch (error) {
-      console.error("Phone check exception:", error);
       return { available: true };
     }
   },
@@ -62,13 +59,11 @@ export const availabilityCheck = {
       });
 
       if (error) {
-        console.error("Username check error:", error);
         return { available: true };
       }
 
       return { available: data as boolean };
     } catch (error) {
-      console.error("Username check exception:", error);
       return { available: true };
     }
   },
