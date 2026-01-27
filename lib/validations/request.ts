@@ -24,10 +24,12 @@ export const requestSchema = z.object({
     message: "Please select a size",
   }),
 
+  // ============================================================================
+  // UPDATED: Require exactly 2 photos (matches database constraint)
+  // ============================================================================
   parcel_photos: z
     .array(z.string().url())
-    .min(1, "Please upload at least one photo")
-    .max(5, "Maximum 5 photos allowed"),
+    .length(2, "Exactly 2 photos are required"),
 
   // Delivery contact required for OTP and traveller contact
   delivery_contact_name: z

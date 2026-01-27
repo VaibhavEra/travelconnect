@@ -82,11 +82,16 @@ export const tripSchema = z
   )
   .refine(
     (data) => {
-      // Validate departure is not in the past
+      // ============================================================================
+      // UPDATED: Validate departure is not in the past (5-minute grace period)
+      // Matches server-side validation in validate_trip_dates()
+      // ============================================================================
       const departureDateTime = new Date(
         `${data.departure_date}T${data.departure_time}`,
       );
-      return departureDateTime > new Date();
+      const now = new Date();
+      const fiveMinutesAgo = new Date(now.getTime() - 5 * 60 * 1000);
+      return departureDateTime > fiveMinutesAgo;
     },
     {
       message: "Departure cannot be in the past",
