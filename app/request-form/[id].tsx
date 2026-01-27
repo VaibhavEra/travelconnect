@@ -253,7 +253,7 @@ export default function RequestFormScreen() {
               <ImagePicker
                 images={value}
                 onChange={onChange}
-                maxImages={5}
+                exactCount={2} // ← THIS IS THE ONLY CHANGE
                 error={errors.parcel_photos?.message}
               />
             )}
