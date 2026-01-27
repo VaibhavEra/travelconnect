@@ -49,6 +49,10 @@ export default function RequestsScreen() {
   const [selectedRequestReceiver, setSelectedRequestReceiver] =
     useState<string>("");
 
+  // NEW: Store OTP expiry values
+  const [pickupOtpExpiry, setPickupOtpExpiry] = useState<string>("");
+  const [deliveryOtpExpiry, setDeliveryOtpExpiry] = useState<string>("");
+
   useFocusEffect(
     useCallback(() => {
       if (user && currentMode === "traveller") {
@@ -110,6 +114,7 @@ export default function RequestsScreen() {
     if (request) {
       setSelectedRequestId(requestId);
       setSelectedRequestSender(request.sender?.full_name || "Sender");
+      setPickupOtpExpiry(request.pickup_otp_expiry || ""); // NEW: Set expiry
       setPickupOtpModalVisible(true);
     }
   };
@@ -120,6 +125,7 @@ export default function RequestsScreen() {
     if (request) {
       setSelectedRequestId(requestId);
       setSelectedRequestReceiver(request.delivery_contact_name);
+      setDeliveryOtpExpiry(request.delivery_otp_expiry || ""); // NEW: Set expiry
       setDeliveryOtpModalVisible(true);
     }
   };
@@ -129,6 +135,7 @@ export default function RequestsScreen() {
     try {
       const isValid = await verifyPickupOtp(selectedRequestId, otp);
       if (isValid && user) {
+        setPickupOtpModalVisible(false); // FIXED: Close modal first
         Alert.alert("Success", "Parcel marked as picked up!");
         await getAcceptedRequests(user.id);
       }
@@ -144,6 +151,7 @@ export default function RequestsScreen() {
     try {
       const isValid = await verifyDeliveryOtp(selectedRequestId, otp);
       if (isValid && user) {
+        setDeliveryOtpModalVisible(false); // FIXED: Close modal first
         Alert.alert("Success", "Parcel marked as delivered!");
         await getAcceptedRequests(user.id);
       }
@@ -363,6 +371,7 @@ export default function RequestsScreen() {
         onClose={() => setPickupOtpModalVisible(false)}
         onVerify={handleVerifyPickup}
         senderName={selectedRequestSender}
+        otpExpiry={pickupOtpExpiry} // NEW: Pass expiry
       />
 
       <VerifyDeliveryOtpModal
@@ -370,6 +379,7 @@ export default function RequestsScreen() {
         onClose={() => setDeliveryOtpModalVisible(false)}
         onVerify={handleVerifyDelivery}
         receiverName={selectedRequestReceiver}
+        otpExpiry={deliveryOtpExpiry} // NEW: Pass expiry
       />
     </View>
   );
