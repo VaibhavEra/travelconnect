@@ -1,10 +1,12 @@
-// styles/theme.ts
+import { useColorScheme } from "react-native";
+
 /**
  * Centralized theme configuration for TravelConnect
- * All colors, spacing, typography, and design tokens in one place
+ * Supports light and dark modes with automatic system detection
  */
 
-export const Colors = {
+// Light Mode Colors
+export const LightColors = {
   // Primary palette
   primary: "#007AFF",
   primaryDark: "#0051D5",
@@ -50,6 +52,63 @@ export const Colors = {
   disabled: "#CCCCCC",
   overlay: "rgba(0, 0, 0, 0.5)",
 } as const;
+
+// Dark Mode Colors
+export const DarkColors = {
+  // Primary palette (adjusted for dark backgrounds)
+  primary: "#0A84FF",
+  primaryDark: "#409CFF",
+  primaryLight: "#006DD9",
+
+  // Secondary palette
+  secondary: "#5E5CE6",
+  secondaryDark: "#7D7AFF",
+  secondaryLight: "#4A48CC",
+
+  // Semantic colors
+  success: "#32D74B",
+  error: "#FF453A",
+  warning: "#FF9F0A",
+  info: "#0A84FF",
+
+  // Text colors
+  text: {
+    primary: "#FFFFFF",
+    secondary: "#EBEBF5",
+    tertiary: "#EBEBF599",
+    placeholder: "#EBEBF560",
+    inverse: "#000000",
+  },
+
+  // Background colors
+  background: {
+    primary: "#000000",
+    secondary: "#1C1C1E",
+    tertiary: "#2C2C2E",
+    overlay: "rgba(0, 0, 0, 0.7)",
+  },
+
+  // Border colors
+  border: {
+    default: "#38383A",
+    light: "#48484A",
+    focus: "#0A84FF",
+    error: "#FF453A",
+  },
+
+  // State colors
+  disabled: "#48484A",
+  overlay: "rgba(0, 0, 0, 0.7)",
+} as const;
+
+// Hook to get colors based on color scheme
+export const useThemeColors = () => {
+  const colorScheme = useColorScheme();
+  return colorScheme === "dark" ? DarkColors : LightColors;
+};
+
+// Export light colors as default for backward compatibility
+export const Colors = LightColors;
 
 export const Spacing = {
   xs: 4,

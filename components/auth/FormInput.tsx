@@ -1,5 +1,7 @@
-// components/FormInput.tsx
-import { BorderRadius, Colors, Spacing, Typography } from "@/styles";
+// components/auth/FormInput.tsx
+
+import { BorderRadius, Spacing, Typography } from "@/styles";
+import { useThemeColors } from "@/styles/theme";
 import { forwardRef, useState } from "react";
 import {
   StyleSheet,
@@ -18,28 +20,45 @@ interface FormInputProps extends TextInputProps {
 
 const FormInput = forwardRef<TextInput, FormInputProps>(
   ({ label, error, touched, rightIcon, ...props }, ref) => {
+    const colors = useThemeColors();
     const [isFocused, setIsFocused] = useState(false);
     const showError = touched && error;
 
     return (
       <View style={styles.container}>
-        <Text style={styles.label}>{label}</Text>
+        <Text style={[styles.label, { color: colors.text.primary }]}>
+          {label}
+        </Text>
         <View style={styles.inputContainer}>
           <TextInput
             ref={ref}
             style={[
               styles.input,
-              isFocused && styles.inputFocused,
-              showError && styles.inputError,
+              {
+                borderColor: colors.border.default,
+                backgroundColor: colors.background.primary,
+                color: colors.text.primary,
+              },
+              isFocused && {
+                borderColor: colors.border.focus,
+                borderWidth: 2,
+              },
+              showError && {
+                borderColor: colors.border.error,
+              },
             ]}
             onFocus={() => setIsFocused(true)}
             onBlur={() => setIsFocused(false)}
-            placeholderTextColor={Colors.text.placeholder}
+            placeholderTextColor={colors.text.placeholder}
             {...props}
           />
           {rightIcon && <View style={styles.rightIcon}>{rightIcon}</View>}
         </View>
-        {showError && <Text style={styles.errorText}>{error}</Text>}
+        {showError && (
+          <Text style={[styles.errorText, { color: colors.error }]}>
+            {error}
+          </Text>
+        )}
       </View>
     );
   },
@@ -56,7 +75,6 @@ const styles = StyleSheet.create({
   label: {
     fontSize: Typography.sizes.sm,
     fontWeight: Typography.weights.semibold,
-    color: Colors.text.primary,
     marginBottom: Spacing.sm,
   },
   inputContainer: {
@@ -64,27 +82,19 @@ const styles = StyleSheet.create({
   },
   input: {
     borderWidth: 1,
-    borderColor: Colors.border.default,
-    borderRadius: BorderRadius.md,
+    borderRadius: BorderRadius.lg, // Changed from md to lg for more modern look
     padding: Spacing.md,
+    paddingRight: Spacing.xl + Spacing.lg, // Extra space for right icon
     fontSize: Typography.sizes.md,
-    backgroundColor: Colors.background.primary,
-    color: Colors.text.primary,
-  },
-  inputFocused: {
-    borderColor: Colors.border.focus,
-    borderWidth: 2,
-  },
-  inputError: {
-    borderColor: Colors.border.error,
+    minHeight: 52, // Consistent touch target
   },
   rightIcon: {
     position: "absolute",
     right: Spacing.md,
-    top: Spacing.md,
+    top: "50%",
+    transform: [{ translateY: -12 }], // Center vertically
   },
   errorText: {
-    color: Colors.error,
     fontSize: Typography.sizes.xs,
     marginTop: Spacing.xs,
   },

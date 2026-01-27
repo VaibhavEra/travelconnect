@@ -1,5 +1,7 @@
+import { haptics } from "@/lib/utils/haptics";
 import { TRANSPORT_MODES, TransportMode } from "@/lib/validations/trip";
-import { BorderRadius, Colors, Spacing, Typography } from "@/styles";
+import { BorderRadius, Spacing, Typography } from "@/styles";
+import { useThemeColors } from "@/styles/theme";
 import { Ionicons } from "@expo/vector-icons";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 
@@ -11,10 +13,10 @@ interface TransportModeSelectorProps {
 }
 
 const TRANSPORT_ICONS: Record<TransportMode, keyof typeof Ionicons.glyphMap> = {
-  train: "train-outline",
-  bus: "bus-outline",
-  flight: "airplane-outline",
-  car: "car-outline",
+  train: "train",
+  bus: "bus",
+  flight: "airplane",
+  car: "car",
 };
 
 const TRANSPORT_LABELS: Record<TransportMode, string> = {
@@ -30,9 +32,18 @@ export default function TransportModeSelector({
   onChange,
   error,
 }: TransportModeSelectorProps) {
+  const colors = useThemeColors();
+
+  const handleSelect = (mode: TransportMode) => {
+    haptics.selection();
+    onChange(mode);
+  };
+
   return (
     <View style={styles.container}>
-      <Text style={styles.label}>{label}</Text>
+      <Text style={[styles.label, { color: colors.text.primary }]}>
+        {label}
+      </Text>
 
       <View style={styles.modesContainer}>
         {TRANSPORT_MODES.map((mode) => {
@@ -42,17 +53,31 @@ export default function TransportModeSelector({
               key={mode}
               style={[
                 styles.modeButton,
-                isSelected && styles.modeButtonSelected,
+                {
+                  backgroundColor: isSelected
+                    ? colors.primary + "15"
+                    : colors.background.secondary,
+                  borderColor: isSelected
+                    ? colors.primary
+                    : colors.border.default,
+                },
               ]}
-              onPress={() => onChange(mode)}
+              onPress={() => handleSelect(mode)}
             >
               <Ionicons
                 name={TRANSPORT_ICONS[mode]}
                 size={24}
-                color={isSelected ? Colors.primary : Colors.text.secondary}
+                color={isSelected ? colors.primary : colors.text.secondary}
               />
               <Text
-                style={[styles.modeText, isSelected && styles.modeTextSelected]}
+                style={[
+                  styles.modeText,
+                  { color: colors.text.secondary },
+                  isSelected && {
+                    color: colors.primary,
+                    fontWeight: Typography.weights.semibold,
+                  },
+                ]}
               >
                 {TRANSPORT_LABELS[mode]}
               </Text>
@@ -61,7 +86,9 @@ export default function TransportModeSelector({
         })}
       </View>
 
-      {error && <Text style={styles.error}>{error}</Text>}
+      {error && (
+        <Text style={[styles.error, { color: colors.error }]}>{error}</Text>
+      )}
     </View>
   );
 }
@@ -73,7 +100,6 @@ const styles = StyleSheet.create({
   label: {
     fontSize: Typography.sizes.sm,
     fontWeight: Typography.weights.medium,
-    color: Colors.text.primary,
     marginBottom: Spacing.sm,
   },
   modesContainer: {
@@ -83,30 +109,18 @@ const styles = StyleSheet.create({
   modeButton: {
     flex: 1,
     alignItems: "center",
-    backgroundColor: Colors.background.secondary,
-    borderRadius: BorderRadius.md,
+    borderRadius: BorderRadius.lg,
     paddingVertical: Spacing.md,
     paddingHorizontal: Spacing.sm,
-    borderWidth: 1,
-    borderColor: Colors.border.default,
-  },
-  modeButtonSelected: {
-    backgroundColor: Colors.primary + "15",
-    borderColor: Colors.primary,
+    borderWidth: 1.5,
   },
   modeText: {
     fontSize: Typography.sizes.xs,
-    color: Colors.text.secondary,
     marginTop: Spacing.xs,
     fontWeight: Typography.weights.medium,
   },
-  modeTextSelected: {
-    color: Colors.primary,
-    fontWeight: Typography.weights.semibold,
-  },
   error: {
     fontSize: Typography.sizes.xs,
-    color: Colors.error,
     marginTop: Spacing.xs,
   },
 });

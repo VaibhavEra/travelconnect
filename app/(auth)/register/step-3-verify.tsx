@@ -1,24 +1,26 @@
-// app/(auth)/verify-otp.tsx
+import AuthLayout from "@/components/auth/AuthLayout";
 import OtpInput from "@/components/auth/OtpInput";
+import ProgressIndicator from "@/components/auth/ProgressIndicator";
 import { haptics } from "@/lib/utils/haptics";
 import { parseSupabaseError } from "@/lib/utils/parseSupabaseError";
 import { rateLimitConfigs, rateLimiter } from "@/lib/utils/rateLimit";
 import { AuthFlowState, useAuthStore } from "@/stores/authStore";
-import { BorderRadius, Colors, Spacing, Typography } from "@/styles";
+import { BorderRadius, Spacing, Typography } from "@/styles";
+import { useThemeColors } from "@/styles/theme";
 import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
 import { useEffect, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
-  ScrollView,
   StyleSheet,
   Text,
   TouchableOpacity,
   View,
 } from "react-native";
 
-export default function VerifyOtpScreen() {
+export default function RegisterStep3Screen() {
+  const colors = useThemeColors();
   const [otp, setOtp] = useState("");
   const [loading, setLoading] = useState(false);
   const [resendCooldown, setResendCooldown] = useState(60);
@@ -26,10 +28,9 @@ export default function VerifyOtpScreen() {
   const { flowState, flowContext, verifyEmailOtp, resendEmailOtp } =
     useAuthStore();
 
-  // FIXED: Destructure email with type safety
   const email = flowContext?.email || "";
 
-  // Countdown timer for resend
+  // Countdown timer
   useEffect(() => {
     if (resendCooldown > 0) {
       const timer = setTimeout(
@@ -43,7 +44,12 @@ export default function VerifyOtpScreen() {
   // Redirect if no pending verification
   useEffect(() => {
     if (flowState !== AuthFlowState.SIGNUP_OTP_SENT || !email) {
-      router.replace("/(auth)/login");
+      Alert.alert("Error", "No pending verification. Please register again.", [
+        {
+          text: "OK",
+          onPress: () => router.replace("/(auth)/register/step-1-account"),
+        },
+      ]);
     }
   }, [flowState, email]);
 
@@ -58,7 +64,7 @@ export default function VerifyOtpScreen() {
       return;
     }
 
-    // Rate limit check
+    // Rate limit
     const rateCheck = rateLimiter.check(
       `verify-otp:${email}`,
       rateLimitConfigs.otpResend,
@@ -77,20 +83,28 @@ export default function VerifyOtpScreen() {
       await verifyEmailOtp(email, otp);
       haptics.success();
 
-      Alert.alert("Success!", "Your email has been verified successfully.", [
-        { text: "OK", onPress: () => router.replace("/") },
-      ]);
+      Alert.alert(
+        "Success! 🎉",
+        "Your email has been verified. Welcome to TravelConnect!",
+        [
+          {
+            text: "Get Started",
+            onPress: () => router.replace("/(tabs)/explore"), // Will redirect properly via _layout.tsx
+          },
+        ],
+      );
     } catch (error: any) {
       haptics.error();
       const errorMessage = parseSupabaseError(error);
       Alert.alert("Verification Failed", errorMessage);
+      setOtp(""); // Clear OTP on error
     } finally {
       setLoading(false);
     }
   };
 
   const handleResend = async () => {
-    // Rate limit check
+    // Rate limit
     const rateCheck = rateLimiter.check(
       `resend-otp:${email}`,
       rateLimitConfigs.otpResend,
@@ -109,7 +123,7 @@ export default function VerifyOtpScreen() {
       await resendEmailOtp(email);
       haptics.success();
       setResendCooldown(60);
-      setOtp(""); // Clear OTP input
+      setOtp("");
       Alert.alert("Success", "Verification code sent to your email");
     } catch (error: any) {
       haptics.error();
@@ -121,91 +135,97 @@ export default function VerifyOtpScreen() {
   };
 
   return (
-    <ScrollView
-      contentContainerStyle={styles.scrollContent}
-      keyboardShouldPersistTaps="handled"
-      showsVerticalScrollIndicator={false}
-    >
-      <View style={styles.container}>
-        {/* Header */}
-        <View style={styles.header}>
-          <Ionicons name="mail-outline" size={64} color={Colors.primary} />
-          <Text style={styles.title}>Verify Your Email</Text>
-          <Text style={styles.subtitle}>
-            We've sent a 6-digit verification code to
-          </Text>
-          <Text style={styles.email}>{email}</Text>
-        </View>
+    <AuthLayout>
+      {/* Progress Indicator */}
+      <ProgressIndicator
+        currentStep={3}
+        totalSteps={3}
+        labels={["Account", "Profile", "Verify"]}
+      />
 
-        {/* OTP Input */}
-        <View style={styles.otpContainer}>
-          <OtpInput
-            length={6}
-            value={otp}
-            onChange={setOtp}
-            disabled={loading}
-          />
-        </View>
-
-        {/* Verify Button */}
-        <TouchableOpacity
-          style={[
-            styles.verifyButton,
-            (loading || otp.length !== 6) && styles.buttonDisabled,
-          ]}
-          onPress={handleVerify}
-          disabled={loading || otp.length !== 6}
-          activeOpacity={0.8}
-        >
-          {loading ? (
-            <ActivityIndicator color={Colors.text.inverse} />
-          ) : (
-            <Text style={styles.buttonText}>Verify Email</Text>
-          )}
-        </TouchableOpacity>
-
-        {/* Resend Section */}
-        <View style={styles.resendSection}>
-          <Text style={styles.resendText}>Didn't receive the code?</Text>
-          {resendCooldown > 0 ? (
-            <Text style={styles.timerText}>
-              Resend available in {resendCooldown}s
-            </Text>
-          ) : (
-            <TouchableOpacity onPress={handleResend} disabled={loading}>
-              <Text style={styles.resendLink}>
-                {loading ? "Sending..." : "Resend Code"}
-              </Text>
-            </TouchableOpacity>
-          )}
-        </View>
-
-        {/* Info */}
-        <View style={styles.infoBox}>
-          <Ionicons
-            name="information-circle-outline"
-            size={20}
-            color={Colors.text.secondary}
-          />
-          <Text style={styles.infoText}>
-            Check your spam folder if you don't see the email
-          </Text>
-        </View>
+      {/* Header */}
+      <View style={styles.header}>
+        <Ionicons name="mail-outline" size={64} color={colors.primary} />
+        <Text style={[styles.title, { color: colors.text.primary }]}>
+          Verify Your Email
+        </Text>
+        <Text style={[styles.subtitle, { color: colors.text.secondary }]}>
+          We've sent a 6-digit code to
+        </Text>
+        <Text style={[styles.email, { color: colors.primary }]}>{email}</Text>
       </View>
-    </ScrollView>
+
+      {/* OTP Input */}
+      <View style={styles.otpContainer}>
+        <OtpInput length={6} value={otp} onChange={setOtp} disabled={loading} />
+      </View>
+
+      {/* Verify Button */}
+      <TouchableOpacity
+        style={[
+          styles.verifyButton,
+          { backgroundColor: colors.primary },
+          (loading || otp.length !== 6) && styles.buttonDisabled,
+        ]}
+        onPress={handleVerify}
+        disabled={loading || otp.length !== 6}
+        activeOpacity={0.8}
+      >
+        {loading ? (
+          <ActivityIndicator color={colors.text.inverse} />
+        ) : (
+          <>
+            <Text style={[styles.buttonText, { color: colors.text.inverse }]}>
+              Verify Email
+            </Text>
+            <Ionicons
+              name="checkmark-circle"
+              size={20}
+              color={colors.text.inverse}
+            />
+          </>
+        )}
+      </TouchableOpacity>
+
+      {/* Resend Section */}
+      <View style={styles.resendSection}>
+        <Text style={[styles.resendText, { color: colors.text.secondary }]}>
+          Didn't receive the code?
+        </Text>
+        {resendCooldown > 0 ? (
+          <Text style={[styles.timerText, { color: colors.text.tertiary }]}>
+            Resend in {resendCooldown}s
+          </Text>
+        ) : (
+          <TouchableOpacity onPress={handleResend} disabled={loading}>
+            <Text style={[styles.resendLink, { color: colors.primary }]}>
+              {loading ? "Sending..." : "Resend Code"}
+            </Text>
+          </TouchableOpacity>
+        )}
+      </View>
+
+      {/* Info Box */}
+      <View
+        style={[
+          styles.infoBox,
+          { backgroundColor: colors.background.secondary },
+        ]}
+      >
+        <Ionicons
+          name="information-circle-outline"
+          size={20}
+          color={colors.text.secondary}
+        />
+        <Text style={[styles.infoText, { color: colors.text.secondary }]}>
+          Check your spam folder if you don't see the email
+        </Text>
+      </View>
+    </AuthLayout>
   );
 }
 
 const styles = StyleSheet.create({
-  scrollContent: {
-    flexGrow: 1,
-  },
-  container: {
-    flex: 1,
-    padding: Spacing.lg,
-    paddingTop: Spacing.xxl,
-    backgroundColor: Colors.background.primary,
-  },
   header: {
     alignItems: "center",
     marginBottom: Spacing.xl,
@@ -213,63 +233,58 @@ const styles = StyleSheet.create({
   title: {
     fontSize: Typography.sizes.xxl,
     fontWeight: Typography.weights.bold,
-    color: Colors.text.primary,
     marginTop: Spacing.md,
     marginBottom: Spacing.xs,
+    textAlign: "center",
   },
   subtitle: {
     fontSize: Typography.sizes.sm,
-    color: Colors.text.secondary,
     textAlign: "center",
     marginBottom: Spacing.xs,
   },
   email: {
     fontSize: Typography.sizes.md,
     fontWeight: Typography.weights.semibold,
-    color: Colors.primary,
     textAlign: "center",
   },
   otpContainer: {
     marginBottom: Spacing.xl,
   },
   verifyButton: {
-    backgroundColor: Colors.primary,
-    paddingVertical: Spacing.md + 2,
-    borderRadius: BorderRadius.md,
+    flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
+    gap: Spacing.sm,
+    paddingVertical: Spacing.md + 4,
+    borderRadius: BorderRadius.lg,
     marginBottom: Spacing.lg,
+    minHeight: 52,
   },
   buttonDisabled: {
     opacity: 0.6,
   },
   buttonText: {
-    color: Colors.text.inverse,
     fontSize: Typography.sizes.md,
     fontWeight: Typography.weights.semibold,
   },
   resendSection: {
     alignItems: "center",
     marginBottom: Spacing.xl,
+    gap: Spacing.xs,
   },
   resendText: {
     fontSize: Typography.sizes.sm,
-    color: Colors.text.secondary,
-    marginBottom: Spacing.xs,
   },
   resendLink: {
     fontSize: Typography.sizes.sm,
-    color: Colors.primary,
     fontWeight: Typography.weights.semibold,
   },
   timerText: {
     fontSize: Typography.sizes.sm,
-    color: Colors.text.tertiary,
   },
   infoBox: {
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: Colors.background.secondary,
     padding: Spacing.md,
     borderRadius: BorderRadius.md,
     gap: Spacing.sm,
@@ -277,6 +292,6 @@ const styles = StyleSheet.create({
   infoText: {
     flex: 1,
     fontSize: Typography.sizes.xs,
-    color: Colors.text.secondary,
+    lineHeight: 16,
   },
 });

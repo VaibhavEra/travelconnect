@@ -1,4 +1,6 @@
-import { BorderRadius, Colors, Spacing, Typography } from "@/styles";
+import { haptics } from "@/lib/utils/haptics";
+import { BorderRadius, Spacing, Typography } from "@/styles";
+import { useThemeColors } from "@/styles/theme";
 import { Ionicons } from "@expo/vector-icons";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 
@@ -19,54 +21,111 @@ export default function SlotsStepper({
   max = 5,
   error,
 }: SlotsStepperProps) {
+  const colors = useThemeColors();
+
   const handleDecrement = () => {
     if (value > min) {
+      haptics.light();
       onChange(value - 1);
     }
   };
 
   const handleIncrement = () => {
     if (value < max) {
+      haptics.light();
       onChange(value + 1);
     }
   };
 
   return (
     <View style={styles.container}>
-      <Text style={styles.label}>{label}</Text>
+      <Text style={[styles.label, { color: colors.text.primary }]}>
+        {label}
+      </Text>
 
-      <View style={styles.stepperContainer}>
+      <View
+        style={[
+          styles.stepperContainer,
+          { backgroundColor: colors.background.secondary },
+        ]}
+      >
         <Pressable
-          style={[styles.button, value <= min && styles.buttonDisabled]}
+          style={[
+            styles.button,
+            {
+              backgroundColor:
+                value <= min
+                  ? colors.background.tertiary
+                  : colors.primary + "15",
+            },
+          ]}
           onPress={handleDecrement}
           disabled={value <= min}
         >
           <Ionicons
             name="remove"
             size={20}
-            color={value <= min ? Colors.text.tertiary : Colors.primary}
+            color={value <= min ? colors.text.tertiary : colors.primary}
           />
         </Pressable>
 
         <View style={styles.valueContainer}>
-          <Text style={styles.value}>{value}</Text>
-          <Text style={styles.valueLabel}>slot{value !== 1 ? "s" : ""}</Text>
+          {/* Visual Slots */}
+          <View style={styles.slotsVisual}>
+            {Array.from({ length: max }).map((_, index) => (
+              <View
+                key={index}
+                style={[
+                  styles.slot,
+                  {
+                    backgroundColor:
+                      index < value
+                        ? colors.primary + "30"
+                        : colors.background.tertiary,
+                    borderColor:
+                      index < value ? colors.primary : colors.border.default,
+                  },
+                ]}
+              >
+                {index < value && (
+                  <Ionicons name="cube" size={16} color={colors.primary} />
+                )}
+              </View>
+            ))}
+          </View>
+
+          <Text style={[styles.value, { color: colors.text.primary }]}>
+            {value}
+          </Text>
+          <Text style={[styles.valueLabel, { color: colors.text.secondary }]}>
+            slot{value !== 1 ? "s" : ""}
+          </Text>
         </View>
 
         <Pressable
-          style={[styles.button, value >= max && styles.buttonDisabled]}
+          style={[
+            styles.button,
+            {
+              backgroundColor:
+                value >= max
+                  ? colors.background.tertiary
+                  : colors.primary + "15",
+            },
+          ]}
           onPress={handleIncrement}
           disabled={value >= max}
         >
           <Ionicons
             name="add"
             size={20}
-            color={value >= max ? Colors.text.tertiary : Colors.primary}
+            color={value >= max ? colors.text.tertiary : colors.primary}
           />
         </Pressable>
       </View>
 
-      {error && <Text style={styles.error}>{error}</Text>}
+      {error && (
+        <Text style={[styles.error, { color: colors.error }]}>{error}</Text>
+      )}
     </View>
   );
 }
@@ -78,45 +137,49 @@ const styles = StyleSheet.create({
   label: {
     fontSize: Typography.sizes.sm,
     fontWeight: Typography.weights.medium,
-    color: Colors.text.primary,
     marginBottom: Spacing.sm,
   },
   stepperContainer: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    backgroundColor: Colors.background.secondary,
     borderRadius: BorderRadius.md,
     padding: Spacing.sm,
   },
   button: {
     width: 40,
     height: 40,
-    borderRadius: BorderRadius.sm,
-    backgroundColor: Colors.primary + "15",
+    borderRadius: BorderRadius.md,
     alignItems: "center",
     justifyContent: "center",
-  },
-  buttonDisabled: {
-    backgroundColor: Colors.background.tertiary,
   },
   valueContainer: {
     flex: 1,
     alignItems: "center",
+    gap: Spacing.xs,
+  },
+  slotsVisual: {
+    flexDirection: "row",
+    gap: Spacing.xs,
+    marginBottom: Spacing.xs,
+  },
+  slot: {
+    width: 32,
+    height: 32,
+    borderRadius: BorderRadius.sm,
+    borderWidth: 1.5,
+    alignItems: "center",
+    justifyContent: "center",
   },
   value: {
-    fontSize: Typography.sizes.xxl,
+    fontSize: Typography.sizes.xl,
     fontWeight: Typography.weights.bold,
-    color: Colors.text.primary,
   },
   valueLabel: {
     fontSize: Typography.sizes.xs,
-    color: Colors.text.secondary,
-    marginTop: 2,
   },
   error: {
     fontSize: Typography.sizes.xs,
-    color: Colors.error,
     marginTop: Spacing.xs,
   },
 });

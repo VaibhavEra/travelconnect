@@ -1,12 +1,12 @@
-// app/_layout.tsx
 import { useAuthStore } from "@/stores/authStore";
 import { useModeStore } from "@/stores/modeStore";
-import { Colors } from "@/styles";
+import { useThemeColors } from "@/styles/theme";
 import { Slot, useRouter, useSegments } from "expo-router";
 import { useEffect } from "react";
 import { ActivityIndicator, StyleSheet, View } from "react-native";
 
 export default function RootLayout() {
+  const colors = useThemeColors();
   const router = useRouter();
   const segments = useSegments();
   const { session, loading: authLoading, initialize } = useAuthStore();
@@ -31,18 +31,15 @@ export default function RootLayout() {
 
     // Check if user is on password reset screens
     const isOnPasswordResetFlow =
-      segments[1] === "verify-reset-otp" ||
-      segments[1] === "reset-new-password";
+      segments[0] === "(auth)" &&
+      segments[1] === "reset-password" &&
+      (segments[2] === "verify" || segments[2] === "new-password");
 
     // Check if on dynamic route
-    const firstSegment = String(segments[0] || "");
-    const isOnDynamicRoute =
-      firstSegment.startsWith("trip") ||
-      firstSegment === "request-form" ||
-      firstSegment === "request-details" ||
-      firstSegment === "incoming-request-details";
+    const firstSegment = segments[0];
+    const isOnDynamicRoute = firstSegment === "incoming-request-details";
 
-    // FIXED: Get default route based on mode
+    // Get default route based on mode
     const getDefaultRoute = () => {
       return currentMode === "sender" ? "/(tabs)/explore" : "/(tabs)/my-trips";
     };
@@ -56,7 +53,6 @@ export default function RootLayout() {
       router.replace(getDefaultRoute());
     } else if (session && !inTabsGroup && !inAuthGroup && !isOnDynamicRoute) {
       // Authenticated user NOT in tabs/auth/dynamic routes → redirect to default tab
-      // This catches any miscellaneous routes including root
       router.replace(getDefaultRoute());
     }
   }, [session, authLoading, modeLoading, segments, currentMode]);
@@ -64,8 +60,13 @@ export default function RootLayout() {
   // Show loading while initializing
   if (authLoading || modeLoading) {
     return (
-      <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color={Colors.primary} />
+      <View
+        style={[
+          styles.loadingContainer,
+          { backgroundColor: colors.background.primary },
+        ]}
+      >
+        <ActivityIndicator size="large" color={colors.primary} />
       </View>
     );
   }
@@ -78,6 +79,5 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: "center",
     alignItems: "center",
-    backgroundColor: Colors.background.primary,
   },
 });

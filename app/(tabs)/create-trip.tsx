@@ -6,6 +6,7 @@ import SlotsStepper from "@/components/forms/SlotsStepper";
 import TextInput from "@/components/forms/TextInput";
 import TimePickerInput from "@/components/forms/TimePickerInput";
 import TransportModeSelector from "@/components/forms/TransportModeSelector";
+import ModeSwitcher from "@/components/shared/ModeSwitcher";
 import { haptics } from "@/lib/utils/haptics";
 import {
   PackageCategory,
@@ -15,7 +16,8 @@ import {
 } from "@/lib/validations/trip";
 import { useAuthStore } from "@/stores/authStore";
 import { useTripStore } from "@/stores/tripStore";
-import { BorderRadius, Colors, Spacing, Typography } from "@/styles";
+import { BorderRadius, Spacing, Typography } from "@/styles";
+import { useThemeColors } from "@/styles/theme";
 import { Ionicons } from "@expo/vector-icons";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { router } from "expo-router";
@@ -25,12 +27,13 @@ import {
   Alert,
   KeyboardAvoidingView,
   Platform,
+  Pressable,
   ScrollView,
   StyleSheet,
   Text,
-  TouchableOpacity,
   View,
 } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 
 const getDefaultDepartureDate = () => {
   const tomorrow = new Date();
@@ -46,11 +49,9 @@ const getDefaultArrivalDate = () => {
   return dayAfterTomorrow.toISOString().split("T")[0];
 };
 
-// Helper function to parse and format error messages
 const getErrorMessage = (error: any): { title: string; message: string } => {
   const errorMessage = error.message || "";
 
-  // Server-side validation errors
   if (errorMessage.includes("past") || errorMessage.includes("before")) {
     return {
       title: "Invalid Date",
@@ -97,7 +98,6 @@ const getErrorMessage = (error: any): { title: string; message: string } => {
     };
   }
 
-  // Network errors
   if (errorMessage.includes("network") || errorMessage.includes("fetch")) {
     return {
       title: "Connection Error",
@@ -105,7 +105,6 @@ const getErrorMessage = (error: any): { title: string; message: string } => {
     };
   }
 
-  // Generic fallback
   return {
     title: "Error",
     message: errorMessage || "Failed to create trip. Please try again.",
@@ -113,6 +112,7 @@ const getErrorMessage = (error: any): { title: string; message: string } => {
 };
 
 export default function CreateTripScreen() {
+  const colors = useThemeColors();
   const { user } = useAuthStore();
   const { createTrip, loading } = useTripStore();
 
@@ -166,7 +166,6 @@ export default function CreateTripScreen() {
 
       await createTrip(data, user!.id);
 
-      // Reset form to default values
       reset({
         source: "",
         destination: "",
@@ -183,306 +182,467 @@ export default function CreateTripScreen() {
       });
 
       haptics.success();
+      router.push("/(tabs)/my-trips");
 
-      Alert.alert(
-        "Trip Created! 🎉",
-        "Your trip has been created successfully. You can now receive parcel requests from senders.",
-        [
-          {
-            text: "View My Trips",
-            onPress: () => {
-              router.push("/(tabs)/my-trips");
-            },
-          },
-          {
-            text: "Create Another",
-            style: "cancel",
-          },
-        ],
-      );
+      setTimeout(() => {
+        Alert.alert(
+          "Trip Created! 🎉",
+          "Your trip has been created successfully. You can now receive parcel requests from senders.",
+          [{ text: "OK", style: "default" }],
+        );
+      }, 300);
     } catch (error: any) {
       console.error("Trip creation error:", error);
       haptics.error();
-
-      // Get user-friendly error message
       const { title, message } = getErrorMessage(error);
-
-      Alert.alert(title, message, [
-        {
-          text: "OK",
-          style: "default",
-        },
-      ]);
+      Alert.alert(title, message, [{ text: "OK", style: "default" }]);
     }
   };
 
   const isFormDisabled = !isValid || loading;
+  const hasErrors = Object.keys(errors).length > 0;
 
   return (
-    <KeyboardAvoidingView
-      style={styles.container}
-      behavior={Platform.OS === "ios" ? "padding" : undefined}
+    <SafeAreaView
+      style={[styles.container, { backgroundColor: colors.background.primary }]}
+      edges={["top"]}
     >
-      <ScrollView
-        style={styles.scrollView}
-        contentContainerStyle={styles.scrollContent}
-        showsVerticalScrollIndicator={false}
-        keyboardShouldPersistTaps="handled"
-      >
-        <View style={styles.header}>
-          <Text style={styles.title}>Create Trip</Text>
-          <Text style={styles.subtitle}>Share your journey, help others</Text>
-        </View>
-
-        {/* Info Banner */}
-        <View style={styles.infoBanner}>
-          <Ionicons
-            name="information-circle"
-            size={20}
-            color={Colors.primary}
-          />
-          <Text style={styles.infoBannerText}>
-            All trip details will be verified. Only travelers with valid tickets
-            can create trips.
+      {/* Header */}
+      <View style={[styles.header, { borderBottomColor: colors.border.light }]}>
+        <View>
+          <Text style={[styles.title, { color: colors.text.primary }]}>
+            Create Trip
+          </Text>
+          <Text style={[styles.subtitle, { color: colors.text.secondary }]}>
+            Share your journey, help others
           </Text>
         </View>
+        <ModeSwitcher />
+      </View>
 
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Route & Transport</Text>
-
-          <Controller
-            control={control}
-            name="source"
-            render={({ field: { onChange, value } }) => (
-              <CityDropdown
-                label="Source City"
-                value={value}
-                onChange={onChange}
-                placeholder="Select source city"
-                error={errors.source?.message}
-              />
-            )}
-          />
-
-          <Controller
-            control={control}
-            name="destination"
-            render={({ field: { onChange, value } }) => (
-              <CityDropdown
-                label="Destination City"
-                value={value}
-                onChange={onChange}
-                placeholder="Select destination city"
-                error={errors.destination?.message}
-              />
-            )}
-          />
-
-          <Controller
-            control={control}
-            name="transport_mode"
-            render={({ field: { onChange, value } }) => (
-              <TransportModeSelector
-                label="Transport Mode"
-                value={value as TransportMode}
-                onChange={onChange}
-                error={errors.transport_mode?.message}
-              />
-            )}
-          />
-        </View>
-
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Schedule</Text>
-
-          <View style={styles.row}>
-            <View style={styles.halfWidth}>
-              <Controller
-                control={control}
-                name="departure_date"
-                render={({ field: { onChange, value } }) => (
-                  <DatePickerInput
-                    label="Departure Date"
-                    value={parseDate(value)}
-                    onChange={(date) => onChange(formatDate(date))}
-                    error={errors.departure_date?.message}
-                    minimumDate={new Date()}
-                  />
-                )}
-              />
-            </View>
-            <View style={styles.halfWidth}>
-              <Controller
-                control={control}
-                name="departure_time"
-                render={({ field: { onChange, value } }) => (
-                  <TimePickerInput
-                    label="Departure Time"
-                    value={parseDate("2000-01-01", value)}
-                    onChange={(date) => onChange(formatTime(date))}
-                    error={errors.departure_time?.message}
-                  />
-                )}
-              />
-            </View>
-          </View>
-
-          <View style={styles.row}>
-            <View style={styles.halfWidth}>
-              <Controller
-                control={control}
-                name="arrival_date"
-                render={({ field: { onChange, value } }) => (
-                  <DatePickerInput
-                    label="Arrival Date"
-                    value={parseDate(value)}
-                    onChange={(date) => onChange(formatDate(date))}
-                    error={errors.arrival_date?.message}
-                    minimumDate={parseDate(departureDate)}
-                  />
-                )}
-              />
-            </View>
-            <View style={styles.halfWidth}>
-              <Controller
-                control={control}
-                name="arrival_time"
-                render={({ field: { onChange, value } }) => (
-                  <TimePickerInput
-                    label="Arrival Time"
-                    value={parseDate("2000-01-01", value)}
-                    onChange={(date) => onChange(formatTime(date))}
-                    error={errors.arrival_time?.message}
-                  />
-                )}
-              />
-            </View>
-          </View>
-        </View>
-
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Capacity & Categories</Text>
-
-          <Controller
-            control={control}
-            name="total_slots"
-            render={({ field: { onChange, value } }) => (
-              <SlotsStepper
-                label="Available Slots"
-                value={value}
-                onChange={onChange}
-                min={1}
-                max={5}
-                error={errors.total_slots?.message}
-              />
-            )}
-          />
-
-          <Controller
-            control={control}
-            name="allowed_categories"
-            render={({ field: { onChange, value } }) => (
-              <CategoryCheckboxes
-                label="Allowed Package Categories"
-                value={value as PackageCategory[]}
-                onChange={onChange}
-                error={errors.allowed_categories?.message}
-              />
-            )}
-          />
-        </View>
-
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Verification</Text>
-
-          <Controller
-            control={control}
-            name="pnr_number"
-            render={({ field: { onChange, onBlur, value } }) => (
-              <TextInput
-                label="PNR Number"
-                placeholder="e.g. ABC123456"
-                value={value}
-                onChangeText={(text) => onChange(text.toUpperCase())}
-                onBlur={onBlur}
-                error={errors.pnr_number?.message}
-                autoCapitalize="characters"
-                maxLength={20}
-              />
-            )}
-          />
-
-          <Controller
-            control={control}
-            name="ticket_file_url"
-            render={({ field: { onChange, value } }) => (
-              <FileUploadButton
-                label="Ticket File"
-                value={value}
-                onChange={onChange}
-                userId={user!.id}
-                error={errors.ticket_file_url?.message}
-              />
-            )}
-          />
-        </View>
-
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Additional Notes (Optional)</Text>
-
-          <Controller
-            control={control}
-            name="notes"
-            render={({ field: { onChange, onBlur, value } }) => (
-              <TextInput
-                label="Notes"
-                placeholder="Any special instructions or requirements..."
-                value={value || ""}
-                onChangeText={onChange}
-                onBlur={onBlur}
-                error={errors.notes?.message}
-                multiline
-                numberOfLines={4}
-                maxLength={500}
-                style={{ minHeight: 100, textAlignVertical: "top" }}
-              />
-            )}
-          />
-        </View>
-
-        <TouchableOpacity
-          style={[
-            styles.submitButton,
-            isFormDisabled && styles.submitButtonDisabled,
-          ]}
-          onPress={handleSubmit(onSubmit)}
-          disabled={isFormDisabled}
-          activeOpacity={0.8}
+      <KeyboardAvoidingView
+        style={styles.keyboardView}
+        behavior={Platform.OS === "ios" ? "padding" : undefined}
+      >
+        <ScrollView
+          style={styles.scrollView}
+          contentContainerStyle={styles.scrollContent}
+          showsVerticalScrollIndicator={false}
+          keyboardShouldPersistTaps="handled"
         >
-          {loading ? (
-            <ActivityIndicator color={Colors.text.inverse} />
-          ) : (
-            <>
-              <Ionicons
-                name="checkmark-circle"
-                size={20}
-                color={Colors.text.inverse}
-              />
-              <Text style={styles.submitButtonText}>Create Trip</Text>
-            </>
-          )}
-        </TouchableOpacity>
+          {/* Info Banner */}
+          <View
+            style={[
+              styles.infoBanner,
+              { backgroundColor: colors.primary + "10" },
+            ]}
+          >
+            <Ionicons
+              name="information-circle"
+              size={20}
+              color={colors.primary}
+            />
+            <Text style={[styles.infoBannerText, { color: colors.primary }]}>
+              All trip details will be verified. Only travelers with valid
+              tickets can create trips.
+            </Text>
+          </View>
 
-        <View style={{ height: Spacing.xxxl }} />
-      </ScrollView>
-    </KeyboardAvoidingView>
+          {/* Route & Transport */}
+          <View
+            style={[
+              styles.card,
+              { backgroundColor: colors.background.secondary },
+            ]}
+          >
+            <View style={styles.cardHeader}>
+              <View
+                style={[
+                  styles.cardIconContainer,
+                  { backgroundColor: colors.primary + "15" },
+                ]}
+              >
+                <Ionicons name="map" size={20} color={colors.primary} />
+              </View>
+              <Text style={[styles.cardTitle, { color: colors.text.primary }]}>
+                Route & Transport
+              </Text>
+            </View>
+
+            <Controller
+              control={control}
+              name="source"
+              render={({ field: { onChange, value } }) => (
+                <CityDropdown
+                  label="Source City"
+                  value={value}
+                  onChange={onChange}
+                  placeholder="Select source city"
+                  error={errors.source?.message}
+                />
+              )}
+            />
+
+            <Controller
+              control={control}
+              name="destination"
+              render={({ field: { onChange, value } }) => (
+                <CityDropdown
+                  label="Destination City"
+                  value={value}
+                  onChange={onChange}
+                  placeholder="Select destination city"
+                  error={errors.destination?.message}
+                />
+              )}
+            />
+
+            <Controller
+              control={control}
+              name="transport_mode"
+              render={({ field: { onChange, value } }) => (
+                <TransportModeSelector
+                  label="Transport Mode"
+                  value={value as TransportMode}
+                  onChange={onChange}
+                  error={errors.transport_mode?.message}
+                />
+              )}
+            />
+          </View>
+
+          {/* Schedule */}
+          <View
+            style={[
+              styles.card,
+              { backgroundColor: colors.background.secondary },
+            ]}
+          >
+            <View style={styles.cardHeader}>
+              <View
+                style={[
+                  styles.cardIconContainer,
+                  { backgroundColor: colors.primary + "15" },
+                ]}
+              >
+                <Ionicons name="calendar" size={20} color={colors.primary} />
+              </View>
+              <Text style={[styles.cardTitle, { color: colors.text.primary }]}>
+                Schedule
+              </Text>
+            </View>
+
+            <Text
+              style={[styles.scheduleLabel, { color: colors.text.secondary }]}
+            >
+              Departure
+            </Text>
+            <View style={styles.row}>
+              <View style={styles.halfWidth}>
+                <Controller
+                  control={control}
+                  name="departure_date"
+                  render={({ field: { onChange, value } }) => (
+                    <DatePickerInput
+                      label="Date"
+                      value={parseDate(value)}
+                      onChange={(date) => onChange(formatDate(date))}
+                      error={errors.departure_date?.message}
+                      minimumDate={new Date()}
+                    />
+                  )}
+                />
+              </View>
+              <View style={styles.halfWidth}>
+                <Controller
+                  control={control}
+                  name="departure_time"
+                  render={({ field: { onChange, value } }) => (
+                    <TimePickerInput
+                      label="Time"
+                      value={parseDate("2000-01-01", value)}
+                      onChange={(date) => onChange(formatTime(date))}
+                      error={errors.departure_time?.message}
+                    />
+                  )}
+                />
+              </View>
+            </View>
+
+            <Text
+              style={[styles.scheduleLabel, { color: colors.text.secondary }]}
+            >
+              Arrival
+            </Text>
+            <View style={styles.row}>
+              <View style={styles.halfWidth}>
+                <Controller
+                  control={control}
+                  name="arrival_date"
+                  render={({ field: { onChange, value } }) => (
+                    <DatePickerInput
+                      label="Date"
+                      value={parseDate(value)}
+                      onChange={(date) => onChange(formatDate(date))}
+                      error={errors.arrival_date?.message}
+                      minimumDate={parseDate(departureDate)}
+                    />
+                  )}
+                />
+              </View>
+              <View style={styles.halfWidth}>
+                <Controller
+                  control={control}
+                  name="arrival_time"
+                  render={({ field: { onChange, value } }) => (
+                    <TimePickerInput
+                      label="Time"
+                      value={parseDate("2000-01-01", value)}
+                      onChange={(date) => onChange(formatTime(date))}
+                      error={errors.arrival_time?.message}
+                    />
+                  )}
+                />
+              </View>
+            </View>
+          </View>
+
+          {/* Capacity & Categories */}
+          <View
+            style={[
+              styles.card,
+              { backgroundColor: colors.background.secondary },
+            ]}
+          >
+            <View style={styles.cardHeader}>
+              <View
+                style={[
+                  styles.cardIconContainer,
+                  { backgroundColor: colors.primary + "15" },
+                ]}
+              >
+                <Ionicons name="cube" size={20} color={colors.primary} />
+              </View>
+              <Text style={[styles.cardTitle, { color: colors.text.primary }]}>
+                Capacity & Categories
+              </Text>
+            </View>
+
+            <Controller
+              control={control}
+              name="total_slots"
+              render={({ field: { onChange, value } }) => (
+                <SlotsStepper
+                  label="Available Slots"
+                  value={value}
+                  onChange={onChange}
+                  min={1}
+                  max={5}
+                  error={errors.total_slots?.message}
+                />
+              )}
+            />
+
+            <Controller
+              control={control}
+              name="allowed_categories"
+              render={({ field: { onChange, value } }) => (
+                <CategoryCheckboxes
+                  label="Allowed Package Categories"
+                  value={value as PackageCategory[]}
+                  onChange={onChange}
+                  error={errors.allowed_categories?.message}
+                />
+              )}
+            />
+          </View>
+
+          {/* Verification */}
+          <View
+            style={[
+              styles.card,
+              { backgroundColor: colors.background.secondary },
+            ]}
+          >
+            <View style={styles.cardHeader}>
+              <View
+                style={[
+                  styles.cardIconContainer,
+                  { backgroundColor: colors.success + "15" },
+                ]}
+              >
+                <Ionicons
+                  name="shield-checkmark"
+                  size={20}
+                  color={colors.success}
+                />
+              </View>
+              <Text style={[styles.cardTitle, { color: colors.text.primary }]}>
+                Verification
+              </Text>
+            </View>
+
+            <Controller
+              control={control}
+              name="pnr_number"
+              render={({ field: { onChange, onBlur, value } }) => (
+                <TextInput
+                  label="PNR Number"
+                  placeholder="e.g. ABC123456"
+                  value={value}
+                  onChangeText={(text) => onChange(text.toUpperCase())}
+                  onBlur={onBlur}
+                  error={errors.pnr_number?.message}
+                  autoCapitalize="characters"
+                  maxLength={20}
+                />
+              )}
+            />
+
+            <Controller
+              control={control}
+              name="ticket_file_url"
+              render={({ field: { onChange, value } }) => (
+                <FileUploadButton
+                  label="Ticket File"
+                  value={value}
+                  onChange={onChange}
+                  userId={user!.id}
+                  error={errors.ticket_file_url?.message}
+                />
+              )}
+            />
+          </View>
+
+          {/* Additional Notes */}
+          <View
+            style={[
+              styles.card,
+              { backgroundColor: colors.background.secondary },
+            ]}
+          >
+            <View style={styles.cardHeader}>
+              <View
+                style={[
+                  styles.cardIconContainer,
+                  { backgroundColor: colors.text.tertiary + "15" },
+                ]}
+              >
+                <Ionicons
+                  name="document-text"
+                  size={20}
+                  color={colors.text.secondary}
+                />
+              </View>
+              <Text style={[styles.cardTitle, { color: colors.text.primary }]}>
+                Additional Notes
+                <Text
+                  style={[styles.optional, { color: colors.text.tertiary }]}
+                >
+                  {" "}
+                  (Optional)
+                </Text>
+              </Text>
+            </View>
+
+            <Controller
+              control={control}
+              name="notes"
+              render={({ field: { onChange, onBlur, value } }) => (
+                <TextInput
+                  label="Notes"
+                  placeholder="Any special instructions or requirements..."
+                  value={value || ""}
+                  onChangeText={onChange}
+                  onBlur={onBlur}
+                  error={errors.notes?.message}
+                  multiline
+                  numberOfLines={4}
+                  maxLength={500}
+                  style={{ minHeight: 100, textAlignVertical: "top" }}
+                />
+              )}
+            />
+          </View>
+
+          {/* Validation Errors Summary */}
+          {hasErrors && (
+            <View
+              style={[
+                styles.errorSummary,
+                {
+                  backgroundColor: colors.error + "10",
+                  borderColor: colors.error + "30",
+                },
+              ]}
+            >
+              <Ionicons name="alert-circle" size={20} color={colors.error} />
+              <Text style={[styles.errorSummaryText, { color: colors.error }]}>
+                Please fix the errors above before creating the trip
+              </Text>
+            </View>
+          )}
+
+          {/* Submit Button */}
+          <Pressable
+            style={[
+              styles.submitButton,
+              { backgroundColor: colors.primary },
+              isFormDisabled && styles.submitButtonDisabled,
+            ]}
+            onPress={handleSubmit(onSubmit)}
+            disabled={isFormDisabled}
+          >
+            {loading ? (
+              <ActivityIndicator color={colors.text.inverse} />
+            ) : (
+              <>
+                <Ionicons
+                  name="checkmark-circle"
+                  size={20}
+                  color={colors.text.inverse}
+                />
+                <Text
+                  style={[
+                    styles.submitButtonText,
+                    { color: colors.text.inverse },
+                  ]}
+                >
+                  Create Trip
+                </Text>
+              </>
+            )}
+          </Pressable>
+
+          <View style={{ height: Spacing.xxxl }} />
+        </ScrollView>
+      </KeyboardAvoidingView>
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: Colors.background.primary,
+  },
+  header: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    paddingHorizontal: Spacing.lg,
+    paddingVertical: Spacing.md,
+    borderBottomWidth: 1,
+  },
+  title: {
+    fontSize: Typography.sizes.xl,
+    fontWeight: Typography.weights.bold,
+    marginBottom: 2,
+  },
+  subtitle: {
+    fontSize: Typography.sizes.sm,
+  },
+  keyboardView: {
+    flex: 1,
   },
   scrollView: {
     flex: 1,
@@ -490,45 +650,50 @@ const styles = StyleSheet.create({
   scrollContent: {
     padding: Spacing.lg,
   },
-  header: {
-    marginBottom: Spacing.lg,
-  },
-  title: {
-    fontSize: Typography.sizes.xxxl,
-    fontWeight: Typography.weights.bold,
-    color: Colors.text.primary,
-    marginBottom: Spacing.xs,
-  },
-  subtitle: {
-    fontSize: Typography.sizes.md,
-    color: Colors.text.secondary,
-  },
   infoBanner: {
     flexDirection: "row",
     alignItems: "center",
     gap: Spacing.sm,
-    backgroundColor: Colors.primary + "10",
     padding: Spacing.md,
-    borderRadius: BorderRadius.md,
+    borderRadius: BorderRadius.lg,
     marginBottom: Spacing.lg,
   },
   infoBannerText: {
     flex: 1,
     fontSize: Typography.sizes.sm,
-    color: Colors.primary,
     lineHeight: Typography.sizes.sm * 1.4,
   },
-  section: {
-    backgroundColor: Colors.background.secondary,
-    borderRadius: BorderRadius.lg,
+  card: {
+    borderRadius: BorderRadius.xl,
     padding: Spacing.lg,
     marginBottom: Spacing.md,
   },
-  sectionTitle: {
-    fontSize: Typography.sizes.lg,
-    fontWeight: Typography.weights.semibold,
-    color: Colors.text.primary,
+  cardHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: Spacing.sm,
     marginBottom: Spacing.md,
+  },
+  cardIconContainer: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  cardTitle: {
+    fontSize: Typography.sizes.md,
+    fontWeight: Typography.weights.bold,
+  },
+  optional: {
+    fontSize: Typography.sizes.sm,
+    fontWeight: Typography.weights.normal,
+  },
+  scheduleLabel: {
+    fontSize: Typography.sizes.sm,
+    fontWeight: Typography.weights.semibold,
+    marginBottom: Spacing.sm,
+    marginTop: Spacing.sm,
   },
   row: {
     flexDirection: "row",
@@ -537,22 +702,33 @@ const styles = StyleSheet.create({
   halfWidth: {
     flex: 1,
   },
+  errorSummary: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: Spacing.sm,
+    padding: Spacing.md,
+    borderRadius: BorderRadius.lg,
+    borderWidth: 1.5,
+    marginBottom: Spacing.md,
+  },
+  errorSummaryText: {
+    flex: 1,
+    fontSize: Typography.sizes.sm,
+    fontWeight: Typography.weights.medium,
+  },
   submitButton: {
-    backgroundColor: Colors.primary,
-    borderRadius: BorderRadius.md,
-    paddingVertical: Spacing.md,
+    borderRadius: BorderRadius.xl,
+    paddingVertical: Spacing.md + 2,
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
     gap: Spacing.sm,
-    marginTop: Spacing.md,
   },
   submitButtonDisabled: {
     opacity: 0.5,
   },
   submitButtonText: {
     fontSize: Typography.sizes.md,
-    fontWeight: Typography.weights.semibold,
-    color: Colors.text.inverse,
+    fontWeight: Typography.weights.bold,
   },
 });

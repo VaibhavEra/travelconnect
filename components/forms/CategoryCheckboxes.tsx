@@ -1,5 +1,8 @@
+import { CATEGORY_CONFIG } from "@/lib/constants/categories";
+import { haptics } from "@/lib/utils/haptics";
 import { PACKAGE_CATEGORIES, PackageCategory } from "@/lib/validations/trip";
-import { BorderRadius, Colors, Spacing, Typography } from "@/styles";
+import { BorderRadius, Spacing, Typography } from "@/styles";
+import { useThemeColors } from "@/styles/theme";
 import { Ionicons } from "@expo/vector-icons";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 
@@ -10,30 +13,16 @@ interface CategoryCheckboxesProps {
   error?: string;
 }
 
-const CATEGORY_LABELS: Record<PackageCategory, string> = {
-  documents: "Documents & Papers",
-  clothing: "Clothing & Apparel",
-  medicines: "Medicines",
-  books: "Books",
-  small_items: "Small Personal Items",
-};
-
-const CATEGORY_ICONS: Record<PackageCategory, keyof typeof Ionicons.glyphMap> =
-  {
-    documents: "document-text-outline",
-    clothing: "shirt-outline",
-    medicines: "medical-outline",
-    books: "book-outline",
-    small_items: "cube-outline",
-  };
-
 export default function CategoryCheckboxes({
   label,
   value,
   onChange,
   error,
 }: CategoryCheckboxesProps) {
+  const colors = useThemeColors();
+
   const toggleCategory = (category: PackageCategory) => {
+    haptics.selection();
     if (value.includes(category)) {
       onChange(value.filter((c) => c !== category));
     } else {
@@ -43,40 +32,56 @@ export default function CategoryCheckboxes({
 
   return (
     <View style={styles.container}>
-      <Text style={styles.label}>{label}</Text>
+      <Text style={[styles.label, { color: colors.text.primary }]}>
+        {label}
+      </Text>
 
       <View style={styles.categoriesContainer}>
         {PACKAGE_CATEGORIES.map((category) => {
           const isSelected = value.includes(category);
+          const config =
+            CATEGORY_CONFIG[category as keyof typeof CATEGORY_CONFIG];
+
           return (
             <Pressable
               key={category}
               style={[
                 styles.categoryButton,
-                isSelected && styles.categoryButtonSelected,
+                {
+                  backgroundColor: isSelected
+                    ? colors.primary + "10"
+                    : colors.background.secondary,
+                  borderColor: isSelected
+                    ? colors.primary
+                    : colors.border.default,
+                },
               ]}
               onPress={() => toggleCategory(category)}
             >
               <View style={styles.categoryContent}>
                 <Ionicons
-                  name={CATEGORY_ICONS[category]}
+                  name={config?.icon || "cube"}
                   size={20}
-                  color={isSelected ? Colors.primary : Colors.text.secondary}
+                  color={isSelected ? colors.primary : colors.text.secondary}
                 />
                 <Text
                   style={[
                     styles.categoryText,
-                    isSelected && styles.categoryTextSelected,
+                    { color: colors.text.secondary },
+                    isSelected && {
+                      color: colors.primary,
+                      fontWeight: Typography.weights.semibold,
+                    },
                   ]}
                 >
-                  {CATEGORY_LABELS[category]}
+                  {config?.label || category}
                 </Text>
               </View>
               {isSelected && (
                 <Ionicons
                   name="checkmark-circle"
                   size={18}
-                  color={Colors.primary}
+                  color={colors.primary}
                 />
               )}
             </Pressable>
@@ -84,7 +89,9 @@ export default function CategoryCheckboxes({
         })}
       </View>
 
-      {error && <Text style={styles.error}>{error}</Text>}
+      {error && (
+        <Text style={[styles.error, { color: colors.error }]}>{error}</Text>
+      )}
     </View>
   );
 }
@@ -96,7 +103,6 @@ const styles = StyleSheet.create({
   label: {
     fontSize: Typography.sizes.sm,
     fontWeight: Typography.weights.medium,
-    color: Colors.text.primary,
     marginBottom: Spacing.sm,
   },
   categoriesContainer: {
@@ -106,16 +112,10 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    backgroundColor: Colors.background.secondary,
     borderRadius: BorderRadius.md,
     paddingVertical: Spacing.sm,
     paddingHorizontal: Spacing.md,
-    borderWidth: 1,
-    borderColor: Colors.border.default,
-  },
-  categoryButtonSelected: {
-    backgroundColor: Colors.primary + "10",
-    borderColor: Colors.primary,
+    borderWidth: 1.5,
   },
   categoryContent: {
     flexDirection: "row",
@@ -124,16 +124,10 @@ const styles = StyleSheet.create({
   },
   categoryText: {
     fontSize: Typography.sizes.sm,
-    color: Colors.text.secondary,
     fontWeight: Typography.weights.medium,
-  },
-  categoryTextSelected: {
-    color: Colors.primary,
-    fontWeight: Typography.weights.semibold,
   },
   error: {
     fontSize: Typography.sizes.xs,
-    color: Colors.error,
     marginTop: Spacing.xs,
   },
 });

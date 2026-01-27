@@ -1,12 +1,19 @@
+import { CATEGORY_CONFIG, SIZE_CONFIG } from "@/lib/constants/categories";
+import { haptics } from "@/lib/utils/haptics";
 import { ParcelRequest } from "@/stores/requestStore";
-import { BorderRadius, Colors, Spacing, Typography } from "@/styles";
+import { BorderRadius, Spacing, Typography } from "@/styles";
+import { useThemeColors } from "@/styles/theme";
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
-import { Image, Pressable, StyleSheet, Text, View } from "react-native";
+import { Pressable, StyleSheet, Text, View } from "react-native";
+import Animated, {
+  useAnimatedStyle,
+  useSharedValue,
+  withSpring,
+} from "react-native-reanimated";
 
 interface RequestCardProps {
   request: ParcelRequest;
-  variant?: "sender" | "traveller"; // Add variant prop
 }
 
 type RequestStatus =
@@ -17,361 +24,399 @@ type RequestStatus =
   | "delivered"
   | "cancelled";
 
-const STATUS_COLORS: Record<RequestStatus, string> = {
-  pending: Colors.warning,
-  accepted: Colors.success,
-  rejected: Colors.error,
-  picked_up: Colors.primary,
-  delivered: Colors.success,
-  cancelled: Colors.text.tertiary,
+const STATUS_CONFIG: Record<
+  RequestStatus,
+  {
+    label: string;
+    icon: keyof typeof Ionicons.glyphMap;
+    getColor: (colors: any) => string;
+  }
+> = {
+  pending: {
+    label: "Pending",
+    icon: "time",
+    getColor: (colors) => colors.warning,
+  },
+  accepted: {
+    label: "Accepted",
+    icon: "checkmark-circle",
+    getColor: (colors) => colors.success,
+  },
+  rejected: {
+    label: "Rejected",
+    icon: "close-circle",
+    getColor: (colors) => colors.error,
+  },
+  picked_up: {
+    label: "Picked Up",
+    icon: "hand-left",
+    getColor: (colors) => colors.primary,
+  },
+  delivered: {
+    label: "Delivered",
+    icon: "checkmark-done-circle",
+    getColor: (colors) => colors.success,
+  },
+  cancelled: {
+    label: "Cancelled",
+    icon: "ban",
+    getColor: (colors) => colors.text.tertiary,
+  },
 };
 
-const STATUS_LABELS: Record<RequestStatus, string> = {
-  pending: "Pending",
-  accepted: "Accepted",
-  rejected: "Rejected",
-  picked_up: "Picked Up",
-  delivered: "Delivered",
-  cancelled: "Cancelled",
+const TRANSPORT_ICONS: Record<string, keyof typeof Ionicons.glyphMap> = {
+  flight: "airplane",
+  train: "train",
+  bus: "bus",
 };
 
-export default function RequestCard({
-  request,
-  variant = "traveller",
-}: RequestCardProps) {
+export default function RequestCard({ request }: RequestCardProps) {
+  const colors = useThemeColors();
   const router = useRouter();
+  const scale = useSharedValue(1);
 
   const formatDate = (date: string) => {
     const d = new Date(date);
+    const today = new Date();
+    const tomorrow = new Date(today);
+    tomorrow.setDate(tomorrow.getDate() + 1);
+
+    const isToday = d.toDateString() === today.toDateString();
+    const isTomorrow = d.toDateString() === tomorrow.toDateString();
+
+    if (isToday) return "Today";
+    if (isTomorrow) return "Tomorrow";
+
     return d.toLocaleDateString("en-US", {
+      weekday: "short",
       month: "short",
       day: "numeric",
     });
   };
 
-  const handlePress = () => {
-    if (variant === "sender") {
-      // Sender viewing their own requests - navigate to request-details
-      router.push({
-        pathname: "/request-details/[id]" as any,
-        params: { id: request.id },
-      });
-    } else {
-      // Traveller viewing incoming requests - navigate to incoming-request-details
-      router.push({
-        pathname: "/incoming-request-details/[id]" as any,
-        params: { id: request.id },
-      });
-    }
+  const formatTime = (time: string) => {
+    const [hours, minutes] = time.split(":");
+    const hour = parseInt(hours);
+    const ampm = hour >= 12 ? "PM" : "AM";
+    const displayHour = hour % 12 || 12;
+    return `${displayHour}:${minutes} ${ampm}`;
   };
+
+  const handlePress = () => {
+    haptics.light();
+    router.push(`/my-requests/${request.id}` as any);
+  };
+
+  const handlePressIn = () => {
+    scale.value = withSpring(0.98);
+  };
+
+  const handlePressOut = () => {
+    scale.value = withSpring(1);
+  };
+
+  const animatedStyle = useAnimatedStyle(() => ({
+    transform: [{ scale: scale.value }],
+  }));
 
   const status = request.status as RequestStatus;
-  const statusColor = STATUS_COLORS[status] || Colors.text.secondary;
-  const statusLabel = STATUS_LABELS[status] || request.status;
+  const statusConfig = STATUS_CONFIG[status] || STATUS_CONFIG.pending;
+  const statusColor = statusConfig.getColor(colors);
 
-  // Check if cancelled and determine who cancelled
-  const isCancelled = request.status === "cancelled";
-  const cancelledBySender = request.cancelled_by === "sender";
-  const cancelledByTraveller = request.cancelled_by === "traveller";
+  const isCancelled =
+    request.status === "cancelled" || request.status === "rejected";
 
-  // Get cancellation info text
-  const getCancellationInfo = () => {
-    if (!isCancelled) return null;
-
-    if (variant === "sender") {
-      return cancelledBySender ? "You cancelled" : "Traveller cancelled";
-    } else {
-      return cancelledByTraveller ? "You cancelled" : "Sender cancelled";
-    }
-  };
+  const categoryConfig =
+    CATEGORY_CONFIG[request.category as keyof typeof CATEGORY_CONFIG];
+  const sizeConfig = SIZE_CONFIG[request.size as keyof typeof SIZE_CONFIG];
 
   return (
-    <Pressable
-      style={[styles.card, isCancelled && styles.cardCancelled]}
-      onPress={handlePress}
-    >
-      <View style={styles.header}>
-        <View style={styles.routeInfo}>
-          <Text style={styles.cityText}>{request.trip?.source}</Text>
-          <Ionicons
-            name="arrow-forward"
-            size={14}
-            color={Colors.text.secondary}
-          />
-          <Text style={styles.cityText}>{request.trip?.destination}</Text>
+    <Animated.View style={animatedStyle}>
+      <Pressable
+        style={[
+          styles.card,
+          {
+            backgroundColor: colors.background.secondary,
+            borderColor: colors.border.default,
+          },
+          isCancelled && { opacity: 0.7 },
+        ]}
+        onPress={handlePress}
+        onPressIn={handlePressIn}
+        onPressOut={handlePressOut}
+      >
+        {/* Status Banner */}
+        <View
+          style={[styles.statusBanner, { backgroundColor: statusColor + "15" }]}
+        >
+          <Ionicons name={statusConfig.icon} size={16} color={statusColor} />
+          <Text style={[styles.statusText, { color: statusColor }]}>
+            {statusConfig.label}
+          </Text>
         </View>
-        <View style={styles.statusGroup}>
-          <View
-            style={[
-              styles.statusBadge,
-              { backgroundColor: statusColor + "20" },
-            ]}
-          >
-            <Text style={[styles.statusText, { color: statusColor }]}>
-              {statusLabel}
-            </Text>
-          </View>
-          {isCancelled && (
-            <View style={styles.cancelledByBadge}>
-              <Ionicons name="close-circle" size={12} color={Colors.error} />
-              <Text style={styles.cancelledByText}>
-                {getCancellationInfo()}
+
+        {/* Route Section */}
+        <View style={styles.routeSection}>
+          <View style={styles.routeRow}>
+            <View style={styles.cityContainer}>
+              <Text style={[styles.cityName, { color: colors.text.primary }]}>
+                {request.trip?.source}
               </Text>
+            </View>
+
+            <View style={styles.routeMiddle}>
+              <View
+                style={[
+                  styles.routeLine,
+                  { backgroundColor: colors.border.default },
+                ]}
+              />
+              {request.trip?.transport_mode && (
+                <View
+                  style={[
+                    styles.transportIcon,
+                    { backgroundColor: colors.primary + "15" },
+                  ]}
+                >
+                  <Ionicons
+                    name={
+                      TRANSPORT_ICONS[request.trip.transport_mode] ||
+                      "arrow-forward"
+                    }
+                    size={16}
+                    color={colors.primary}
+                  />
+                </View>
+              )}
+              <View
+                style={[
+                  styles.routeLine,
+                  { backgroundColor: colors.border.default },
+                ]}
+              />
+            </View>
+
+            <View style={[styles.cityContainer, { alignItems: "flex-end" }]}>
+              <Text style={[styles.cityName, { color: colors.text.primary }]}>
+                {request.trip?.destination}
+              </Text>
+            </View>
+          </View>
+
+          {/* Departure & Arrival Details */}
+          {request.trip && (
+            <View style={styles.tripTimings}>
+              <View style={styles.timingItem}>
+                <Ionicons
+                  name="log-out-outline"
+                  size={14}
+                  color={colors.text.tertiary}
+                />
+                <Text
+                  style={[styles.timingText, { color: colors.text.tertiary }]}
+                >
+                  {formatDate(request.trip.departure_date)} •{" "}
+                  {formatTime(request.trip.departure_time)}
+                </Text>
+              </View>
+              {(request.trip as any).arrival_date &&
+                (request.trip as any).arrival_time && (
+                  <View style={styles.timingItem}>
+                    <Ionicons
+                      name="log-in-outline"
+                      size={14}
+                      color={colors.text.tertiary}
+                    />
+                    <Text
+                      style={[
+                        styles.timingText,
+                        { color: colors.text.tertiary },
+                      ]}
+                    >
+                      {formatDate((request.trip as any).arrival_date)} •{" "}
+                      {formatTime((request.trip as any).arrival_time)}
+                    </Text>
+                  </View>
+                )}
             </View>
           )}
         </View>
-      </View>
 
-      <View style={styles.body}>
-        <View style={styles.photoSection}>
-          {request.parcel_photos && request.parcel_photos.length > 0 && (
-            <Image
-              source={{ uri: request.parcel_photos[0] }}
+        {/* Divider */}
+        <View
+          style={[styles.divider, { backgroundColor: colors.border.light }]}
+        />
+
+        {/* Parcel Details - Separated */}
+        <View style={styles.detailsSection}>
+          {/* Size */}
+          <View style={styles.detailItem}>
+            <Text style={[styles.detailLabel, { color: colors.text.tertiary }]}>
+              Size
+            </Text>
+            <View
               style={[
-                styles.thumbnail,
-                isCancelled && styles.thumbnailCancelled,
+                styles.detailChip,
+                { backgroundColor: colors.primary + "10" },
               ]}
-            />
-          )}
-          {request.parcel_photos && request.parcel_photos.length > 1 && (
-            <View style={styles.photoCount}>
-              <Ionicons name="images" size={12} color={Colors.text.inverse} />
-              <Text style={styles.photoCountText}>
-                {request.parcel_photos.length}
-              </Text>
-            </View>
-          )}
-        </View>
-
-        <View style={styles.details}>
-          <Text
-            style={[
-              styles.description,
-              isCancelled && styles.descriptionCancelled,
-            ]}
-            numberOfLines={2}
-          >
-            {request.item_description}
-          </Text>
-
-          <View style={styles.meta}>
-            <View style={styles.metaItem}>
+            >
               <Ionicons
-                name="cube-outline"
-                size={14}
-                color={Colors.text.secondary}
+                name={sizeConfig.icon}
+                size={16}
+                color={colors.primary}
               />
-              <Text style={styles.metaText}>
-                {request.size.charAt(0).toUpperCase() + request.size.slice(1)}
-              </Text>
-            </View>
-
-            <View style={styles.metaItem}>
-              <Ionicons
-                name="pricetag-outline"
-                size={14}
-                color={Colors.text.secondary}
-              />
-              <Text style={styles.metaText}>
-                {request.category.charAt(0).toUpperCase() +
-                  request.category.slice(1)}
+              <Text style={[styles.detailChipText, { color: colors.primary }]}>
+                {sizeConfig.label}
               </Text>
             </View>
           </View>
 
-          {/* Show cancellation reason if cancelled and reason exists */}
-          {isCancelled && request.rejection_reason && (
-            <View style={styles.cancellationReasonBox}>
-              <Text style={styles.cancellationReasonText} numberOfLines={1}>
-                {request.rejection_reason}
-              </Text>
-            </View>
-          )}
-        </View>
-      </View>
-
-      <View style={styles.footer}>
-        {request.trip && (
-          <View style={styles.tripDate}>
-            <Ionicons
-              name="calendar-outline"
-              size={14}
-              color={Colors.text.tertiary}
-            />
-            <Text style={styles.tripDateText}>
-              {formatDate(request.trip.departure_date)}
+          {/* Category */}
+          <View style={styles.detailItem}>
+            <Text style={[styles.detailLabel, { color: colors.text.tertiary }]}>
+              Category
             </Text>
+            <View
+              style={[
+                styles.detailChip,
+                { backgroundColor: colors.background.primary },
+              ]}
+            >
+              <Ionicons
+                name={categoryConfig.icon}
+                size={16}
+                color={colors.text.secondary}
+              />
+              <Text
+                style={[
+                  styles.detailChipText,
+                  { color: colors.text.secondary },
+                ]}
+              >
+                {categoryConfig.label}
+              </Text>
+            </View>
           </View>
-        )}
-
-        <View style={styles.receiver}>
-          <Ionicons
-            name="person-outline"
-            size={14}
-            color={Colors.text.tertiary}
-          />
-          <Text style={styles.receiverText}>
-            {request.delivery_contact_name}
-          </Text>
         </View>
-      </View>
-    </Pressable>
+
+        {/* Chevron Footer */}
+        <View style={[styles.footer, { borderTopColor: colors.border.light }]}>
+          <Text style={[styles.footerText, { color: colors.text.tertiary }]}>
+            View Details
+          </Text>
+          <Ionicons
+            name="chevron-forward"
+            size={18}
+            color={colors.text.tertiary}
+          />
+        </View>
+      </Pressable>
+    </Animated.View>
   );
 }
 
 const styles = StyleSheet.create({
   card: {
-    backgroundColor: Colors.background.secondary,
-    borderRadius: BorderRadius.lg,
-    padding: Spacing.md,
-    marginBottom: Spacing.md,
+    borderRadius: BorderRadius.xl,
     borderWidth: 1,
-    borderColor: Colors.border.default,
+    overflow: "hidden",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.06,
+    shadowRadius: 8,
+    elevation: 2,
   },
-  cardCancelled: {
-    opacity: 0.7,
-    borderColor: Colors.text.tertiary,
-  },
-  header: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "flex-start",
-    marginBottom: Spacing.sm,
-  },
-  routeInfo: {
+  statusBanner: {
     flexDirection: "row",
     alignItems: "center",
+    justifyContent: "center",
     gap: Spacing.xs,
-    flex: 1,
-  },
-  cityText: {
-    fontSize: Typography.sizes.sm,
-    fontWeight: Typography.weights.semibold,
-    color: Colors.text.primary,
-  },
-  statusGroup: {
-    alignItems: "flex-end",
-    gap: Spacing.xs,
-  },
-  statusBadge: {
-    paddingHorizontal: Spacing.sm,
-    paddingVertical: Spacing.xs,
-    borderRadius: BorderRadius.sm,
+    paddingVertical: Spacing.sm,
   },
   statusText: {
-    fontSize: Typography.sizes.xs,
+    fontSize: Typography.sizes.sm,
     fontWeight: Typography.weights.semibold,
   },
-  cancelledByBadge: {
+  routeSection: {
+    padding: Spacing.lg,
+  },
+  routeRow: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 4,
-    backgroundColor: Colors.error + "10",
-    paddingHorizontal: Spacing.xs,
-    paddingVertical: 2,
-    borderRadius: BorderRadius.sm,
-  },
-  cancelledByText: {
-    fontSize: 10,
-    fontWeight: Typography.weights.medium,
-    color: Colors.error,
-  },
-  body: {
-    flexDirection: "row",
-    gap: Spacing.sm,
     marginBottom: Spacing.sm,
   },
-  photoSection: {
-    position: "relative",
+  cityContainer: {
+    flex: 1,
   },
-  thumbnail: {
-    width: 80,
-    height: 80,
-    borderRadius: BorderRadius.md,
-    backgroundColor: Colors.background.primary,
+  cityName: {
+    fontSize: Typography.sizes.md,
+    fontWeight: Typography.weights.bold,
   },
-  thumbnailCancelled: {
-    opacity: 0.5,
-  },
-  photoCount: {
-    position: "absolute",
-    bottom: 4,
-    right: 4,
+  routeMiddle: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 2,
-    backgroundColor: "rgba(0,0,0,0.7)",
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    borderRadius: BorderRadius.sm,
+    paddingHorizontal: Spacing.sm,
   },
-  photoCountText: {
-    fontSize: 10,
-    fontWeight: Typography.weights.semibold,
-    color: Colors.text.inverse,
+  routeLine: {
+    width: 24,
+    height: 2,
   },
-  details: {
-    flex: 1,
-    justifyContent: "space-between",
+  transportIcon: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    alignItems: "center",
+    justifyContent: "center",
+    marginHorizontal: -8,
   },
-  description: {
-    fontSize: Typography.sizes.sm,
-    color: Colors.text.primary,
-    lineHeight: Typography.sizes.sm * 1.4,
-    marginBottom: Spacing.xs,
+  tripTimings: {
+    gap: Spacing.xs,
   },
-  descriptionCancelled: {
-    color: Colors.text.secondary,
-  },
-  meta: {
-    flexDirection: "row",
-    gap: Spacing.md,
-  },
-  metaItem: {
+  timingItem: {
     flexDirection: "row",
     alignItems: "center",
     gap: Spacing.xs,
   },
-  metaText: {
+  timingText: {
     fontSize: Typography.sizes.xs,
-    color: Colors.text.secondary,
   },
-  cancellationReasonBox: {
-    backgroundColor: Colors.error + "10",
-    paddingHorizontal: Spacing.xs,
-    paddingVertical: 4,
-    borderRadius: BorderRadius.sm,
-    marginTop: Spacing.xs,
+  divider: {
+    height: 1,
   },
-  cancellationReasonText: {
-    fontSize: 10,
-    color: Colors.error,
-    fontStyle: "italic",
+  detailsSection: {
+    padding: Spacing.lg,
+    gap: Spacing.md,
+  },
+  detailItem: {
+    gap: Spacing.xs,
+  },
+  detailLabel: {
+    fontSize: Typography.sizes.xs,
+    fontWeight: Typography.weights.medium,
+  },
+  detailChip: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: Spacing.xs,
+    paddingHorizontal: Spacing.sm,
+    paddingVertical: Spacing.xs,
+    borderRadius: BorderRadius.md,
+    alignSelf: "flex-start",
+  },
+  detailChipText: {
+    fontSize: Typography.sizes.sm,
+    fontWeight: Typography.weights.semibold,
   },
   footer: {
     flexDirection: "row",
-    justifyContent: "space-between",
     alignItems: "center",
-    paddingTop: Spacing.sm,
+    justifyContent: "center",
+    gap: Spacing.xs,
+    paddingVertical: Spacing.sm,
     borderTopWidth: 1,
-    borderTopColor: Colors.border.light,
   },
-  tripDate: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: Spacing.xs,
-  },
-  tripDateText: {
-    fontSize: Typography.sizes.xs,
-    color: Colors.text.tertiary,
-  },
-  receiver: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: Spacing.xs,
-  },
-  receiverText: {
-    fontSize: Typography.sizes.xs,
-    color: Colors.text.tertiary,
+  footerText: {
+    fontSize: Typography.sizes.sm,
+    fontWeight: Typography.weights.medium,
   },
 });

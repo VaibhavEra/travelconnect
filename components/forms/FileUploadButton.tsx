@@ -1,6 +1,7 @@
 import { uploadTicketFile } from "@/lib/utils/fileUpload";
 import { haptics } from "@/lib/utils/haptics";
-import { BorderRadius, Colors, Spacing, Typography } from "@/styles";
+import { BorderRadius, Spacing, Typography } from "@/styles";
+import { useThemeColors } from "@/styles/theme";
 import { Ionicons } from "@expo/vector-icons";
 import * as DocumentPicker from "expo-document-picker";
 import { useState } from "react";
@@ -28,6 +29,7 @@ export default function FileUploadButton({
   userId,
   error,
 }: FileUploadButtonProps) {
+  const colors = useThemeColors();
   const [uploading, setUploading] = useState(false);
   const [uploadError, setUploadError] = useState<string | null>(null);
 
@@ -49,7 +51,6 @@ export default function FileUploadButton({
 
       const file = result.assets[0];
 
-      // Upload file
       const uploadResult = await uploadTicketFile(
         file.uri,
         file.mimeType || "image/jpeg",
@@ -74,8 +75,8 @@ export default function FileUploadButton({
   };
 
   const handleRemove = () => {
-    onChange("");
     haptics.light();
+    onChange("");
   };
 
   const isImage =
@@ -86,47 +87,77 @@ export default function FileUploadButton({
 
   return (
     <View style={styles.container}>
-      <Text style={styles.label}>{label}</Text>
+      <Text style={[styles.label, { color: colors.text.primary }]}>
+        {label}
+      </Text>
 
       {value ? (
-        <View style={styles.uploadedContainer}>
+        <View
+          style={[
+            styles.uploadedContainer,
+            { backgroundColor: colors.background.secondary },
+          ]}
+        >
           {isImage ? (
             <Image source={{ uri: value }} style={styles.preview} />
           ) : (
-            <View style={styles.pdfPreview}>
-              <Ionicons name="document-text" size={48} color={Colors.primary} />
-              <Text style={styles.pdfText}>PDF Uploaded</Text>
+            <View
+              style={[
+                styles.pdfPreview,
+                { backgroundColor: colors.primary + "10" },
+              ]}
+            >
+              <Ionicons name="document-text" size={48} color={colors.primary} />
+              <Text style={[styles.pdfText, { color: colors.primary }]}>
+                Ticket Uploaded
+              </Text>
             </View>
           )}
 
-          <Pressable style={styles.removeButton} onPress={handleRemove}>
-            <Ionicons name="close-circle" size={24} color={Colors.error} />
+          <Pressable
+            style={[
+              styles.removeButton,
+              { backgroundColor: colors.background.primary },
+            ]}
+            onPress={handleRemove}
+          >
+            <Ionicons name="close-circle" size={24} color={colors.error} />
           </Pressable>
         </View>
       ) : (
         <Pressable
-          style={[styles.uploadButton, error && styles.uploadButtonError]}
+          style={[
+            styles.uploadButton,
+            {
+              backgroundColor: colors.background.secondary,
+              borderColor: error ? colors.error : colors.border.default,
+            },
+          ]}
           onPress={handleUpload}
           disabled={uploading}
         >
           {uploading ? (
-            <ActivityIndicator color={Colors.primary} />
+            <ActivityIndicator color={colors.primary} />
           ) : (
             <>
-              <Ionicons
-                name="cloud-upload-outline"
-                size={32}
-                color={Colors.primary}
-              />
-              <Text style={styles.uploadText}>Upload Ticket</Text>
-              <Text style={styles.uploadSubtext}>Image or PDF (Max 5MB)</Text>
+              <Ionicons name="cloud-upload" size={32} color={colors.primary} />
+              <Text style={[styles.uploadText, { color: colors.primary }]}>
+                Upload Ticket
+              </Text>
+              <Text
+                style={[styles.uploadSubtext, { color: colors.text.tertiary }]}
+              >
+                Image or PDF (Max 5MB)
+              </Text>
             </>
           )}
         </Pressable>
       )}
 
       {(error || uploadError) && (
-        <Text style={styles.error}>{error || uploadError}</Text>
+        <Text style={[styles.error, { color: colors.error }]}>
+          {error || uploadError}
+        </Text>
       )}
     </View>
   );
@@ -139,37 +170,28 @@ const styles = StyleSheet.create({
   label: {
     fontSize: Typography.sizes.sm,
     fontWeight: Typography.weights.medium,
-    color: Colors.text.primary,
     marginBottom: Spacing.xs,
   },
   uploadButton: {
-    backgroundColor: Colors.background.secondary,
-    borderRadius: BorderRadius.md,
+    borderRadius: BorderRadius.lg,
     paddingVertical: Spacing.xl,
     alignItems: "center",
     justifyContent: "center",
     borderWidth: 2,
-    borderColor: Colors.border.default,
     borderStyle: "dashed",
-  },
-  uploadButtonError: {
-    borderColor: Colors.error,
   },
   uploadText: {
     fontSize: Typography.sizes.md,
     fontWeight: Typography.weights.semibold,
-    color: Colors.primary,
     marginTop: Spacing.sm,
   },
   uploadSubtext: {
     fontSize: Typography.sizes.xs,
-    color: Colors.text.tertiary,
     marginTop: Spacing.xs,
   },
   uploadedContainer: {
     position: "relative",
-    backgroundColor: Colors.background.secondary,
-    borderRadius: BorderRadius.md,
+    borderRadius: BorderRadius.lg,
     overflow: "hidden",
   },
   preview: {
@@ -182,23 +204,20 @@ const styles = StyleSheet.create({
     height: 200,
     alignItems: "center",
     justifyContent: "center",
-    backgroundColor: Colors.background.tertiary,
   },
   pdfText: {
     fontSize: Typography.sizes.sm,
-    color: Colors.text.secondary,
+    fontWeight: Typography.weights.medium,
     marginTop: Spacing.xs,
   },
   removeButton: {
     position: "absolute",
     top: Spacing.sm,
     right: Spacing.sm,
-    backgroundColor: Colors.background.primary,
     borderRadius: BorderRadius.full,
   },
   error: {
     fontSize: Typography.sizes.xs,
-    color: Colors.error,
     marginTop: Spacing.xs,
   },
 });

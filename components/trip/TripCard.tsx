@@ -1,12 +1,22 @@
+import { CATEGORY_CONFIG } from "@/lib/constants/categories";
+import { haptics } from "@/lib/utils/haptics";
 import { Trip } from "@/stores/tripStore";
-import { BorderRadius, Colors, Spacing, Typography } from "@/styles";
+import { BorderRadius, Spacing, Typography } from "@/styles";
+import { useThemeColors } from "@/styles/theme";
 import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
 import { Pressable, StyleSheet, Text, View } from "react-native";
+import Animated, {
+  useAnimatedStyle,
+  useSharedValue,
+  withSpring,
+} from "react-native-reanimated";
 
 interface TripCardProps {
   trip: Trip;
 }
+
+type TripStatus = "open" | "in_progress" | "completed" | "cancelled";
 
 const TRANSPORT_ICONS: Record<
   Trip["transport_mode"],
@@ -18,28 +28,56 @@ const TRANSPORT_ICONS: Record<
   car: "car",
 };
 
-const STATUS_COLORS: Record<Trip["status"], string> = {
-  open: Colors.success,
-  in_progress: Colors.warning,
-  completed: Colors.text.tertiary,
-  cancelled: Colors.error,
-};
-
-const STATUS_LABELS: Record<Trip["status"], string> = {
-  open: "Open",
-  in_progress: "In Progress",
-  completed: "Completed",
-  cancelled: "Cancelled",
+const STATUS_CONFIG: Record<
+  TripStatus,
+  {
+    label: string;
+    icon: keyof typeof Ionicons.glyphMap;
+    getColor: (colors: any) => string;
+  }
+> = {
+  open: {
+    label: "Open",
+    icon: "checkmark-circle",
+    getColor: (colors) => colors.success,
+  },
+  in_progress: {
+    label: "In Progress",
+    icon: "time",
+    getColor: (colors) => colors.warning,
+  },
+  completed: {
+    label: "Completed",
+    icon: "checkmark-done-circle",
+    getColor: (colors) => colors.success,
+  },
+  cancelled: {
+    label: "Cancelled",
+    icon: "close-circle",
+    getColor: (colors) => colors.error,
+  },
 };
 
 export default function TripCard({ trip }: TripCardProps) {
+  const colors = useThemeColors();
+  const scale = useSharedValue(1);
+
   const formatDate = (date: string) => {
     const d = new Date(date);
-    const options: Intl.DateTimeFormatOptions = {
-      day: "numeric",
+    const today = new Date();
+    const tomorrow = new Date(today);
+    tomorrow.setDate(tomorrow.getDate() + 1);
+
+    const isToday = d.toDateString() === today.toDateString();
+    const isTomorrow = d.toDateString() === tomorrow.toDateString();
+
+    if (isToday) return "Today";
+    if (isTomorrow) return "Tomorrow";
+
+    return d.toLocaleDateString("en-US", {
       month: "short",
-    };
-    return d.toLocaleDateString("en-US", options);
+      day: "numeric",
+    });
   };
 
   const formatTime = (time: string) => {
@@ -58,138 +96,314 @@ export default function TripCard({ trip }: TripCardProps) {
     return departureDateTime > now && trip.status === "open";
   };
 
-  const handlePress = () => {
-    router.push({
-      pathname: "/trip/[id]",
-      params: { id: trip.id },
-    });
+  const renderSlots = () => {
+    const slots = [];
+    const maxSlots = Math.min(trip.total_slots, 5);
+
+    for (let i = 0; i < maxSlots; i++) {
+      const isAvailable = i < trip.available_slots;
+      slots.push(
+        <View
+          key={i}
+          style={[
+            styles.slotDot,
+            {
+              backgroundColor: isAvailable
+                ? colors.success
+                : colors.text.tertiary + "40",
+            },
+          ]}
+        />,
+      );
+    }
+    return slots;
   };
 
+  const handlePress = () => {
+    haptics.light();
+    router.push(`/(tabs)/my-trips/${trip.id}`);
+  };
+
+  const handlePressIn = () => {
+    scale.value = withSpring(0.98);
+  };
+
+  const handlePressOut = () => {
+    scale.value = withSpring(1);
+  };
+
+  const animatedStyle = useAnimatedStyle(() => ({
+    transform: [{ scale: scale.value }],
+  }));
+
+  const status = trip.status as TripStatus;
+  const statusConfig = STATUS_CONFIG[status];
+  const statusColor = statusConfig.getColor(colors);
+  const isCancelled = trip.status === "cancelled";
+
   return (
-    <Pressable style={styles.card} onPress={handlePress}>
-      <View style={styles.header}>
-        <View style={styles.route}>
-          <Text style={styles.cityText}>{trip.source}</Text>
-          <Ionicons
-            name="arrow-forward"
-            size={16}
-            color={Colors.text.secondary}
-          />
-          <Text style={styles.cityText}>{trip.destination}</Text>
-        </View>
-
+    <Animated.View style={animatedStyle}>
+      <Pressable
+        style={[
+          styles.card,
+          {
+            backgroundColor: colors.background.secondary,
+            borderColor: colors.border.default,
+          },
+          isCancelled && { opacity: 0.7 },
+        ]}
+        onPress={handlePress}
+        onPressIn={handlePressIn}
+        onPressOut={handlePressOut}
+      >
+        {/* Status Banner */}
         <View
-          style={[
-            styles.statusBadge,
-            { backgroundColor: STATUS_COLORS[trip.status] + "20" },
-          ]}
+          style={[styles.statusBanner, { backgroundColor: statusColor + "15" }]}
         >
-          <Text
-            style={[styles.statusText, { color: STATUS_COLORS[trip.status] }]}
-          >
-            {STATUS_LABELS[trip.status]}
+          <Ionicons name={statusConfig.icon} size={16} color={statusColor} />
+          <Text style={[styles.statusText, { color: statusColor }]}>
+            {statusConfig.label}
           </Text>
+          {isUpcoming() && (
+            <>
+              <View
+                style={[
+                  styles.separator,
+                  { backgroundColor: statusColor + "30" },
+                ]}
+              />
+              <Ionicons name="time" size={14} color={statusColor} />
+              <Text style={[styles.statusText, { color: statusColor }]}>
+                Upcoming
+              </Text>
+            </>
+          )}
         </View>
-      </View>
 
-      <View style={styles.details}>
-        <View style={styles.detailRow}>
-          <Ionicons
-            name={TRANSPORT_ICONS[trip.transport_mode]}
-            size={16}
-            color={Colors.text.secondary}
+        {/* Route Section */}
+        <View style={styles.content}>
+          {/* Cities Row */}
+          <View style={styles.citiesRow}>
+            <View style={styles.cityColumn}>
+              <Text style={[styles.cityName, { color: colors.text.primary }]}>
+                {trip.source}
+              </Text>
+              <Text style={[styles.dateTime, { color: colors.text.secondary }]}>
+                {formatDate(trip.departure_date)}
+              </Text>
+              <Text style={[styles.dateTime, { color: colors.text.secondary }]}>
+                {formatTime(trip.departure_time)}
+              </Text>
+            </View>
+
+            <View style={styles.routeMiddle}>
+              <View
+                style={[
+                  styles.routeLine,
+                  { backgroundColor: colors.border.default },
+                ]}
+              />
+              <View
+                style={[
+                  styles.transportIcon,
+                  { backgroundColor: colors.primary + "15" },
+                ]}
+              >
+                <Ionicons
+                  name={TRANSPORT_ICONS[trip.transport_mode]}
+                  size={18}
+                  color={colors.primary}
+                />
+              </View>
+              <View
+                style={[
+                  styles.routeLine,
+                  { backgroundColor: colors.border.default },
+                ]}
+              />
+            </View>
+
+            <View style={[styles.cityColumn, { alignItems: "flex-end" }]}>
+              <Text style={[styles.cityName, { color: colors.text.primary }]}>
+                {trip.destination}
+              </Text>
+              <Text style={[styles.dateTime, { color: colors.text.secondary }]}>
+                {formatDate(trip.arrival_date)}
+              </Text>
+              <Text style={[styles.dateTime, { color: colors.text.secondary }]}>
+                {formatTime(trip.arrival_time)}
+              </Text>
+            </View>
+          </View>
+
+          {/* Divider */}
+          <View
+            style={[styles.divider, { backgroundColor: colors.border.light }]}
           />
-          <Text style={styles.detailText}>
-            {trip.transport_mode.charAt(0).toUpperCase() +
-              trip.transport_mode.slice(1)}
-          </Text>
+
+          {/* Info Row */}
+          <View style={styles.infoRow}>
+            {/* Slots with Dots */}
+            <View style={styles.slotsContainer}>
+              <View style={styles.slotsRow}>{renderSlots()}</View>
+              <Text
+                style={[styles.slotsText, { color: colors.text.secondary }]}
+              >
+                {trip.available_slots}/{trip.total_slots} slots
+              </Text>
+            </View>
+
+            {/* Categories */}
+            <View style={styles.categoriesContainer}>
+              {trip.allowed_categories.slice(0, 3).map((category) => {
+                const config =
+                  CATEGORY_CONFIG[category as keyof typeof CATEGORY_CONFIG];
+                return (
+                  <Ionicons
+                    key={category}
+                    name={config?.icon || "cube"}
+                    size={14}
+                    color={colors.text.tertiary}
+                  />
+                );
+              })}
+              {trip.allowed_categories.length > 3 && (
+                <Text
+                  style={[
+                    styles.moreCategoriesText,
+                    { color: colors.text.tertiary },
+                  ]}
+                >
+                  +{trip.allowed_categories.length - 3}
+                </Text>
+              )}
+            </View>
+          </View>
         </View>
 
-        <View style={styles.detailRow}>
-          <Ionicons name="calendar" size={16} color={Colors.text.secondary} />
-          <Text style={styles.detailText}>
-            {formatDate(trip.departure_date)} at{" "}
-            {formatTime(trip.departure_time)}
+        {/* Footer */}
+        <View style={[styles.footer, { borderTopColor: colors.border.light }]}>
+          <Text style={[styles.footerText, { color: colors.text.tertiary }]}>
+            View Details
           </Text>
+          <Ionicons
+            name="chevron-forward"
+            size={16}
+            color={colors.text.tertiary}
+          />
         </View>
-
-        <View style={styles.detailRow}>
-          <Ionicons name="cube" size={16} color={Colors.text.secondary} />
-          <Text style={styles.detailText}>
-            {trip.available_slots}/{trip.total_slots} slots available
-          </Text>
-        </View>
-      </View>
-
-      {isUpcoming() && (
-        <View style={styles.upcomingBadge}>
-          <Ionicons name="time" size={12} color={Colors.primary} />
-          <Text style={styles.upcomingText}>Upcoming</Text>
-        </View>
-      )}
-    </Pressable>
+      </Pressable>
+    </Animated.View>
   );
 }
 
 const styles = StyleSheet.create({
   card: {
-    backgroundColor: Colors.background.secondary,
-    borderRadius: BorderRadius.lg,
-    padding: Spacing.md,
-    marginBottom: Spacing.md,
+    borderRadius: BorderRadius.xl,
     borderWidth: 1,
-    borderColor: Colors.border.default,
+    overflow: "hidden",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.06,
+    shadowRadius: 8,
+    elevation: 2,
   },
-  header: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "flex-start",
-    marginBottom: Spacing.sm,
-  },
-  route: {
+  statusBanner: {
     flexDirection: "row",
     alignItems: "center",
+    justifyContent: "center",
     gap: Spacing.xs,
-    flex: 1,
-  },
-  cityText: {
-    fontSize: Typography.sizes.md,
-    fontWeight: Typography.weights.semibold,
-    color: Colors.text.primary,
-  },
-  statusBadge: {
-    paddingHorizontal: Spacing.sm,
-    paddingVertical: Spacing.xs,
-    borderRadius: BorderRadius.sm,
+    paddingVertical: Spacing.sm,
   },
   statusText: {
-    fontSize: Typography.sizes.xs,
-    fontWeight: Typography.weights.medium,
-  },
-  details: {
-    gap: Spacing.xs,
-  },
-  detailRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: Spacing.xs,
-  },
-  detailText: {
     fontSize: Typography.sizes.sm,
-    color: Colors.text.secondary,
+    fontWeight: Typography.weights.semibold,
   },
-  upcomingBadge: {
+  separator: {
+    width: 1,
+    height: 14,
+    marginHorizontal: Spacing.xs,
+  },
+  content: {
+    padding: Spacing.lg,
+  },
+  citiesRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginBottom: Spacing.md,
+  },
+  cityColumn: {
+    flex: 1,
+    gap: 2,
+  },
+  cityName: {
+    fontSize: Typography.sizes.md,
+    fontWeight: Typography.weights.bold,
+    marginBottom: Spacing.xs,
+  },
+  dateTime: {
+    fontSize: Typography.sizes.xs,
+  },
+  routeMiddle: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: Spacing.md,
+  },
+  routeLine: {
+    width: 28,
+    height: 2,
+  },
+  transportIcon: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    alignItems: "center",
+    justifyContent: "center",
+    marginHorizontal: -10,
+  },
+  divider: {
+    height: 1,
+    marginBottom: Spacing.md,
+  },
+  infoRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+  },
+  slotsContainer: {
+    gap: 4,
+  },
+  slotsRow: {
+    flexDirection: "row",
+    gap: 4,
+  },
+  slotDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+  },
+  slotsText: {
+    fontSize: Typography.sizes.xs,
+  },
+  categoriesContainer: {
     flexDirection: "row",
     alignItems: "center",
     gap: Spacing.xs,
-    marginTop: Spacing.sm,
-    paddingTop: Spacing.sm,
-    borderTopWidth: 1,
-    borderTopColor: Colors.border.light,
   },
-  upcomingText: {
+  moreCategoriesText: {
     fontSize: Typography.sizes.xs,
     fontWeight: Typography.weights.medium,
-    color: Colors.primary,
+  },
+  footer: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 4,
+    paddingVertical: Spacing.sm,
+    borderTopWidth: 1,
+  },
+  footerText: {
+    fontSize: Typography.sizes.xs,
+    fontWeight: Typography.weights.medium,
   },
 });

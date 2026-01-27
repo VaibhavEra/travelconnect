@@ -1,69 +1,100 @@
 import CityDropdown from "@/components/forms/CityDropdown";
+import { haptics } from "@/lib/utils/haptics";
 import { useSearchStore } from "@/stores/searchStore";
-import { BorderRadius, Colors, Spacing, Typography } from "@/styles";
+import { Spacing } from "@/styles";
+import { useThemeColors } from "@/styles/theme";
 import { Ionicons } from "@expo/vector-icons";
-import { StyleSheet, Text, View } from "react-native";
+import { StyleSheet, TouchableOpacity, View } from "react-native";
 
 export default function TripSearchBar() {
+  const colors = useThemeColors();
   const { filters, setFilters } = useSearchStore();
+
+  const handleSwap = () => {
+    if (!filters.source && !filters.destination) return;
+
+    haptics.light();
+    setFilters({
+      source: filters.destination,
+      destination: filters.source,
+    });
+  };
+
+  const canSwap = filters.source || filters.destination;
 
   return (
     <View style={styles.container}>
-      <Text style={styles.label}>Where are you sending?</Text>
+      {/* From City */}
+      <CityDropdown
+        label="From"
+        value={filters.source}
+        onChange={(city) => setFilters({ source: city })}
+        placeholder="Select origin city"
+      />
 
-      <View style={styles.routeContainer}>
-        <View style={styles.cityField}>
-          <CityDropdown
-            label="From"
-            value={filters.source}
-            onChange={(city) => setFilters({ source: city })}
-            placeholder="Source city"
-          />
-        </View>
-
-        <View style={styles.swapIcon}>
+      {/* Swap Button */}
+      <View style={styles.swapContainer}>
+        <View
+          style={[styles.swapLine, { backgroundColor: colors.border.default }]}
+        />
+        <TouchableOpacity
+          style={[
+            styles.swapButton,
+            {
+              backgroundColor: colors.background.primary,
+              borderColor: colors.border.default,
+            },
+            !canSwap && styles.swapButtonDisabled,
+          ]}
+          onPress={handleSwap}
+          disabled={!canSwap}
+          activeOpacity={0.7}
+        >
           <Ionicons
-            name="swap-horizontal"
-            size={24}
-            color={Colors.text.secondary}
+            name="swap-vertical"
+            size={20}
+            color={canSwap ? colors.primary : colors.text.tertiary}
           />
-        </View>
-
-        <View style={styles.cityField}>
-          <CityDropdown
-            label="To"
-            value={filters.destination}
-            onChange={(city) => setFilters({ destination: city })}
-            placeholder="Destination city"
-          />
-        </View>
+        </TouchableOpacity>
+        <View
+          style={[styles.swapLine, { backgroundColor: colors.border.default }]}
+        />
       </View>
+
+      {/* To City */}
+      <CityDropdown
+        label="To"
+        value={filters.destination}
+        onChange={(city) => setFilters({ destination: city })}
+        placeholder="Select destination city"
+      />
     </View>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
-    backgroundColor: Colors.background.secondary,
-    borderRadius: BorderRadius.lg,
-    padding: Spacing.lg,
-    marginBottom: Spacing.md,
+    gap: Spacing.xs,
   },
-  label: {
-    fontSize: Typography.sizes.lg,
-    fontWeight: Typography.weights.semibold,
-    color: Colors.text.primary,
-    marginBottom: Spacing.md,
-  },
-  routeContainer: {
+  swapContainer: {
     flexDirection: "row",
     alignItems: "center",
-    gap: Spacing.sm,
+    marginVertical: Spacing.xs,
   },
-  cityField: {
+  swapLine: {
     flex: 1,
+    height: 1,
   },
-  swapIcon: {
-    paddingTop: 20,
+  swapButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    alignItems: "center",
+    justifyContent: "center",
+    borderWidth: 1,
+    marginHorizontal: Spacing.sm,
+  },
+  swapButtonDisabled: {
+    opacity: 0.5,
   },
 });

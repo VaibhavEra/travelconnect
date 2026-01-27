@@ -1,4 +1,5 @@
-import { BorderRadius, Colors, Spacing, Typography } from "@/styles";
+import { BorderRadius, Spacing, Typography } from "@/styles";
+import { useThemeColors } from "@/styles/theme";
 import { useState } from "react";
 import {
   TextInput as RNTextInput,
@@ -18,31 +19,50 @@ export default function TextInput({
   label,
   error,
   helperText,
+  style,
   ...props
 }: TextInputProps) {
+  const colors = useThemeColors();
   const [isFocused, setIsFocused] = useState(false);
 
   return (
     <View style={styles.container}>
-      <Text style={styles.label}>{label}</Text>
+      <Text style={[styles.label, { color: colors.text.primary }]}>
+        {label}
+      </Text>
 
       <RNTextInput
         style={[
           styles.input,
-          isFocused && styles.inputFocused,
-          error && styles.inputError,
+          {
+            backgroundColor: colors.background.primary,
+            borderColor: colors.border.default,
+            color: colors.text.primary,
+          },
+          isFocused && {
+            borderColor: colors.primary,
+            backgroundColor: colors.background.primary,
+          },
+          error && {
+            borderColor: colors.error,
+          },
+          style,
         ]}
-        placeholderTextColor={Colors.text.placeholder}
+        placeholderTextColor={colors.text.tertiary}
         onFocus={() => setIsFocused(true)}
         onBlur={() => setIsFocused(false)}
         {...props}
       />
 
       {helperText && !error && (
-        <Text style={styles.helperText}>{helperText}</Text>
+        <Text style={[styles.helperText, { color: colors.text.tertiary }]}>
+          {helperText}
+        </Text>
       )}
 
-      {error && <Text style={styles.error}>{error}</Text>}
+      {error && (
+        <Text style={[styles.error, { color: colors.error }]}>{error}</Text>
+      )}
     </View>
   );
 }
@@ -54,33 +74,21 @@ const styles = StyleSheet.create({
   label: {
     fontSize: Typography.sizes.sm,
     fontWeight: Typography.weights.medium,
-    color: Colors.text.primary,
     marginBottom: Spacing.xs,
   },
   input: {
-    backgroundColor: Colors.background.secondary,
     borderRadius: BorderRadius.md,
     paddingHorizontal: Spacing.md,
     paddingVertical: Spacing.md,
     fontSize: Typography.sizes.md,
-    color: Colors.text.primary,
-    borderWidth: 1,
-    borderColor: Colors.border.default,
-  },
-  inputFocused: {
-    borderColor: Colors.border.focus,
-  },
-  inputError: {
-    borderColor: Colors.error,
+    borderWidth: 1.5,
   },
   helperText: {
     fontSize: Typography.sizes.xs,
-    color: Colors.text.tertiary,
     marginTop: Spacing.xs,
   },
   error: {
     fontSize: Typography.sizes.xs,
-    color: Colors.error,
     marginTop: Spacing.xs,
   },
 });
