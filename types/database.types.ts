@@ -12,6 +12,31 @@ export type Database = {
   __InternalSupabase: {
     PostgrestVersion: "14.1"
   }
+  graphql_public: {
+    Tables: {
+      [_ in never]: never
+    }
+    Views: {
+      [_ in never]: never
+    }
+    Functions: {
+      graphql: {
+        Args: {
+          extensions?: Json
+          operationName?: string
+          query?: string
+          variables?: Json
+        }
+        Returns: Json
+      }
+    }
+    Enums: {
+      [_ in never]: never
+    }
+    CompositeTypes: {
+      [_ in never]: never
+    }
+  }
   public: {
     Tables: {
       failed_login_attempts: {
@@ -38,19 +63,20 @@ export type Database = {
       parcel_requests: {
         Row: {
           accepted_at: string | null
+          cancelled_by: string | null
           category: string
           created_at: string | null
           delivered_at: string | null
           delivery_contact_name: string
           delivery_contact_phone: string
           delivery_otp: string | null
-          delivery_otp_expires_at: string | null
+          delivery_otp_expiry: string | null
           id: string
           item_description: string
-          parcel_photos: string[] | null
+          parcel_photos: string[]
           picked_up_at: string | null
           pickup_otp: string | null
-          pickup_otp_expires_at: string | null
+          pickup_otp_expiry: string | null
           rejected_at: string | null
           rejection_reason: string | null
           sender_id: string
@@ -63,19 +89,20 @@ export type Database = {
         }
         Insert: {
           accepted_at?: string | null
+          cancelled_by?: string | null
           category: string
           created_at?: string | null
           delivered_at?: string | null
           delivery_contact_name: string
           delivery_contact_phone: string
           delivery_otp?: string | null
-          delivery_otp_expires_at?: string | null
+          delivery_otp_expiry?: string | null
           id?: string
           item_description: string
-          parcel_photos?: string[] | null
+          parcel_photos?: string[]
           picked_up_at?: string | null
           pickup_otp?: string | null
-          pickup_otp_expires_at?: string | null
+          pickup_otp_expiry?: string | null
           rejected_at?: string | null
           rejection_reason?: string | null
           sender_id: string
@@ -88,19 +115,20 @@ export type Database = {
         }
         Update: {
           accepted_at?: string | null
+          cancelled_by?: string | null
           category?: string
           created_at?: string | null
           delivered_at?: string | null
           delivery_contact_name?: string
           delivery_contact_phone?: string
           delivery_otp?: string | null
-          delivery_otp_expires_at?: string | null
+          delivery_otp_expiry?: string | null
           id?: string
           item_description?: string
-          parcel_photos?: string[] | null
+          parcel_photos?: string[]
           picked_up_at?: string | null
           pickup_otp?: string | null
-          pickup_otp_expires_at?: string | null
+          pickup_otp_expiry?: string | null
           rejected_at?: string | null
           rejection_reason?: string | null
           sender_id?: string
@@ -240,6 +268,18 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      accept_request_atomic: {
+        Args: { p_request_id: string; p_traveller_notes?: string }
+        Returns: Json
+      }
+      cancel_request_with_validation: {
+        Args: {
+          p_cancellation_reason?: string
+          p_cancelled_by: string
+          p_request_id: string
+        }
+        Returns: Json
+      }
       check_email_available: { Args: { check_email: string }; Returns: boolean }
       check_phone_available: { Args: { check_phone: string }; Returns: boolean }
       check_username_available: {
@@ -250,21 +290,59 @@ export type Database = {
         Args: { user_email: string }
         Returns: undefined
       }
+      create_request_with_validation: {
+        Args: {
+          p_category: string
+          p_delivery_contact_name: string
+          p_delivery_contact_phone: string
+          p_item_description: string
+          p_parcel_photos: string[]
+          p_sender_notes?: string
+          p_size: string
+          p_trip_id: string
+        }
+        Returns: string
+      }
+      create_trip_with_validation: {
+        Args: {
+          p_allowed_categories: string[]
+          p_arrival_date: string
+          p_arrival_time: string
+          p_departure_date: string
+          p_departure_time: string
+          p_destination: string
+          p_notes?: string
+          p_pnr_number: string
+          p_source: string
+          p_ticket_file_url: string
+          p_total_slots: number
+          p_transport_mode: string
+        }
+        Returns: string
+      }
       generate_otp: { Args: never; Returns: string }
       generate_pickup_otp: { Args: { request_id: string }; Returns: string }
       is_account_locked: { Args: { user_email: string }; Returns: boolean }
+      is_trip_available: { Args: { p_trip_id: string }; Returns: boolean }
       record_failed_login: {
         Args: { user_email: string; user_ip?: string }
         Returns: undefined
       }
-      verify_delivery_otp: {
-        Args: { otp_code: string; request_id: string }
+      validate_trip_dates: {
+        Args: {
+          p_arrival_date: string
+          p_arrival_time: string
+          p_departure_date: string
+          p_departure_time: string
+        }
         Returns: boolean
       }
-      verify_pickup_otp: {
-        Args: { otp_code: string; request_id: string }
-        Returns: boolean
-      }
+      verify_delivery_otp:
+        | { Args: { p_otp: string; p_request_id: string }; Returns: Json }
+        | { Args: { otp_code: string; request_id: string }; Returns: boolean }
+      verify_pickup_otp:
+        | { Args: { p_otp: string; p_request_id: string }; Returns: Json }
+        | { Args: { otp_code: string; request_id: string }; Returns: boolean }
     }
     Enums: {
       [_ in never]: never
@@ -393,6 +471,9 @@ export type CompositeTypes<
     : never
 
 export const Constants = {
+  graphql_public: {
+    Enums: {},
+  },
   public: {
     Enums: {},
   },
