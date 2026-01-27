@@ -69,8 +69,27 @@ export default function RequestCard({
   const statusColor = STATUS_COLORS[status] || Colors.text.secondary;
   const statusLabel = STATUS_LABELS[status] || request.status;
 
+  // Check if cancelled and determine who cancelled
+  const isCancelled = request.status === "cancelled";
+  const cancelledBySender = request.cancelled_by === "sender";
+  const cancelledByTraveller = request.cancelled_by === "traveller";
+
+  // Get cancellation info text
+  const getCancellationInfo = () => {
+    if (!isCancelled) return null;
+
+    if (variant === "sender") {
+      return cancelledBySender ? "You cancelled" : "Traveller cancelled";
+    } else {
+      return cancelledByTraveller ? "You cancelled" : "Sender cancelled";
+    }
+  };
+
   return (
-    <Pressable style={styles.card} onPress={handlePress}>
+    <Pressable
+      style={[styles.card, isCancelled && styles.cardCancelled]}
+      onPress={handlePress}
+    >
       <View style={styles.header}>
         <View style={styles.routeInfo}>
           <Text style={styles.cityText}>{request.trip?.source}</Text>
@@ -81,12 +100,25 @@ export default function RequestCard({
           />
           <Text style={styles.cityText}>{request.trip?.destination}</Text>
         </View>
-        <View
-          style={[styles.statusBadge, { backgroundColor: statusColor + "20" }]}
-        >
-          <Text style={[styles.statusText, { color: statusColor }]}>
-            {statusLabel}
-          </Text>
+        <View style={styles.statusGroup}>
+          <View
+            style={[
+              styles.statusBadge,
+              { backgroundColor: statusColor + "20" },
+            ]}
+          >
+            <Text style={[styles.statusText, { color: statusColor }]}>
+              {statusLabel}
+            </Text>
+          </View>
+          {isCancelled && (
+            <View style={styles.cancelledByBadge}>
+              <Ionicons name="close-circle" size={12} color={Colors.error} />
+              <Text style={styles.cancelledByText}>
+                {getCancellationInfo()}
+              </Text>
+            </View>
+          )}
         </View>
       </View>
 
@@ -95,7 +127,10 @@ export default function RequestCard({
           {request.parcel_photos && request.parcel_photos.length > 0 && (
             <Image
               source={{ uri: request.parcel_photos[0] }}
-              style={styles.thumbnail}
+              style={[
+                styles.thumbnail,
+                isCancelled && styles.thumbnailCancelled,
+              ]}
             />
           )}
           {request.parcel_photos && request.parcel_photos.length > 1 && (
@@ -109,7 +144,13 @@ export default function RequestCard({
         </View>
 
         <View style={styles.details}>
-          <Text style={styles.description} numberOfLines={2}>
+          <Text
+            style={[
+              styles.description,
+              isCancelled && styles.descriptionCancelled,
+            ]}
+            numberOfLines={2}
+          >
             {request.item_description}
           </Text>
 
@@ -137,6 +178,15 @@ export default function RequestCard({
               </Text>
             </View>
           </View>
+
+          {/* Show cancellation reason if cancelled and reason exists */}
+          {isCancelled && request.rejection_reason && (
+            <View style={styles.cancellationReasonBox}>
+              <Text style={styles.cancellationReasonText} numberOfLines={1}>
+                {request.rejection_reason}
+              </Text>
+            </View>
+          )}
         </View>
       </View>
 
@@ -178,10 +228,14 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: Colors.border.default,
   },
+  cardCancelled: {
+    opacity: 0.7,
+    borderColor: Colors.text.tertiary,
+  },
   header: {
     flexDirection: "row",
     justifyContent: "space-between",
-    alignItems: "center",
+    alignItems: "flex-start",
     marginBottom: Spacing.sm,
   },
   routeInfo: {
@@ -195,6 +249,10 @@ const styles = StyleSheet.create({
     fontWeight: Typography.weights.semibold,
     color: Colors.text.primary,
   },
+  statusGroup: {
+    alignItems: "flex-end",
+    gap: Spacing.xs,
+  },
   statusBadge: {
     paddingHorizontal: Spacing.sm,
     paddingVertical: Spacing.xs,
@@ -203,6 +261,20 @@ const styles = StyleSheet.create({
   statusText: {
     fontSize: Typography.sizes.xs,
     fontWeight: Typography.weights.semibold,
+  },
+  cancelledByBadge: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    backgroundColor: Colors.error + "10",
+    paddingHorizontal: Spacing.xs,
+    paddingVertical: 2,
+    borderRadius: BorderRadius.sm,
+  },
+  cancelledByText: {
+    fontSize: 10,
+    fontWeight: Typography.weights.medium,
+    color: Colors.error,
   },
   body: {
     flexDirection: "row",
@@ -217,6 +289,9 @@ const styles = StyleSheet.create({
     height: 80,
     borderRadius: BorderRadius.md,
     backgroundColor: Colors.background.primary,
+  },
+  thumbnailCancelled: {
+    opacity: 0.5,
   },
   photoCount: {
     position: "absolute",
@@ -245,6 +320,9 @@ const styles = StyleSheet.create({
     lineHeight: Typography.sizes.sm * 1.4,
     marginBottom: Spacing.xs,
   },
+  descriptionCancelled: {
+    color: Colors.text.secondary,
+  },
   meta: {
     flexDirection: "row",
     gap: Spacing.md,
@@ -257,6 +335,18 @@ const styles = StyleSheet.create({
   metaText: {
     fontSize: Typography.sizes.xs,
     color: Colors.text.secondary,
+  },
+  cancellationReasonBox: {
+    backgroundColor: Colors.error + "10",
+    paddingHorizontal: Spacing.xs,
+    paddingVertical: 4,
+    borderRadius: BorderRadius.sm,
+    marginTop: Spacing.xs,
+  },
+  cancellationReasonText: {
+    fontSize: 10,
+    color: Colors.error,
+    fontStyle: "italic",
   },
   footer: {
     flexDirection: "row",
