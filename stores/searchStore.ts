@@ -1,5 +1,6 @@
 import { supabase } from "@/lib/supabase";
 import { parseSupabaseError } from "@/lib/utils/errorHandling";
+import { logger } from "@/lib/utils/logger";
 import { Trip } from "@/stores/tripStore";
 import { create } from "zustand";
 
@@ -29,17 +30,6 @@ const initialFilters: SearchFilters = {
   destination: "",
   departureDate: null,
   transportMode: "all",
-};
-
-// Conditional logging
-const isDev = __DEV__;
-const log = {
-  info: (message: string, ...args: any[]) => {
-    if (isDev) console.log(`[Search] ${message}`, ...args);
-  },
-  error: (message: string, error?: any) => {
-    if (isDev) console.error(`[Search Error] ${message}`, error);
-  },
 };
 
 // Helper to normalize trip from database
@@ -87,13 +77,20 @@ export const useSearchStore = create<SearchState>((set, get) => ({
 
       const { filters } = get();
 
+      // Get current user ID to filter out own trips
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+
       // Start with base query - only open trips with available slots
+      // Performance: Uses idx_trips_search_available composite index
       let query = supabase
         .from("trips")
         .select("*")
         .eq("status", "open")
         .gt("available_slots", 0)
         .gte("departure_date", new Date().toISOString().split("T")[0]) // Future trips only
+        .neq("traveller_id", user?.id || "") // NEW: Filter out own trips
         .order("departure_date", { ascending: true })
         .order("departure_time", { ascending: true });
 
@@ -124,10 +121,13 @@ export const useSearchStore = create<SearchState>((set, get) => ({
       const normalizedTrips = (trips || []).map(normalizeTrip);
 
       set({ results: normalizedTrips, loading: false });
-      log.info("Search completed", normalizedTrips.length, "results");
+      logger.info("Search completed", {
+        count: normalizedTrips.length,
+        filters,
+      });
     } catch (error: any) {
       const errorMessage = parseSupabaseError(error);
-      log.error("Search failed", error);
+      logger.error("Search failed", error);
       set({ loading: false, error: errorMessage, results: [] });
     }
   },
@@ -135,7 +135,7 @@ export const useSearchStore = create<SearchState>((set, get) => ({
   // Clear all filters
   clearFilters: () => {
     set({ filters: initialFilters, results: [], error: null });
-    log.info("Filters cleared");
+    logger.info("Filters cleared");
   },
 
   // Clear error

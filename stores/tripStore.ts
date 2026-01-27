@@ -1,6 +1,7 @@
 import { supabase } from "@/lib/supabase";
 import { parseSupabaseError } from "@/lib/utils/errorHandling";
-import { formatTripForDatabase, TripFormData } from "@/lib/validations/trip";
+import { logger } from "@/lib/utils/logger";
+import { TripFormData } from "@/lib/validations/trip";
 import { Database } from "@/types/database.types";
 import { create } from "zustand";
 
@@ -48,17 +49,6 @@ interface TripState {
   clearError: () => void;
 }
 
-// Conditional logging
-const isDev = __DEV__;
-const log = {
-  info: (message: string, ...args: any[]) => {
-    if (isDev) console.log(`[Trip] ${message}`, ...args);
-  },
-  error: (message: string, error?: any) => {
-    if (isDev) console.error(`[Trip Error] ${message}`, error);
-  },
-};
-
 // Helper to convert DbTrip to Trip (handle nulls)
 const normalizeTrip = (dbTrip: DbTrip): Trip => {
   // Ensure status is valid
@@ -93,20 +83,49 @@ export const useTripStore = create<TripState>((set, get) => ({
   loading: false,
   error: null,
 
-  // Create new trip
+  // ============================================================================
+  // UPDATED: Create new trip with server-side validation
+  // ============================================================================
   createTrip: async (data: TripFormData, userId: string) => {
     try {
       set({ loading: true, error: null });
 
-      const tripData = formatTripForDatabase(data, userId);
+      // Prepare RPC parameters (only include p_notes if it has a value)
+      const rpcParams: any = {
+        p_source: data.source.trim(),
+        p_destination: data.destination.trim(),
+        p_departure_date: data.departure_date,
+        p_departure_time: data.departure_time,
+        p_arrival_date: data.arrival_date,
+        p_arrival_time: data.arrival_time,
+        p_transport_mode: data.transport_mode,
+        p_pnr_number: data.pnr_number.trim(),
+        p_ticket_file_url: data.ticket_file_url,
+        p_total_slots: data.total_slots,
+        p_allowed_categories: data.allowed_categories,
+      };
 
-      const { data: trip, error } = await supabase
+      // Only add p_notes if it exists
+      if (data.notes) {
+        rpcParams.p_notes = data.notes;
+      }
+
+      // Use RPC function for server-side validation
+      const { data: tripId, error: rpcError } = await supabase.rpc(
+        "create_trip_with_validation",
+        rpcParams,
+      );
+
+      if (rpcError) throw rpcError;
+
+      // Fetch the created trip
+      const { data: trip, error: fetchError } = await supabase
         .from("trips")
-        .insert(tripData)
-        .select()
+        .select("*")
+        .eq("id", tripId)
         .single();
 
-      if (error) throw error;
+      if (fetchError) throw fetchError;
 
       const normalizedTrip = normalizeTrip(trip);
 
@@ -116,11 +135,11 @@ export const useTripStore = create<TripState>((set, get) => ({
         loading: false,
       }));
 
-      log.info("Trip created successfully", normalizedTrip.id);
+      logger.info("Trip created successfully", { tripId: normalizedTrip.id });
       return normalizedTrip;
     } catch (error: any) {
       const errorMessage = parseSupabaseError(error);
-      log.error("Create trip failed", error);
+      logger.error("Create trip failed", error);
       set({ loading: false, error: errorMessage });
       throw new Error(errorMessage);
     }
@@ -143,10 +162,10 @@ export const useTripStore = create<TripState>((set, get) => ({
       const normalizedTrips = (trips || []).map(normalizeTrip);
 
       set({ trips: normalizedTrips, loading: false });
-      log.info("Fetched trips", normalizedTrips.length);
+      logger.info("Fetched trips", { count: normalizedTrips.length });
     } catch (error: any) {
       const errorMessage = parseSupabaseError(error);
-      log.error("Fetch trips failed", error);
+      logger.error("Fetch trips failed", error);
       set({ loading: false, error: errorMessage });
     }
   },
@@ -158,12 +177,18 @@ export const useTripStore = create<TripState>((set, get) => ({
 
       const today = new Date().toISOString().split("T")[0];
 
+      // Get current user ID to filter out own trips
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+
       const { data: trips, error } = await supabase
         .from("trips")
         .select("*")
         .eq("status", "open")
         .gte("departure_date", today)
         .gt("available_slots", 0)
+        .neq("traveller_id", user?.id || "") // NEW: Filter out own trips
         .order("departure_date", { ascending: true })
         .order("departure_time", { ascending: true });
 
@@ -172,10 +197,10 @@ export const useTripStore = create<TripState>((set, get) => ({
       const normalizedTrips = (trips || []).map(normalizeTrip);
 
       set({ trips: normalizedTrips, loading: false });
-      log.info("Fetched available trips", normalizedTrips.length);
+      logger.info("Fetched available trips", { count: normalizedTrips.length });
     } catch (error: any) {
       const errorMessage = parseSupabaseError(error);
-      log.error("Fetch available trips failed", error);
+      logger.error("Fetch available trips failed", error);
       set({ loading: false, error: errorMessage, trips: [] });
     }
   },
@@ -196,11 +221,11 @@ export const useTripStore = create<TripState>((set, get) => ({
       const normalizedTrip = normalizeTrip(trip);
 
       set({ currentTrip: normalizedTrip, loading: false });
-      log.info("Fetched trip", tripId);
+      logger.info("Fetched trip", { tripId });
       return normalizedTrip;
     } catch (error: any) {
       const errorMessage = parseSupabaseError(error);
-      log.error("Get trip failed", error);
+      logger.error("Get trip failed", error);
       set({ loading: false, error: errorMessage, currentTrip: null });
       return null;
     }
@@ -233,10 +258,10 @@ export const useTripStore = create<TripState>((set, get) => ({
         set({ currentTrip: normalizedTrip });
       }
 
-      log.info("Trip updated", tripId);
+      logger.info("Trip updated", { tripId });
     } catch (error: any) {
       const errorMessage = parseSupabaseError(error);
-      log.error("Update trip failed", error);
+      logger.error("Update trip failed", error);
       set({ loading: false, error: errorMessage });
       throw new Error(errorMessage);
     }
@@ -265,10 +290,10 @@ export const useTripStore = create<TripState>((set, get) => ({
         set({ currentTrip: { ...get().currentTrip!, status } });
       }
 
-      log.info("Trip status updated", tripId, status);
+      logger.info("Trip status updated", { tripId, status });
     } catch (error: any) {
       const errorMessage = parseSupabaseError(error);
-      log.error("Update trip status failed", error);
+      logger.error("Update trip status failed", error);
       set({ loading: false, error: errorMessage });
       throw new Error(errorMessage);
     }
@@ -294,10 +319,10 @@ export const useTripStore = create<TripState>((set, get) => ({
         loading: false,
       }));
 
-      log.info("Trip cancelled", tripId);
+      logger.info("Trip cancelled", { tripId });
     } catch (error: any) {
       const errorMessage = parseSupabaseError(error);
-      log.error("Delete trip failed", error);
+      logger.error("Delete trip failed", error);
       set({ loading: false, error: errorMessage });
       throw new Error(errorMessage);
     }

@@ -1,5 +1,6 @@
 import { supabase } from "@/lib/supabase";
 import { parseSupabaseError } from "@/lib/utils/errorHandling";
+import { logger } from "@/lib/utils/logger";
 import { Database } from "@/types/database.types";
 import { create } from "zustand";
 
@@ -50,14 +51,13 @@ interface RequestState {
   getRequestById: (requestId: string) => Promise<ParcelRequest | null>;
   acceptRequest: (requestId: string, travellerNotes?: string) => Promise<void>;
   rejectRequest: (requestId: string, reason: string) => Promise<void>;
-  cancelRequest: (requestId: string) => Promise<void>;
+  cancelRequest: (requestId: string, reason?: string) => Promise<void>;
   updateRequestStatus: (
     requestId: string,
     status: DbParcelRequest["status"],
   ) => Promise<void>;
 
   // OTP Methods
-  generatePickupOtp: (requestId: string) => Promise<string>;
   verifyPickupOtp: (requestId: string, otp: string) => Promise<boolean>;
   verifyDeliveryOtp: (requestId: string, otp: string) => Promise<boolean>;
   getPickupOtp: (requestId: string) => Promise<string | null>;
@@ -65,17 +65,6 @@ interface RequestState {
 
   clearError: () => void;
 }
-
-// Conditional logging
-const isDev = __DEV__;
-const log = {
-  info: (message: string, ...args: any[]) => {
-    if (isDev) console.log(`[Request] ${message}`, ...args);
-  },
-  error: (message: string, error?: any) => {
-    if (isDev) console.error(`[Request Error] ${message}`, error);
-  },
-};
 
 export const useRequestStore = create<RequestState>((set, get) => ({
   // Initial state
@@ -86,32 +75,60 @@ export const useRequestStore = create<RequestState>((set, get) => ({
   loading: false,
   error: null,
 
-  // Create new parcel request
+  // ============================================================================
+  // UPDATED: Create new parcel request with server-side validation
+  // ============================================================================
   createRequest: async (data: CreateRequestData, senderId: string) => {
     try {
       set({ loading: true, error: null });
 
-      const { data: request, error } = await supabase
+      // Prepare RPC parameters (only include p_sender_notes if it has a value)
+      const rpcParams: any = {
+        p_trip_id: data.trip_id,
+        p_item_description: data.item_description,
+        p_category: data.category,
+        p_size: data.size,
+        p_parcel_photos: data.parcel_photos,
+        p_delivery_contact_name: data.delivery_contact_name,
+        p_delivery_contact_phone: data.delivery_contact_phone,
+      };
+
+      // Only add p_sender_notes if it exists
+      if (data.sender_notes) {
+        rpcParams.p_sender_notes = data.sender_notes;
+      }
+
+      // Use RPC function for server-side validation and OTP generation
+      const { data: requestId, error: rpcError } = await supabase.rpc(
+        "create_request_with_validation",
+        rpcParams,
+      );
+
+      if (rpcError) throw rpcError;
+
+      // Fetch the created request with trip details
+      const { data: request, error: fetchError } = await supabase
         .from("parcel_requests")
-        .insert({
-          ...data,
-          sender_id: senderId,
-          status: "pending",
-        })
-        .select()
+        .select(
+          `
+          *,
+          trip:trips(source, destination, departure_date, departure_time, transport_mode)
+        `,
+        )
+        .eq("id", requestId)
         .single();
 
-      if (error) throw error;
+      if (fetchError) throw fetchError;
 
       set((state) => ({
         myRequests: [request as ParcelRequest, ...state.myRequests],
         loading: false,
       }));
 
-      log.info("Request created successfully", request.id);
+      logger.info("Request created successfully", { requestId });
     } catch (error: any) {
       const errorMessage = parseSupabaseError(error);
-      log.error("Create request failed", error);
+      logger.error("Create request failed", error);
       set({ loading: false, error: errorMessage });
       throw new Error(errorMessage);
     }
@@ -136,10 +153,10 @@ export const useRequestStore = create<RequestState>((set, get) => ({
       if (error) throw error;
 
       set({ myRequests: (requests || []) as ParcelRequest[], loading: false });
-      log.info("Fetched my requests", requests?.length || 0);
+      logger.info("Fetched my requests", { count: requests?.length || 0 });
     } catch (error: any) {
       const errorMessage = parseSupabaseError(error);
-      log.error("Fetch my requests failed", error);
+      logger.error("Fetch my requests failed", error);
       set({ loading: false, error: errorMessage, myRequests: [] });
     }
   },
@@ -167,10 +184,12 @@ export const useRequestStore = create<RequestState>((set, get) => ({
         incomingRequests: (requests || []) as ParcelRequest[],
         loading: false,
       });
-      log.info("Fetched incoming requests", requests?.length || 0);
+      logger.info("Fetched incoming requests", {
+        count: requests?.length || 0,
+      });
     } catch (error: any) {
       const errorMessage = parseSupabaseError(error);
-      log.error("Fetch incoming requests failed", error);
+      logger.error("Fetch incoming requests failed", error);
       set({ loading: false, error: errorMessage, incomingRequests: [] });
     }
   },
@@ -199,10 +218,12 @@ export const useRequestStore = create<RequestState>((set, get) => ({
         acceptedRequests: (requests || []) as ParcelRequest[],
         loading: false,
       });
-      log.info("Fetched accepted requests", requests?.length || 0);
+      logger.info("Fetched accepted requests", {
+        count: requests?.length || 0,
+      });
     } catch (error: any) {
       const errorMessage = parseSupabaseError(error);
-      log.error("Fetch accepted requests failed", error);
+      logger.error("Fetch accepted requests failed", error);
       set({ loading: false, error: errorMessage, acceptedRequests: [] });
     }
   },
@@ -228,36 +249,42 @@ export const useRequestStore = create<RequestState>((set, get) => ({
 
       const parcelRequest = request as ParcelRequest;
       set({ currentRequest: parcelRequest, loading: false });
-      log.info("Fetched request", requestId);
+      logger.info("Fetched request", { requestId });
       return parcelRequest;
     } catch (error: any) {
       const errorMessage = parseSupabaseError(error);
-      log.error("Get request failed", error);
+      logger.error("Get request failed", error);
       set({ loading: false, error: errorMessage, currentRequest: null });
       return null;
     }
   },
 
-  // Accept request (also generates pickup OTP)
+  // ============================================================================
+  // UPDATED: Accept request with atomic slot decrement
+  // ============================================================================
   acceptRequest: async (requestId: string, travellerNotes?: string) => {
     try {
       set({ loading: true, error: null });
 
-      // First update the request status
-      const { error: updateError } = await supabase
-        .from("parcel_requests")
-        .update({
-          status: "accepted",
-          traveller_notes: travellerNotes || null,
-          updated_at: new Date().toISOString(),
-        })
-        .eq("id", requestId);
+      // Prepare RPC parameters (only include p_traveller_notes if it has a value)
+      const rpcParams: any = {
+        p_request_id: requestId,
+      };
 
-      if (updateError) throw updateError;
+      // Only add p_traveller_notes if it exists
+      if (travellerNotes) {
+        rpcParams.p_traveller_notes = travellerNotes;
+      }
 
-      // Generate pickup OTP
-      const pickupOtp = await get().generatePickupOtp(requestId);
-      log.info("Pickup OTP generated", pickupOtp);
+      // Use atomic RPC to prevent race conditions
+      const { data: result, error: rpcError } = await supabase.rpc(
+        "accept_request_atomic",
+        rpcParams,
+      );
+
+      if (rpcError) throw rpcError;
+
+      logger.info("Request accepted atomically", { result });
 
       // Refresh incoming and accepted requests
       set((state) => ({
@@ -273,30 +300,40 @@ export const useRequestStore = create<RequestState>((set, get) => ({
         loading: false,
       }));
 
-      log.info("Request accepted", requestId);
+      logger.info("Request accepted", { requestId });
     } catch (error: any) {
       const errorMessage = parseSupabaseError(error);
-      log.error("Accept request failed", error);
+      logger.error("Accept request failed", error);
       set({ loading: false, error: errorMessage });
       throw new Error(errorMessage);
     }
   },
 
-  // Reject request
+  // ============================================================================
+  // UPDATED: Reject request with validation (uses cancel_request_with_validation)
+  // ============================================================================
   rejectRequest: async (requestId: string, reason: string) => {
     try {
       set({ loading: true, error: null });
 
-      const { error } = await supabase
-        .from("parcel_requests")
-        .update({
-          status: "rejected",
-          rejection_reason: reason,
-          updated_at: new Date().toISOString(),
-        })
-        .eq("id", requestId);
+      // Prepare RPC parameters
+      const rpcParams: any = {
+        p_request_id: requestId,
+        p_cancelled_by: "traveller",
+      };
 
-      if (error) throw error;
+      // Only add p_cancellation_reason if it exists
+      if (reason) {
+        rpcParams.p_cancellation_reason = reason;
+      }
+
+      // Use cancel_request_with_validation with traveller as cancelled_by
+      const { data: result, error: rpcError } = await supabase.rpc(
+        "cancel_request_with_validation",
+        rpcParams,
+      );
+
+      if (rpcError) throw rpcError;
 
       // Update local state
       set((state) => ({
@@ -304,7 +341,8 @@ export const useRequestStore = create<RequestState>((set, get) => ({
           req.id === requestId
             ? {
                 ...req,
-                status: "rejected" as const,
+                status: "cancelled" as const,
+                cancelled_by: "traveller",
                 rejection_reason: reason,
               }
             : req,
@@ -312,42 +350,62 @@ export const useRequestStore = create<RequestState>((set, get) => ({
         loading: false,
       }));
 
-      log.info("Request rejected", requestId);
+      logger.info("Request rejected by traveller", { requestId });
     } catch (error: any) {
       const errorMessage = parseSupabaseError(error);
-      log.error("Reject request failed", error);
+      logger.error("Reject request failed", error);
       set({ loading: false, error: errorMessage });
       throw new Error(errorMessage);
     }
   },
 
-  // Cancel request (sender)
-  cancelRequest: async (requestId: string) => {
+  // ============================================================================
+  // UPDATED: Cancel request with 24h validation
+  // ============================================================================
+  cancelRequest: async (requestId: string, reason?: string) => {
     try {
       set({ loading: true, error: null });
 
-      const { error } = await supabase
-        .from("parcel_requests")
-        .update({
-          status: "cancelled",
-          updated_at: new Date().toISOString(),
-        })
-        .eq("id", requestId);
+      // Prepare RPC parameters
+      const rpcParams: any = {
+        p_request_id: requestId,
+        p_cancelled_by: "sender",
+      };
 
-      if (error) throw error;
+      // Only add p_cancellation_reason if it exists
+      if (reason) {
+        rpcParams.p_cancellation_reason = reason;
+      }
+
+      // Use RPC to enforce 24h cancellation rule
+      const { data: result, error: rpcError } = await supabase.rpc(
+        "cancel_request_with_validation",
+        rpcParams,
+      );
+
+      if (rpcError) throw rpcError;
+
+      logger.info("Request cancelled with validation", { result });
 
       // Update local state
       set((state) => ({
         myRequests: state.myRequests.map((req) =>
-          req.id === requestId ? { ...req, status: "cancelled" as const } : req,
+          req.id === requestId
+            ? {
+                ...req,
+                status: "cancelled" as const,
+                cancelled_by: "sender",
+                rejection_reason: reason || null,
+              }
+            : req,
         ),
         loading: false,
       }));
 
-      log.info("Request cancelled", requestId);
+      logger.info("Request cancelled", { requestId });
     } catch (error: any) {
       const errorMessage = parseSupabaseError(error);
-      log.error("Cancel request failed", error);
+      logger.error("Cancel request failed", error);
       set({ loading: false, error: errorMessage });
       throw new Error(errorMessage);
     }
@@ -385,40 +443,44 @@ export const useRequestStore = create<RequestState>((set, get) => ({
         loading: false,
       }));
 
-      log.info("Request status updated", requestId, status);
+      logger.info("Request status updated", { requestId, status });
     } catch (error: any) {
       const errorMessage = parseSupabaseError(error);
-      log.error("Update status failed", error);
+      logger.error("Update status failed", error);
       set({ loading: false, error: errorMessage });
       throw new Error(errorMessage);
     }
   },
 
-  // Generate pickup OTP (called when accepting request)
-  generatePickupOtp: async (requestId: string) => {
-    const { data, error } = await supabase.rpc("generate_pickup_otp", {
-      request_id: requestId,
-    });
-
-    if (error) throw error;
-    return data as string; // NEW - returns string directly
-  },
-
-  // Verify pickup OTP and mark as picked up
+  // ============================================================================
+  // UPDATED: Verify pickup OTP (new signature, returns JSON with delivery OTP)
+  // ============================================================================
   verifyPickupOtp: async (requestId: string, otp: string) => {
     try {
       set({ loading: true, error: null });
 
+      // Use new RPC signature (returns JSON with delivery OTP)
       const { data, error } = await supabase.rpc("verify_pickup_otp", {
-        request_id: requestId,
-        otp_code: otp,
+        p_request_id: requestId,
+        p_otp: otp,
       });
 
       if (error) throw error;
 
-      const isValid = data as boolean;
+      // New function returns JSON: { request_id, status, delivery_otp, delivery_otp_expiry }
+      const result = data as {
+        request_id: string;
+        status: string;
+        delivery_otp: string;
+        delivery_otp_expiry: string;
+      };
 
-      if (isValid) {
+      logger.info("Pickup verified, delivery OTP generated", {
+        requestId,
+        deliveryOtp: result.delivery_otp,
+      });
+
+      if (result && result.status === "picked_up") {
         // Refresh current request if it's the one being updated
         if (get().currentRequest?.id === requestId) {
           await get().getRequestById(requestId);
@@ -433,34 +495,48 @@ export const useRequestStore = create<RequestState>((set, get) => ({
           ),
           loading: false,
         }));
+
+        return true;
       } else {
         set({ loading: false });
+        return false;
       }
-
-      return isValid;
     } catch (error: any) {
       const errorMessage = parseSupabaseError(error);
-      log.error("Verify pickup OTP failed", error);
+      logger.error("Verify pickup OTP failed", error);
       set({ loading: false, error: errorMessage });
       throw new Error(errorMessage);
     }
   },
 
-  // Verify delivery OTP and mark as delivered
+  // ============================================================================
+  // UPDATED: Verify delivery OTP (new signature, returns JSON)
+  // ============================================================================
   verifyDeliveryOtp: async (requestId: string, otp: string) => {
     try {
       set({ loading: true, error: null });
 
+      // Use new RPC signature (returns JSON)
       const { data, error } = await supabase.rpc("verify_delivery_otp", {
-        request_id: requestId,
-        otp_code: otp,
+        p_request_id: requestId,
+        p_otp: otp,
       });
 
       if (error) throw error;
 
-      const isValid = data as boolean;
+      // New function returns JSON: { request_id, status, delivered_at }
+      const result = data as {
+        request_id: string;
+        status: string;
+        delivered_at: string;
+      };
 
-      if (isValid) {
+      logger.info("Delivery verified", {
+        requestId,
+        deliveredAt: result.delivered_at,
+      });
+
+      if (result && result.status === "delivered") {
         // Refresh current request if it's the one being updated
         if (get().currentRequest?.id === requestId) {
           await get().getRequestById(requestId);
@@ -475,14 +551,15 @@ export const useRequestStore = create<RequestState>((set, get) => ({
           ),
           loading: false,
         }));
+
+        return true;
       } else {
         set({ loading: false });
+        return false;
       }
-
-      return isValid;
     } catch (error: any) {
       const errorMessage = parseSupabaseError(error);
-      log.error("Verify delivery OTP failed", error);
+      logger.error("Verify delivery OTP failed", error);
       set({ loading: false, error: errorMessage });
       throw new Error(errorMessage);
     }
@@ -500,7 +577,7 @@ export const useRequestStore = create<RequestState>((set, get) => ({
       if (error) throw error;
       return data?.pickup_otp || null;
     } catch (error) {
-      log.error("Get pickup OTP failed", error);
+      logger.error("Get pickup OTP failed", error);
       return null;
     }
   },
@@ -517,7 +594,7 @@ export const useRequestStore = create<RequestState>((set, get) => ({
       if (error) throw error;
       return data?.delivery_otp || null;
     } catch (error) {
-      log.error("Get delivery OTP failed", error);
+      logger.error("Get delivery OTP failed", error);
       return null;
     }
   },
