@@ -1,6 +1,6 @@
 import { BorderRadius, Colors, Spacing, Typography } from "@/styles";
 import { Ionicons } from "@expo/vector-icons";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   ActivityIndicator,
   Modal,
@@ -16,6 +16,7 @@ interface VerifyDeliveryOtpModalProps {
   onClose: () => void;
   onVerify: (otp: string) => Promise<boolean>;
   receiverName: string;
+  otpExpiry?: string; // NEW: ISO timestamp of when OTP expires
 }
 
 export default function VerifyDeliveryOtpModal({
@@ -23,14 +24,64 @@ export default function VerifyDeliveryOtpModal({
   onClose,
   onVerify,
   receiverName,
+  otpExpiry, // NEW
 }: VerifyDeliveryOtpModalProps) {
   const [otp, setOtp] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [timeRemaining, setTimeRemaining] = useState<string | null>(null);
+  const [isExpiringSoon, setIsExpiringSoon] = useState(false);
+  const [isExpired, setIsExpired] = useState(false);
+
+  // Calculate time remaining
+  useEffect(() => {
+    if (!otpExpiry) return;
+
+    const updateTimer = () => {
+      const now = new Date().getTime();
+      const expiry = new Date(otpExpiry).getTime();
+      const diff = expiry - now;
+
+      if (diff <= 0) {
+        setTimeRemaining("Expired");
+        setIsExpired(true);
+        setIsExpiringSoon(false);
+        return;
+      }
+
+      // Calculate days, hours, and minutes
+      const days = Math.floor(diff / (1000 * 60 * 60 * 24));
+      const hours = Math.floor(
+        (diff % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60),
+      );
+      const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
+
+      // Show warning if less than 6 hours remaining
+      setIsExpiringSoon(diff < 6 * 60 * 60 * 1000);
+
+      if (days > 0) {
+        setTimeRemaining(`${days}d ${hours}h remaining`);
+      } else if (hours > 0) {
+        setTimeRemaining(`${hours}h ${minutes}m remaining`);
+      } else {
+        setTimeRemaining(`${minutes}m remaining`);
+      }
+    };
+
+    updateTimer();
+    const interval = setInterval(updateTimer, 60000); // Update every minute
+
+    return () => clearInterval(interval);
+  }, [otpExpiry]);
 
   const handleVerify = async () => {
     if (otp.length !== 6) {
       setError("Please enter a 6-digit OTP");
+      return;
+    }
+
+    if (isExpired) {
+      setError("This OTP has expired. Please contact support.");
       return;
     }
 
@@ -48,7 +99,15 @@ export default function VerifyDeliveryOtpModal({
       }
     } catch (error: any) {
       console.error("Verify delivery OTP failed:", error);
-      setError(error.message || "Failed to verify OTP. Please try again.");
+
+      // Better error messages
+      if (error.message?.includes("expired")) {
+        setError("This OTP has expired. Please contact support.");
+      } else if (error.message?.includes("Invalid")) {
+        setError("Invalid OTP. Please check and try again.");
+      } else {
+        setError(error.message || "Failed to verify OTP. Please try again.");
+      }
     } finally {
       setLoading(false);
     }
@@ -84,6 +143,44 @@ export default function VerifyDeliveryOtpModal({
           </View>
 
           <View style={styles.content}>
+            {/* OTP Expiry Info */}
+            {otpExpiry && timeRemaining && (
+              <View
+                style={[
+                  styles.expiryBox,
+                  isExpired && styles.expiryBoxExpired,
+                  isExpiringSoon && !isExpired && styles.expiryBoxWarning,
+                ]}
+              >
+                <Ionicons
+                  name={
+                    isExpired
+                      ? "close-circle"
+                      : isExpiringSoon
+                        ? "time"
+                        : "checkmark-circle"
+                  }
+                  size={16}
+                  color={
+                    isExpired
+                      ? Colors.error
+                      : isExpiringSoon
+                        ? Colors.warning
+                        : Colors.success
+                  }
+                />
+                <Text
+                  style={[
+                    styles.expiryText,
+                    isExpired && styles.expiryTextExpired,
+                    isExpiringSoon && !isExpired && styles.expiryTextWarning,
+                  ]}
+                >
+                  {isExpired ? "OTP Expired" : `Valid for ${timeRemaining}`}
+                </Text>
+              </View>
+            )}
+
             <Text style={styles.label}>
               Enter OTP <Text style={styles.required}>*</Text>
             </Text>
@@ -98,7 +195,7 @@ export default function VerifyDeliveryOtpModal({
               }}
               keyboardType="number-pad"
               maxLength={6}
-              editable={!loading}
+              editable={!loading && !isExpired}
               autoFocus
             />
             {error ? (
@@ -120,14 +217,20 @@ export default function VerifyDeliveryOtpModal({
             </Pressable>
 
             <Pressable
-              style={[styles.button, styles.verifyButton]}
+              style={[
+                styles.button,
+                styles.verifyButton,
+                isExpired && styles.verifyButtonDisabled,
+              ]}
               onPress={handleVerify}
-              disabled={loading || otp.length !== 6}
+              disabled={loading || otp.length !== 6 || isExpired}
             >
               {loading ? (
                 <ActivityIndicator color={Colors.text.inverse} size="small" />
               ) : (
-                <Text style={styles.verifyButtonText}>Verify & Deliver</Text>
+                <Text style={styles.verifyButtonText}>
+                  {isExpired ? "OTP Expired" : "Verify & Deliver"}
+                </Text>
               )}
             </Pressable>
           </View>
@@ -172,6 +275,32 @@ const styles = StyleSheet.create({
   },
   content: {
     padding: Spacing.lg,
+  },
+  expiryBox: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: Spacing.xs,
+    backgroundColor: Colors.success + "10",
+    padding: Spacing.sm,
+    borderRadius: BorderRadius.sm,
+    marginBottom: Spacing.md,
+  },
+  expiryBoxWarning: {
+    backgroundColor: Colors.warning + "10",
+  },
+  expiryBoxExpired: {
+    backgroundColor: Colors.error + "10",
+  },
+  expiryText: {
+    fontSize: Typography.sizes.xs,
+    fontWeight: Typography.weights.medium,
+    color: Colors.success,
+  },
+  expiryTextWarning: {
+    color: Colors.warning,
+  },
+  expiryTextExpired: {
+    color: Colors.error,
   },
   label: {
     fontSize: Typography.sizes.sm,
@@ -234,6 +363,9 @@ const styles = StyleSheet.create({
   },
   verifyButton: {
     backgroundColor: Colors.success,
+  },
+  verifyButtonDisabled: {
+    backgroundColor: Colors.text.tertiary,
   },
   verifyButtonText: {
     fontSize: Typography.sizes.md,
