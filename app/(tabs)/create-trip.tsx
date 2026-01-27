@@ -46,6 +46,72 @@ const getDefaultArrivalDate = () => {
   return dayAfterTomorrow.toISOString().split("T")[0];
 };
 
+// Helper function to parse and format error messages
+const getErrorMessage = (error: any): { title: string; message: string } => {
+  const errorMessage = error.message || "";
+
+  // Server-side validation errors
+  if (errorMessage.includes("past") || errorMessage.includes("before")) {
+    return {
+      title: "Invalid Date",
+      message:
+        "Departure date cannot be in the past. Please select a future date.",
+    };
+  }
+
+  if (errorMessage.includes("after departure")) {
+    return {
+      title: "Invalid Time",
+      message: "Arrival time must be after departure time.",
+    };
+  }
+
+  if (errorMessage.includes("same route")) {
+    return {
+      title: "Duplicate Route",
+      message: "Source and destination cannot be the same city.",
+    };
+  }
+
+  if (
+    errorMessage.includes("category") ||
+    errorMessage.includes("categories")
+  ) {
+    return {
+      title: "Categories Required",
+      message: "Please select at least one package category to allow.",
+    };
+  }
+
+  if (errorMessage.includes("PNR")) {
+    return {
+      title: "Invalid PNR",
+      message: "Please check your PNR number and try again.",
+    };
+  }
+
+  if (errorMessage.includes("ticket")) {
+    return {
+      title: "Ticket Required",
+      message: "Please upload your ticket file for verification.",
+    };
+  }
+
+  // Network errors
+  if (errorMessage.includes("network") || errorMessage.includes("fetch")) {
+    return {
+      title: "Connection Error",
+      message: "Please check your internet connection and try again.",
+    };
+  }
+
+  // Generic fallback
+  return {
+    title: "Error",
+    message: errorMessage || "Failed to create trip. Please try again.",
+  };
+};
+
 export default function CreateTripScreen() {
   const { user } = useAuthStore();
   const { createTrip, loading } = useTripStore();
@@ -100,6 +166,7 @@ export default function CreateTripScreen() {
 
       await createTrip(data, user!.id);
 
+      // Reset form to default values
       reset({
         source: "",
         destination: "",
@@ -117,22 +184,35 @@ export default function CreateTripScreen() {
 
       haptics.success();
 
-      Alert.alert("Success", "Your trip has been created successfully!", [
-        {
-          text: "View Trips",
-          onPress: () => {
-            router.push("/(tabs)/my-trips");
+      Alert.alert(
+        "Trip Created! 🎉",
+        "Your trip has been created successfully. You can now receive parcel requests from senders.",
+        [
+          {
+            text: "View My Trips",
+            onPress: () => {
+              router.push("/(tabs)/my-trips");
+            },
           },
-        },
-        {
-          text: "Create Another",
-          style: "cancel",
-        },
-      ]);
+          {
+            text: "Create Another",
+            style: "cancel",
+          },
+        ],
+      );
     } catch (error: any) {
       console.error("Trip creation error:", error);
       haptics.error();
-      Alert.alert("Error", error.message || "Failed to create trip");
+
+      // Get user-friendly error message
+      const { title, message } = getErrorMessage(error);
+
+      Alert.alert(title, message, [
+        {
+          text: "OK",
+          style: "default",
+        },
+      ]);
     }
   };
 
@@ -152,6 +232,19 @@ export default function CreateTripScreen() {
         <View style={styles.header}>
           <Text style={styles.title}>Create Trip</Text>
           <Text style={styles.subtitle}>Share your journey, help others</Text>
+        </View>
+
+        {/* Info Banner */}
+        <View style={styles.infoBanner}>
+          <Ionicons
+            name="information-circle"
+            size={20}
+            color={Colors.primary}
+          />
+          <Text style={styles.infoBannerText}>
+            All trip details will be verified. Only travelers with valid tickets
+            can create trips.
+          </Text>
         </View>
 
         <View style={styles.section}>
@@ -398,7 +491,7 @@ const styles = StyleSheet.create({
     padding: Spacing.lg,
   },
   header: {
-    marginBottom: Spacing.xl,
+    marginBottom: Spacing.lg,
   },
   title: {
     fontSize: Typography.sizes.xxxl,
@@ -409,6 +502,21 @@ const styles = StyleSheet.create({
   subtitle: {
     fontSize: Typography.sizes.md,
     color: Colors.text.secondary,
+  },
+  infoBanner: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: Spacing.sm,
+    backgroundColor: Colors.primary + "10",
+    padding: Spacing.md,
+    borderRadius: BorderRadius.md,
+    marginBottom: Spacing.lg,
+  },
+  infoBannerText: {
+    flex: 1,
+    fontSize: Typography.sizes.sm,
+    color: Colors.primary,
+    lineHeight: Typography.sizes.sm * 1.4,
   },
   section: {
     backgroundColor: Colors.background.secondary,
