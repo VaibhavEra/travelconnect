@@ -8,7 +8,6 @@ import {
   Pressable,
   StyleSheet,
   Text,
-  TextInput,
   View,
 } from "react-native";
 
@@ -28,16 +27,10 @@ export default function CityDropdown({
   error,
 }: CityDropdownProps) {
   const [isOpen, setIsOpen] = useState(false);
-  const [searchQuery, setSearchQuery] = useState("");
-
-  const filteredCities = INDIAN_CITIES.filter((city) =>
-    city.toLowerCase().includes(searchQuery.toLowerCase()),
-  );
 
   const handleSelect = (city: string) => {
     onChange(city);
     setIsOpen(false);
-    setSearchQuery("");
   };
 
   return (
@@ -73,17 +66,8 @@ export default function CityDropdown({
               </Pressable>
             </View>
 
-            <TextInput
-              style={styles.searchInput}
-              placeholder="Search cities..."
-              placeholderTextColor={Colors.text.placeholder}
-              value={searchQuery}
-              onChangeText={setSearchQuery}
-              autoFocus
-            />
-
             <FlatList
-              data={filteredCities}
+              data={INDIAN_CITIES}
               keyExtractor={(item) => item}
               renderItem={({ item }) => (
                 <Pressable
@@ -111,7 +95,7 @@ export default function CityDropdown({
                 </Pressable>
               )}
               ListEmptyComponent={
-                <Text style={styles.emptyText}>No cities found</Text>
+                <Text style={styles.emptyText}>No cities available</Text>
               }
             />
           </View>
@@ -180,18 +164,6 @@ const styles = StyleSheet.create({
     fontSize: Typography.sizes.xl,
     fontWeight: Typography.weights.bold,
     color: Colors.text.primary,
-  },
-  searchInput: {
-    backgroundColor: Colors.background.secondary,
-    borderRadius: BorderRadius.md,
-    paddingHorizontal: Spacing.md,
-    paddingVertical: Spacing.sm,
-    marginHorizontal: Spacing.lg,
-    marginBottom: Spacing.md,
-    fontSize: Typography.sizes.md,
-    color: Colors.text.primary,
-    borderWidth: 1,
-    borderColor: Colors.border.default,
   },
   cityItem: {
     flexDirection: "row",
