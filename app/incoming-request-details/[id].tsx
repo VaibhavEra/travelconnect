@@ -93,7 +93,14 @@ export default function IncomingRequestDetailsScreen() {
   const request = currentRequest;
   const isPending = request.status === "pending";
   const isAccepted = request.status === "accepted";
+  const isCancelled = request.status === "cancelled";
   const isRejected = request.status === "rejected";
+  const isPickedUp = request.status === "picked_up";
+  const isDelivered = request.status === "delivered";
+
+  // Show contact info only after acceptance
+  const canViewContacts =
+    isAccepted || isPickedUp || isDelivered || isCancelled || isRejected;
 
   return (
     <>
@@ -115,13 +122,23 @@ export default function IncomingRequestDetailsScreen() {
             styles.statusBadge,
             isPending && styles.statusPending,
             isAccepted && styles.statusAccepted,
-            isRejected && styles.statusRejected,
+            (isRejected || isCancelled) && styles.statusRejected,
           ]}
         >
           <Text style={styles.statusText}>
             {request.status.charAt(0).toUpperCase() + request.status.slice(1)}
           </Text>
         </View>
+
+        {/* Privacy Notice for Pending Requests */}
+        {isPending && (
+          <View style={styles.privacyNotice}>
+            <Ionicons name="lock-closed" size={16} color={Colors.primary} />
+            <Text style={styles.privacyText}>
+              Contact details will be visible after you accept this request
+            </Text>
+          </View>
+        )}
 
         {/* Parcel Photos */}
         {request.parcel_photos && request.parcel_photos.length > 0 && (
@@ -193,8 +210,8 @@ export default function IncomingRequestDetailsScreen() {
           </View>
         </View>
 
-        {/* Sender Information */}
-        {request.sender && (
+        {/* Sender Information - Only show if accepted */}
+        {canViewContacts && request.sender && (
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>Sender Information</Text>
             <View style={styles.card}>
@@ -227,37 +244,39 @@ export default function IncomingRequestDetailsScreen() {
           </View>
         )}
 
-        {/* Delivery Contact */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Delivery Contact</Text>
-          <View style={styles.card}>
-            <View style={styles.contactRow}>
-              <View style={styles.contactInfo}>
-                <Ionicons
-                  name="location-outline"
-                  size={24}
-                  color={Colors.primary}
-                />
-                <View style={styles.contactText}>
-                  <Text style={styles.contactLabel}>Receiver</Text>
-                  <Text style={styles.contactValue}>
-                    {request.delivery_contact_name}
-                  </Text>
+        {/* Delivery Contact - Only show if accepted */}
+        {canViewContacts && (
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>Delivery Contact</Text>
+            <View style={styles.card}>
+              <View style={styles.contactRow}>
+                <View style={styles.contactInfo}>
+                  <Ionicons
+                    name="location-outline"
+                    size={24}
+                    color={Colors.primary}
+                  />
+                  <View style={styles.contactText}>
+                    <Text style={styles.contactLabel}>Receiver</Text>
+                    <Text style={styles.contactValue}>
+                      {request.delivery_contact_name}
+                    </Text>
+                  </View>
                 </View>
+                <Pressable
+                  style={styles.callButton}
+                  onPress={() => handleCall(request.delivery_contact_phone)}
+                >
+                  <Ionicons
+                    name="call-outline"
+                    size={20}
+                    color={Colors.primary}
+                  />
+                </Pressable>
               </View>
-              <Pressable
-                style={styles.callButton}
-                onPress={() => handleCall(request.delivery_contact_phone)}
-              >
-                <Ionicons
-                  name="call-outline"
-                  size={20}
-                  color={Colors.primary}
-                />
-              </Pressable>
             </View>
           </View>
-        </View>
+        )}
 
         {/* Trip Information */}
         {request.trip && (
@@ -315,8 +334,29 @@ export default function IncomingRequestDetailsScreen() {
           </View>
         )}
 
-        {/* Rejection Reason (if rejected) */}
-        {isRejected && request.rejection_reason && (
+        {/* Cancellation Details */}
+        {isCancelled && (
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>Cancellation Details</Text>
+            <View style={[styles.card, styles.cancellationCard]}>
+              <View style={styles.cancellationHeader}>
+                <Ionicons name="close-circle" size={20} color={Colors.error} />
+                <Text style={styles.cancellationTitle}>
+                  Cancelled by{" "}
+                  {request.cancelled_by === "sender" ? "Sender" : "You"}
+                </Text>
+              </View>
+              {request.rejection_reason && (
+                <Text style={styles.cancellationReason}>
+                  Reason: {request.rejection_reason}
+                </Text>
+              )}
+            </View>
+          </View>
+        )}
+
+        {/* Rejection Reason (for backwards compatibility) */}
+        {isRejected && !isCancelled && request.rejection_reason && (
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>Rejection Reason</Text>
             <View style={[styles.card, styles.rejectionCard]}>
@@ -374,14 +414,18 @@ export default function IncomingRequestDetailsScreen() {
         visible={acceptModalVisible}
         onClose={() => setAcceptModalVisible(false)}
         onAccept={handleAccept}
-        senderName={request.sender?.full_name || "Sender"}
+        senderName={
+          canViewContacts ? request.sender?.full_name || "Sender" : "Sender"
+        }
       />
 
       <RejectRequestModal
         visible={rejectModalVisible}
         onClose={() => setRejectModalVisible(false)}
         onReject={handleReject}
-        senderName={request.sender?.full_name || "Sender"}
+        senderName={
+          canViewContacts ? request.sender?.full_name || "Sender" : "Sender"
+        }
       />
     </>
   );
@@ -406,7 +450,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: Spacing.md,
     paddingVertical: Spacing.xs,
     borderRadius: BorderRadius.md,
-    marginBottom: Spacing.lg,
+    marginBottom: Spacing.md,
   },
   statusPending: {
     backgroundColor: Colors.warning + "20",
@@ -421,6 +465,21 @@ const styles = StyleSheet.create({
     fontSize: Typography.sizes.sm,
     fontWeight: Typography.weights.semibold,
     color: Colors.text.primary,
+  },
+  privacyNotice: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: Spacing.xs,
+    backgroundColor: Colors.primary + "10",
+    padding: Spacing.md,
+    borderRadius: BorderRadius.md,
+    marginBottom: Spacing.lg,
+  },
+  privacyText: {
+    flex: 1,
+    fontSize: Typography.sizes.sm,
+    color: Colors.primary,
+    lineHeight: Typography.sizes.sm * 1.4,
   },
   section: {
     marginBottom: Spacing.lg,
@@ -520,6 +579,28 @@ const styles = StyleSheet.create({
   tripText: {
     fontSize: Typography.sizes.sm,
     color: Colors.text.secondary,
+  },
+  cancellationCard: {
+    backgroundColor: Colors.error + "10",
+    borderWidth: 1,
+    borderColor: Colors.error + "30",
+    gap: Spacing.sm,
+  },
+  cancellationHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: Spacing.xs,
+  },
+  cancellationTitle: {
+    fontSize: Typography.sizes.sm,
+    fontWeight: Typography.weights.semibold,
+    color: Colors.error,
+  },
+  cancellationReason: {
+    fontSize: Typography.sizes.sm,
+    color: Colors.text.primary,
+    lineHeight: 20,
+    paddingLeft: Spacing.xl,
   },
   rejectionCard: {
     backgroundColor: Colors.error + "10",
