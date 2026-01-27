@@ -8,10 +8,12 @@ import {
   ActivityIndicator,
   Alert,
   Image,
+  Modal,
   Pressable,
   ScrollView,
   StyleSheet,
   Text,
+  TextInput,
   View,
 } from "react-native";
 
@@ -41,12 +43,140 @@ const STATUS_LABELS: Record<RequestStatus, string> = {
   cancelled: "Cancelled",
 };
 
+// Cancel Request Modal Component
+function CancelRequestModal({
+  visible,
+  onClose,
+  onCancel,
+  tripDepartureDate,
+}: {
+  visible: boolean;
+  onClose: () => void;
+  onCancel: (reason?: string) => Promise<void>;
+  tripDepartureDate: string;
+}) {
+  const [reason, setReason] = useState("");
+  const [loading, setLoading] = useState(false);
+
+  // Check if within 24 hours
+  const departureTime = new Date(tripDepartureDate).getTime();
+  const now = new Date().getTime();
+  const hoursUntilDeparture = (departureTime - now) / (1000 * 60 * 60);
+  const isWithin24Hours = hoursUntilDeparture < 24;
+
+  const handleCancel = async () => {
+    try {
+      setLoading(true);
+      await onCancel(reason.trim() || undefined);
+      setReason("");
+      onClose();
+    } catch (error: any) {
+      // Error already handled by parent
+      setLoading(false);
+    }
+  };
+
+  const handleClose = () => {
+    if (!loading) {
+      setReason("");
+      onClose();
+    }
+  };
+
+  return (
+    <Modal
+      visible={visible}
+      transparent
+      animationType="fade"
+      onRequestClose={handleClose}
+    >
+      <View style={cancelModalStyles.overlay}>
+        <View style={cancelModalStyles.modal}>
+          <View style={cancelModalStyles.header}>
+            <Ionicons name="warning" size={48} color={Colors.warning} />
+            <Text style={cancelModalStyles.title}>Cancel Request</Text>
+            <Text style={cancelModalStyles.subtitle}>
+              {isWithin24Hours
+                ? "Cannot cancel within 24 hours of departure"
+                : "Are you sure you want to cancel this request?"}
+            </Text>
+          </View>
+
+          <View style={cancelModalStyles.content}>
+            {isWithin24Hours ? (
+              <View style={cancelModalStyles.warningBox}>
+                <Ionicons name="alert-circle" size={20} color={Colors.error} />
+                <Text style={cancelModalStyles.warningText}>
+                  Cancellation is not allowed within 24 hours of trip departure
+                  ({Math.round(hoursUntilDeparture)} hours remaining). Please
+                  contact the traveller directly.
+                </Text>
+              </View>
+            ) : (
+              <>
+                <Text style={cancelModalStyles.label}>Reason (Optional)</Text>
+                <TextInput
+                  style={cancelModalStyles.input}
+                  placeholder="Why are you cancelling? (optional)"
+                  placeholderTextColor={Colors.text.tertiary}
+                  value={reason}
+                  onChangeText={setReason}
+                  multiline
+                  numberOfLines={3}
+                  textAlignVertical="top"
+                  editable={!loading}
+                  maxLength={200}
+                />
+                <Text style={cancelModalStyles.hint}>
+                  Providing a reason helps improve our service
+                </Text>
+              </>
+            )}
+          </View>
+
+          <View style={cancelModalStyles.actions}>
+            <Pressable
+              style={[cancelModalStyles.button, cancelModalStyles.backButton]}
+              onPress={handleClose}
+              disabled={loading}
+            >
+              <Text style={cancelModalStyles.backButtonText}>
+                {isWithin24Hours ? "Close" : "Go Back"}
+              </Text>
+            </Pressable>
+
+            {!isWithin24Hours && (
+              <Pressable
+                style={[
+                  cancelModalStyles.button,
+                  cancelModalStyles.cancelButton,
+                ]}
+                onPress={handleCancel}
+                disabled={loading}
+              >
+                {loading ? (
+                  <ActivityIndicator color={Colors.text.inverse} size="small" />
+                ) : (
+                  <Text style={cancelModalStyles.cancelButtonText}>
+                    Cancel Request
+                  </Text>
+                )}
+              </Pressable>
+            )}
+          </View>
+        </View>
+      </View>
+    </Modal>
+  );
+}
+
 export default function RequestDetailsScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const { user } = useAuthStore();
   const { currentRequest, loading, getRequestById, cancelRequest } =
     useRequestStore();
   const [selectedPhotoIndex, setSelectedPhotoIndex] = useState(0);
+  const [showCancelModal, setShowCancelModal] = useState(false);
 
   useEffect(() => {
     if (id) {
@@ -72,35 +202,33 @@ export default function RequestDetailsScreen() {
     return `${displayHour}:${minutes} ${ampm}`;
   };
 
-  const handleCancel = () => {
-    Alert.alert(
-      "Cancel Request",
-      "Are you sure you want to cancel this parcel request? This action cannot be undone.",
-      [
-        { text: "No", style: "cancel" },
-        {
-          text: "Yes, Cancel",
-          style: "destructive",
-          onPress: async () => {
-            try {
-              await cancelRequest(id);
-              Alert.alert(
-                "Request Cancelled",
-                "Your parcel request has been cancelled.",
-                [
-                  {
-                    text: "OK",
-                    onPress: () => router.back(),
-                  },
-                ],
-              );
-            } catch (error: any) {
-              Alert.alert("Error", error.message || "Failed to cancel request");
-            }
+  const handleCancel = async (reason?: string) => {
+    try {
+      await cancelRequest(id, reason);
+      Alert.alert(
+        "Request Cancelled",
+        "Your parcel request has been cancelled.",
+        [
+          {
+            text: "OK",
+            onPress: () => router.back(),
           },
-        },
-      ],
-    );
+        ],
+      );
+    } catch (error: any) {
+      // Handle 24h cancellation error
+      if (
+        error.message?.includes("24 hours") ||
+        error.message?.includes("Cannot cancel")
+      ) {
+        Alert.alert(
+          "Cannot Cancel",
+          "Cancellation is not allowed within 24 hours of trip departure. Please contact the traveller directly.",
+        );
+      } else {
+        Alert.alert("Error", error.message || "Failed to cancel request");
+      }
+    }
   };
 
   if (loading || !currentRequest) {
@@ -293,6 +421,64 @@ export default function RequestDetailsScreen() {
           </View>
         </View>
 
+        {/*  FIXED: Pickup OTP Section - Only show after acceptance */}
+        {currentRequest.status === "accepted" &&
+          currentRequest.pickup_otp &&
+          currentRequest.pickup_otp_expiry && (
+            <View style={styles.section}>
+              <Text style={styles.sectionTitle}>Pickup OTP</Text>
+              <View style={styles.otpCard}>
+                <View style={styles.otpIconContainer}>
+                  <Ionicons name="key" size={32} color={Colors.primary} />
+                </View>
+                <View style={styles.otpContent}>
+                  <Text style={styles.otpInstruction}>
+                    Share this code with the traveller at pickup:
+                  </Text>
+                  <Text style={styles.otpCode}>
+                    {currentRequest.pickup_otp}
+                  </Text>
+                  <Text style={styles.otpExpiry}>
+                    Valid until{" "}
+                    {new Date(currentRequest.pickup_otp_expiry).toLocaleString(
+                      "en-IN",
+                      {
+                        day: "numeric",
+                        month: "short",
+                        hour: "2-digit",
+                        minute: "2-digit",
+                      },
+                    )}
+                  </Text>
+                </View>
+              </View>
+            </View>
+          )}
+
+        {/* Cancellation Details Section */}
+        {currentRequest.status === "cancelled" && (
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>Cancellation Details</Text>
+            <View style={styles.cancellationBox}>
+              <View style={styles.cancellationHeader}>
+                <Ionicons name="close-circle" size={20} color={Colors.error} />
+                <Text style={styles.cancellationTitle}>
+                  Cancelled by{" "}
+                  {currentRequest.cancelled_by === "sender"
+                    ? "You"
+                    : "Traveller"}
+                </Text>
+              </View>
+              {currentRequest.rejection_reason && (
+                <Text style={styles.cancellationReason}>
+                  Reason: {currentRequest.rejection_reason}
+                </Text>
+              )}
+            </View>
+          </View>
+        )}
+
+        {/* Rejection Reason - only for rejected status */}
         {currentRequest.status === "rejected" &&
           currentRequest.rejection_reason && (
             <View style={styles.section}>
@@ -317,7 +503,10 @@ export default function RequestDetailsScreen() {
           )}
 
         {canCancel && (
-          <Pressable style={styles.cancelButton} onPress={handleCancel}>
+          <Pressable
+            style={styles.cancelButton}
+            onPress={() => setShowCancelModal(true)}
+          >
             <Ionicons name="close-circle" size={20} color={Colors.error} />
             <Text style={styles.cancelButtonText}>Cancel Request</Text>
           </Pressable>
@@ -325,9 +514,121 @@ export default function RequestDetailsScreen() {
 
         <View style={{ height: Spacing.xxxl }} />
       </ScrollView>
+
+      <CancelRequestModal
+        visible={showCancelModal}
+        onClose={() => setShowCancelModal(false)}
+        onCancel={handleCancel}
+        tripDepartureDate={currentRequest.trip?.departure_date || ""}
+      />
     </View>
   );
 }
+
+const cancelModalStyles = StyleSheet.create({
+  overlay: {
+    flex: 1,
+    backgroundColor: "rgba(0, 0, 0, 0.5)",
+    justifyContent: "center",
+    alignItems: "center",
+    padding: Spacing.lg,
+  },
+  modal: {
+    backgroundColor: Colors.background.primary,
+    borderRadius: BorderRadius.lg,
+    width: "100%",
+    maxWidth: 400,
+    overflow: "hidden",
+  },
+  header: {
+    alignItems: "center",
+    padding: Spacing.lg,
+    borderBottomWidth: 1,
+    borderBottomColor: Colors.border.default,
+  },
+  title: {
+    fontSize: Typography.sizes.xl,
+    fontWeight: Typography.weights.bold,
+    color: Colors.text.primary,
+    marginTop: Spacing.sm,
+  },
+  subtitle: {
+    fontSize: Typography.sizes.sm,
+    color: Colors.text.secondary,
+    textAlign: "center",
+    marginTop: Spacing.xs,
+  },
+  content: {
+    padding: Spacing.lg,
+  },
+  warningBox: {
+    flexDirection: "row",
+    gap: Spacing.sm,
+    backgroundColor: Colors.error + "10",
+    padding: Spacing.md,
+    borderRadius: BorderRadius.md,
+    borderWidth: 1,
+    borderColor: Colors.error + "30",
+  },
+  warningText: {
+    flex: 1,
+    fontSize: Typography.sizes.sm,
+    color: Colors.error,
+    lineHeight: Typography.sizes.sm * 1.5,
+  },
+  label: {
+    fontSize: Typography.sizes.sm,
+    fontWeight: Typography.weights.medium,
+    color: Colors.text.primary,
+    marginBottom: Spacing.xs,
+  },
+  input: {
+    backgroundColor: Colors.background.secondary,
+    borderRadius: BorderRadius.md,
+    borderWidth: 1,
+    borderColor: Colors.border.default,
+    padding: Spacing.md,
+    fontSize: Typography.sizes.md,
+    color: Colors.text.primary,
+    minHeight: 80,
+  },
+  hint: {
+    fontSize: Typography.sizes.xs,
+    color: Colors.text.tertiary,
+    marginTop: Spacing.xs,
+  },
+  actions: {
+    flexDirection: "row",
+    gap: Spacing.sm,
+    padding: Spacing.lg,
+    borderTopWidth: 1,
+    borderTopColor: Colors.border.default,
+  },
+  button: {
+    flex: 1,
+    paddingVertical: Spacing.md,
+    borderRadius: BorderRadius.md,
+    alignItems: "center",
+  },
+  backButton: {
+    backgroundColor: Colors.background.secondary,
+    borderWidth: 1,
+    borderColor: Colors.border.default,
+  },
+  backButtonText: {
+    fontSize: Typography.sizes.md,
+    fontWeight: Typography.weights.semibold,
+    color: Colors.text.secondary,
+  },
+  cancelButton: {
+    backgroundColor: Colors.error,
+  },
+  cancelButtonText: {
+    fontSize: Typography.sizes.md,
+    fontWeight: Typography.weights.semibold,
+    color: Colors.text.inverse,
+  },
+});
 
 const styles = StyleSheet.create({
   container: {
@@ -484,6 +785,67 @@ const styles = StyleSheet.create({
     fontSize: Typography.sizes.sm,
     fontWeight: Typography.weights.medium,
     color: Colors.primary,
+  },
+  // ✅ NEW: OTP Card Styles
+  otpCard: {
+    flexDirection: "row",
+    backgroundColor: Colors.primary + "10",
+    borderRadius: BorderRadius.md,
+    padding: Spacing.lg,
+    borderWidth: 2,
+    borderColor: Colors.primary + "30",
+    gap: Spacing.md,
+  },
+  otpIconContainer: {
+    width: 56,
+    height: 56,
+    backgroundColor: Colors.primary + "20",
+    borderRadius: BorderRadius.md,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  otpContent: {
+    flex: 1,
+    gap: Spacing.xs,
+  },
+  otpInstruction: {
+    fontSize: Typography.sizes.xs,
+    color: Colors.text.secondary,
+    fontWeight: Typography.weights.medium,
+  },
+  otpCode: {
+    fontSize: Typography.sizes.xxxl,
+    fontWeight: Typography.weights.bold,
+    color: Colors.primary,
+    letterSpacing: 4,
+  },
+  otpExpiry: {
+    fontSize: Typography.sizes.xs,
+    color: Colors.text.tertiary,
+  },
+  cancellationBox: {
+    backgroundColor: Colors.error + "10",
+    padding: Spacing.md,
+    borderRadius: BorderRadius.md,
+    borderWidth: 1,
+    borderColor: Colors.error + "30",
+    gap: Spacing.sm,
+  },
+  cancellationHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: Spacing.xs,
+  },
+  cancellationTitle: {
+    fontSize: Typography.sizes.sm,
+    fontWeight: Typography.weights.semibold,
+    color: Colors.error,
+  },
+  cancellationReason: {
+    fontSize: Typography.sizes.sm,
+    color: Colors.text.primary,
+    lineHeight: Typography.sizes.sm * 1.5,
+    paddingLeft: Spacing.xl,
   },
   rejectionBox: {
     flexDirection: "row",
