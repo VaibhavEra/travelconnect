@@ -427,25 +427,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     try {
       const currentEmail = get().user?.email;
 
-      const { error } = await supabase.auth.signOut();
-      if (error) throw error;
-
-      // Clear failed login attempts on logout
-      if (currentEmail) {
-        await get().clearFailedAttempts(currentEmail);
-        logger.info("Failed login attempts cleared on logout");
-      }
-
-      // Clean up auth subscription (FIXED)
-      if (authSubscription) {
-        authSubscription.unsubscribe();
-        authSubscription = null;
-      }
-
-      // Clear profile from profileStore
-      useProfileStore.getState().setProfile(null);
-
-      // FULL RESET (FIXED)
+      // Clear state IMMEDIATELY
       set({
         session: null,
         user: null,
@@ -453,9 +435,38 @@ export const useAuthStore = create<AuthState>((set, get) => ({
         flowContext: null,
         pendingVerification: null,
       });
+
+      // Clear profile from profileStore immediately
+      useProfileStore.getState().setProfile(null);
+
+      // Clean up auth subscription
+      if (authSubscription) {
+        authSubscription.unsubscribe();
+        authSubscription = null;
+      }
+
+      // THEN do async operations (moved after state clear)
+      const { error } = await supabase.auth.signOut();
+      if (error) {
+        logger.error("Sign out error (non-blocking)", error);
+      }
+
+      // Clear failed login attempts on logout
+      if (currentEmail) {
+        await get().clearFailedAttempts(currentEmail);
+        logger.info("Failed login attempts cleared on logout");
+      }
     } catch (error) {
       logger.error("Sign out failed", error);
-      throw error;
+      // Ensure state is cleared even on error
+      set({
+        session: null,
+        user: null,
+        flowState: AuthFlowState.UNAUTHENTICATED,
+        flowContext: null,
+        pendingVerification: null,
+      });
+      useProfileStore.getState().setProfile(null);
     }
   },
 

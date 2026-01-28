@@ -21,10 +21,16 @@ import { SafeAreaView } from "react-native-safe-area-context";
 
 export default function ProfileScreen() {
   const colors = useThemeColors();
-  const { user, signOut } = useAuthStore();
+  const user = useAuthStore((state) => state.user);
+  const { signOut } = useAuthStore();
   const profile = useProfileStore((state) => state.profile);
-  const { currentMode, switchMode } = useModeStore(); // FIXED: Use switchMode
+  const { currentMode, switchMode } = useModeStore();
   const [signingOut, setSigningOut] = useState(false);
+
+  // ADD THIS: Guard against null user during sign out
+  if (!user) {
+    return null;
+  }
 
   const handleSignOut = async () => {
     Alert.alert("Sign Out", "Are you sure you want to sign out?", [
@@ -55,7 +61,7 @@ export default function ProfileScreen() {
   const handleModeSwitch = async () => {
     haptics.selection();
     const newMode = currentMode === "sender" ? "traveller" : "sender";
-    await switchMode(newMode); // FIXED: Use switchMode with await
+    await switchMode(newMode);
   };
 
   return (
@@ -199,7 +205,7 @@ export default function ProfileScreen() {
           <InfoRow
             icon="mail"
             label="Email"
-            value={user?.email || ""}
+            value={user.email || ""}
             colors={colors}
           />
           <InfoRow
