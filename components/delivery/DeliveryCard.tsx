@@ -1,5 +1,8 @@
+import { REQUEST_STATUS_CONFIG, RequestStatus } from "@/lib/constants";
+import { formatDateShort } from "@/lib/utils/dateTime";
 import { ParcelRequest } from "@/stores/requestStore";
-import { BorderRadius, Colors, Spacing, Typography } from "@/styles";
+import { BorderRadius, Spacing, Typography, withOpacity } from "@/styles";
+import { useThemeColors } from "@/styles/theme";
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import { Image, Pressable, StyleSheet, Text, View } from "react-native";
@@ -10,49 +13,15 @@ interface DeliveryCardProps {
   onMarkDelivery?: (requestId: string) => void;
 }
 
-type RequestStatus =
-  | "pending"
-  | "accepted"
-  | "rejected"
-  | "picked_up"
-  | "delivered"
-  | "cancelled";
-
-const STATUS_COLORS: Record<RequestStatus, string> = {
-  pending: Colors.warning,
-  accepted: Colors.success,
-  rejected: Colors.error,
-  picked_up: Colors.primary,
-  delivered: Colors.success,
-  cancelled: Colors.text.tertiary,
-};
-
-const STATUS_LABELS: Record<RequestStatus, string> = {
-  pending: "Pending",
-  accepted: "Ready for Pickup",
-  rejected: "Rejected",
-  picked_up: "In Transit",
-  delivered: "Delivered",
-  cancelled: "Cancelled",
-};
-
 export default function DeliveryCard({
   request,
   onMarkPickup,
   onMarkDelivery,
 }: DeliveryCardProps) {
   const router = useRouter();
-
-  const formatDate = (date: string) => {
-    const d = new Date(date);
-    return d.toLocaleDateString("en-US", {
-      month: "short",
-      day: "numeric",
-    });
-  };
+  const colors = useThemeColors();
 
   const handlePress = () => {
-    // Navigate to incoming request details
     router.push({
       pathname: "/incoming-request-details/[id]" as any,
       params: { id: request.id },
@@ -60,8 +29,11 @@ export default function DeliveryCard({
   };
 
   const status = request.status as RequestStatus;
-  const statusColor = STATUS_COLORS[status] || Colors.text.secondary;
-  const statusLabel = STATUS_LABELS[status] || request.status;
+  const statusConfig = REQUEST_STATUS_CONFIG[status];
+  const statusColor = statusConfig
+    ? colors[statusConfig.colorKey]
+    : colors.text.secondary;
+  const statusLabel = statusConfig?.label || request.status;
 
   const showPickupButton = status === "accepted";
   const showDeliveryButton = status === "picked_up";
@@ -71,18 +43,22 @@ export default function DeliveryCard({
       <Pressable onPress={handlePress}>
         <View style={styles.header}>
           <View style={styles.routeInfo}>
-            <Text style={styles.cityText}>{request.trip?.source}</Text>
+            <Text style={[styles.cityText, { color: colors.text.primary }]}>
+              {request.trip?.source}
+            </Text>
             <Ionicons
               name="arrow-forward"
               size={14}
-              color={Colors.text.secondary}
+              color={colors.text.secondary}
             />
-            <Text style={styles.cityText}>{request.trip?.destination}</Text>
+            <Text style={[styles.cityText, { color: colors.text.primary }]}>
+              {request.trip?.destination}
+            </Text>
           </View>
           <View
             style={[
               styles.statusBadge,
-              { backgroundColor: statusColor + "20" },
+              { backgroundColor: withOpacity(statusColor, "medium") },
             ]}
           >
             <Text style={[styles.statusText, { color: statusColor }]}>
@@ -96,13 +72,26 @@ export default function DeliveryCard({
             {request.parcel_photos && request.parcel_photos.length > 0 && (
               <Image
                 source={{ uri: request.parcel_photos[0] }}
-                style={styles.thumbnail}
+                style={[
+                  styles.thumbnail,
+                  { backgroundColor: colors.background.primary },
+                ]}
               />
             )}
             {request.parcel_photos && request.parcel_photos.length > 1 && (
-              <View style={styles.photoCount}>
-                <Ionicons name="images" size={12} color={Colors.text.inverse} />
-                <Text style={styles.photoCountText}>
+              <View
+                style={[
+                  styles.photoCount,
+                  { backgroundColor: "rgba(0, 0, 0, 0.7)" },
+                ]}
+              >
+                <Ionicons name="images" size={12} color={colors.text.inverse} />
+                <Text
+                  style={[
+                    styles.photoCountText,
+                    { color: colors.text.inverse },
+                  ]}
+                >
                   {request.parcel_photos.length}
                 </Text>
               </View>
@@ -110,7 +99,10 @@ export default function DeliveryCard({
           </View>
 
           <View style={styles.details}>
-            <Text style={styles.description} numberOfLines={2}>
+            <Text
+              style={[styles.description, { color: colors.text.primary }]}
+              numberOfLines={2}
+            >
               {request.item_description}
             </Text>
 
@@ -119,9 +111,11 @@ export default function DeliveryCard({
                 <Ionicons
                   name="cube-outline"
                   size={14}
-                  color={Colors.text.secondary}
+                  color={colors.text.secondary}
                 />
-                <Text style={styles.metaText}>
+                <Text
+                  style={[styles.metaText, { color: colors.text.secondary }]}
+                >
                   {request.size.charAt(0).toUpperCase() + request.size.slice(1)}
                 </Text>
               </View>
@@ -130,9 +124,11 @@ export default function DeliveryCard({
                 <Ionicons
                   name="person-outline"
                   size={14}
-                  color={Colors.text.secondary}
+                  color={colors.text.secondary}
                 />
-                <Text style={styles.metaText}>
+                <Text
+                  style={[styles.metaText, { color: colors.text.secondary }]}
+                >
                   {request.sender?.full_name || "Sender"}
                 </Text>
               </View>
@@ -146,10 +142,12 @@ export default function DeliveryCard({
               <Ionicons
                 name="calendar-outline"
                 size={14}
-                color={Colors.text.tertiary}
+                color={colors.text.tertiary}
               />
-              <Text style={styles.tripDateText}>
-                {formatDate(request.trip.departure_date)}
+              <Text
+                style={[styles.tripDateText, { color: colors.text.tertiary }]}
+              >
+                {formatDateShort(request.trip.departure_date)}
               </Text>
             </View>
           )}
@@ -158,9 +156,11 @@ export default function DeliveryCard({
             <Ionicons
               name="location-outline"
               size={14}
-              color={Colors.text.tertiary}
+              color={colors.text.tertiary}
             />
-            <Text style={styles.receiverText}>
+            <Text
+              style={[styles.receiverText, { color: colors.text.tertiary }]}
+            >
               {request.delivery_contact_name}
             </Text>
           </View>
@@ -169,28 +169,47 @@ export default function DeliveryCard({
 
       {/* Action Buttons */}
       {(showPickupButton || showDeliveryButton) && (
-        <View style={styles.actionContainer}>
+        <View
+          style={[
+            styles.actionContainer,
+            { borderTopColor: colors.border.light },
+          ]}
+        >
           {showPickupButton && onMarkPickup && (
             <Pressable
-              style={[styles.actionButton, styles.pickupButton]}
+              style={[styles.actionButton, { backgroundColor: colors.primary }]}
               onPress={() => onMarkPickup(request.id)}
             >
-              <Ionicons name="cube" size={18} color={Colors.text.inverse} />
-              <Text style={styles.actionButtonText}>Mark as Picked Up</Text>
+              <Ionicons name="cube" size={18} color={colors.text.inverse} />
+              <Text
+                style={[
+                  styles.actionButtonText,
+                  { color: colors.text.inverse },
+                ]}
+              >
+                Mark as Picked Up
+              </Text>
             </Pressable>
           )}
 
           {showDeliveryButton && onMarkDelivery && (
             <Pressable
-              style={[styles.actionButton, styles.deliveryButton]}
+              style={[styles.actionButton, { backgroundColor: colors.success }]}
               onPress={() => onMarkDelivery(request.id)}
             >
               <Ionicons
                 name="checkmark-done"
                 size={18}
-                color={Colors.text.inverse}
+                color={colors.text.inverse}
               />
-              <Text style={styles.actionButtonText}>Mark as Delivered</Text>
+              <Text
+                style={[
+                  styles.actionButtonText,
+                  { color: colors.text.inverse },
+                ]}
+              >
+                Mark as Delivered
+              </Text>
             </Pressable>
           )}
         </View>
@@ -201,12 +220,12 @@ export default function DeliveryCard({
 
 const styles = StyleSheet.create({
   card: {
-    backgroundColor: Colors.background.secondary,
+    backgroundColor: "transparent", // Will use parent background
     borderRadius: BorderRadius.lg,
     padding: Spacing.md,
     marginBottom: Spacing.md,
     borderWidth: 1,
-    borderColor: Colors.border.default,
+    borderColor: "transparent", // Set dynamically in component
   },
   header: {
     flexDirection: "row",
@@ -223,7 +242,6 @@ const styles = StyleSheet.create({
   cityText: {
     fontSize: Typography.sizes.sm,
     fontWeight: Typography.weights.semibold,
-    color: Colors.text.primary,
   },
   statusBadge: {
     paddingHorizontal: Spacing.sm,
@@ -246,7 +264,6 @@ const styles = StyleSheet.create({
     width: 80,
     height: 80,
     borderRadius: BorderRadius.md,
-    backgroundColor: Colors.background.primary,
   },
   photoCount: {
     position: "absolute",
@@ -255,7 +272,6 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     gap: 2,
-    backgroundColor: "rgba(0,0,0,0.7)",
     paddingHorizontal: 6,
     paddingVertical: 2,
     borderRadius: BorderRadius.sm,
@@ -263,7 +279,6 @@ const styles = StyleSheet.create({
   photoCountText: {
     fontSize: 10,
     fontWeight: Typography.weights.semibold,
-    color: Colors.text.inverse,
   },
   details: {
     flex: 1,
@@ -271,7 +286,6 @@ const styles = StyleSheet.create({
   },
   description: {
     fontSize: Typography.sizes.sm,
-    color: Colors.text.primary,
     lineHeight: Typography.sizes.sm * 1.4,
     marginBottom: Spacing.xs,
   },
@@ -286,7 +300,6 @@ const styles = StyleSheet.create({
   },
   metaText: {
     fontSize: Typography.sizes.xs,
-    color: Colors.text.secondary,
   },
   footer: {
     flexDirection: "row",
@@ -294,7 +307,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     paddingTop: Spacing.sm,
     borderTopWidth: 1,
-    borderTopColor: Colors.border.light,
+    borderTopColor: "transparent", // Set dynamically
   },
   tripDate: {
     flexDirection: "row",
@@ -303,7 +316,6 @@ const styles = StyleSheet.create({
   },
   tripDateText: {
     fontSize: Typography.sizes.xs,
-    color: Colors.text.tertiary,
   },
   receiver: {
     flexDirection: "row",
@@ -312,13 +324,11 @@ const styles = StyleSheet.create({
   },
   receiverText: {
     fontSize: Typography.sizes.xs,
-    color: Colors.text.tertiary,
   },
   actionContainer: {
     marginTop: Spacing.sm,
     paddingTop: Spacing.sm,
     borderTopWidth: 1,
-    borderTopColor: Colors.border.light,
   },
   actionButton: {
     flexDirection: "row",
@@ -329,15 +339,8 @@ const styles = StyleSheet.create({
     borderRadius: BorderRadius.md,
     marginTop: Spacing.xs,
   },
-  pickupButton: {
-    backgroundColor: Colors.primary,
-  },
-  deliveryButton: {
-    backgroundColor: Colors.success,
-  },
   actionButtonText: {
     fontSize: Typography.sizes.sm,
     fontWeight: Typography.weights.semibold,
-    color: Colors.text.inverse,
   },
 });

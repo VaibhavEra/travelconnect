@@ -1,4 +1,5 @@
-import { BorderRadius, Colors, Spacing } from "@/styles";
+import { BorderRadius, Overlays, Spacing } from "@/styles";
+import { useThemeColors } from "@/styles/theme";
 import { Ionicons } from "@expo/vector-icons";
 import { useState } from "react";
 import {
@@ -20,6 +21,7 @@ interface PhotoGalleryProps {
 }
 
 export default function PhotoGallery({ photos }: PhotoGalleryProps) {
+  const colors = useThemeColors();
   const [currentIndex, setCurrentIndex] = useState(0);
   const [modalVisible, setModalVisible] = useState(false);
 
@@ -55,21 +57,31 @@ export default function PhotoGallery({ photos }: PhotoGalleryProps) {
         </ScrollView>
 
         {photos.length > 1 && (
-          <View style={styles.pagination}>
-            <Text style={styles.paginationText}>
+          <View
+            style={[
+              styles.pagination,
+              { backgroundColor: colors.background.overlay },
+            ]}
+          >
+            <Text
+              style={[styles.paginationText, { color: colors.text.inverse }]}
+            >
               {currentIndex + 1} / {photos.length}
             </Text>
           </View>
         )}
 
         <Pressable
-          style={styles.expandButton}
+          style={[
+            styles.expandButton,
+            { backgroundColor: colors.background.overlay },
+          ]}
           onPress={() => setModalVisible(true)}
         >
           <Ionicons
             name="expand-outline"
             size={20}
-            color={Colors.text.inverse}
+            color={colors.text.inverse}
           />
         </Pressable>
       </View>
@@ -81,12 +93,14 @@ export default function PhotoGallery({ photos }: PhotoGalleryProps) {
         animationType="fade"
         onRequestClose={() => setModalVisible(false)}
       >
-        <View style={styles.modalContainer}>
+        <View
+          style={[styles.modalContainer, { backgroundColor: Overlays.heavy }]}
+        >
           <Pressable
             style={styles.closeButton}
             onPress={() => setModalVisible(false)}
           >
-            <Ionicons name="close" size={32} color={Colors.text.inverse} />
+            <Ionicons name="close" size={32} color={colors.text.inverse} />
           </Pressable>
 
           <ScrollView
@@ -106,8 +120,18 @@ export default function PhotoGallery({ photos }: PhotoGalleryProps) {
             ))}
           </ScrollView>
 
-          <View style={styles.modalPagination}>
-            <Text style={styles.modalPaginationText}>
+          <View
+            style={[
+              styles.modalPagination,
+              { backgroundColor: colors.background.overlay },
+            ]}
+          >
+            <Text
+              style={[
+                styles.modalPaginationText,
+                { color: colors.text.inverse },
+              ]}
+            >
               {currentIndex + 1} / {photos.length}
             </Text>
           </View>
@@ -135,13 +159,11 @@ const styles = StyleSheet.create({
     position: "absolute",
     bottom: Spacing.sm,
     right: Spacing.lg + Spacing.sm,
-    backgroundColor: Colors.background.overlay,
     paddingHorizontal: Spacing.sm,
     paddingVertical: 4,
     borderRadius: BorderRadius.sm,
   },
   paginationText: {
-    color: Colors.text.inverse,
     fontSize: 12,
     fontWeight: "600",
   },
@@ -149,13 +171,11 @@ const styles = StyleSheet.create({
     position: "absolute",
     top: Spacing.sm,
     right: Spacing.lg + Spacing.sm,
-    backgroundColor: Colors.background.overlay,
     padding: Spacing.xs,
     borderRadius: BorderRadius.sm,
   },
   modalContainer: {
     flex: 1,
-    backgroundColor: "rgba(0, 0, 0, 0.95)",
   },
   closeButton: {
     position: "absolute",
@@ -180,13 +200,11 @@ const styles = StyleSheet.create({
     position: "absolute",
     bottom: 50,
     alignSelf: "center",
-    backgroundColor: Colors.background.overlay,
     paddingHorizontal: Spacing.md,
     paddingVertical: Spacing.sm,
     borderRadius: BorderRadius.md,
   },
   modalPaginationText: {
-    color: Colors.text.inverse,
     fontSize: 16,
     fontWeight: "600",
   },

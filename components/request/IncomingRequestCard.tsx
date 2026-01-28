@@ -1,7 +1,14 @@
+import { REQUEST_STATUS_CONFIG, RequestStatus } from "@/lib/constants";
 import { CATEGORY_CONFIG, SIZE_CONFIG } from "@/lib/constants/categories";
 import { haptics } from "@/lib/utils/haptics";
 import { ParcelRequest } from "@/stores/requestStore";
-import { BorderRadius, Spacing, Typography } from "@/styles";
+import {
+  Animations,
+  BorderRadius,
+  Spacing,
+  Typography,
+  withOpacity,
+} from "@/styles";
 import { useThemeColors } from "@/styles/theme";
 import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
@@ -16,61 +23,6 @@ interface IncomingRequestCardProps {
   request: ParcelRequest;
 }
 
-type RequestStatus =
-  | "pending"
-  | "accepted"
-  | "rejected"
-  | "picked_up"
-  | "delivered"
-  | "cancelled";
-
-const STATUS_CONFIG: Record<
-  RequestStatus,
-  {
-    label: string;
-    icon: keyof typeof Ionicons.glyphMap;
-    getColor: (colors: any) => string;
-    getBgColor: (colors: any) => string;
-  }
-> = {
-  pending: {
-    label: "Needs Review",
-    icon: "time",
-    getColor: (colors) => colors.warning,
-    getBgColor: (colors) => colors.warning + "15",
-  },
-  accepted: {
-    label: "Accepted",
-    icon: "checkmark-circle",
-    getColor: (colors) => colors.success,
-    getBgColor: (colors) => colors.success + "15",
-  },
-  rejected: {
-    label: "Rejected",
-    icon: "close-circle",
-    getColor: (colors) => colors.error,
-    getBgColor: (colors) => colors.error + "15",
-  },
-  picked_up: {
-    label: "Picked Up",
-    icon: "hand-left",
-    getColor: (colors) => colors.primary,
-    getBgColor: (colors) => colors.primary + "15",
-  },
-  delivered: {
-    label: "Delivered",
-    icon: "checkmark-done-circle",
-    getColor: (colors) => colors.success,
-    getBgColor: (colors) => colors.success + "15",
-  },
-  cancelled: {
-    label: "Cancelled",
-    icon: "ban",
-    getColor: (colors) => colors.text.tertiary,
-    getBgColor: (colors) => colors.text.tertiary + "15",
-  },
-};
-
 export default function IncomingRequestCard({
   request,
 }: IncomingRequestCardProps) {
@@ -83,11 +35,14 @@ export default function IncomingRequestCard({
   };
 
   const handlePressIn = () => {
-    scale.value = withSpring(0.97, { damping: 15 });
+    scale.value = withSpring(
+      Animations.scale.pressed,
+      Animations.spring.gentle,
+    );
   };
 
   const handlePressOut = () => {
-    scale.value = withSpring(1, { damping: 15 });
+    scale.value = withSpring(1, Animations.spring.gentle);
   };
 
   const animatedStyle = useAnimatedStyle(() => ({
@@ -95,9 +50,9 @@ export default function IncomingRequestCard({
   }));
 
   const status = request.status as RequestStatus;
-  const statusConfig = STATUS_CONFIG[status];
-  const statusColor = statusConfig.getColor(colors);
-  const statusBgColor = statusConfig.getBgColor(colors);
+  const statusConfig = REQUEST_STATUS_CONFIG[status];
+  const statusColor = colors[statusConfig.colorKey];
+  const statusBgColor = withOpacity(statusColor, "light");
 
   const categoryConfig =
     CATEGORY_CONFIG[request.category as keyof typeof CATEGORY_CONFIG];
@@ -112,7 +67,9 @@ export default function IncomingRequestCard({
           styles.card,
           {
             backgroundColor: colors.background.secondary,
-            borderColor: isPending ? statusColor + "40" : colors.border.default,
+            borderColor: isPending
+              ? withOpacity(statusColor, "strong")
+              : colors.border.default,
           },
           isPending && styles.pendingCard,
         ]}
@@ -208,7 +165,7 @@ export default function IncomingRequestCard({
                 <View
                   style={[
                     styles.tag,
-                    { backgroundColor: colors.primary + "10" },
+                    { backgroundColor: withOpacity(colors.primary, "subtle") },
                   ]}
                 >
                   <Ionicons
@@ -253,7 +210,7 @@ export default function IncomingRequestCard({
               <View
                 style={[
                   styles.senderIcon,
-                  { backgroundColor: colors.primary + "10" },
+                  { backgroundColor: withOpacity(colors.primary, "subtle") },
                 ]}
               >
                 <Ionicons name="person" size={12} color={colors.primary} />
@@ -277,7 +234,7 @@ export default function IncomingRequestCard({
               <View
                 style={[
                   styles.actionHint,
-                  { backgroundColor: statusColor + "15" },
+                  { backgroundColor: withOpacity(statusColor, "light") },
                 ]}
               >
                 <Text style={[styles.actionHintText, { color: statusColor }]}>

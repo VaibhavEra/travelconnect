@@ -1,28 +1,19 @@
+import {
+  TRANSPORT_CONFIG_WITH_ALL,
+  TransportModeWithAll,
+} from "@/lib/constants";
 import { haptics } from "@/lib/utils/haptics";
 import { useSearchStore } from "@/stores/searchStore";
-import { Trip } from "@/stores/tripStore";
-import { BorderRadius, Spacing, Typography } from "@/styles";
+import { BorderRadius, Spacing, Typography, withOpacity } from "@/styles";
 import { useThemeColors } from "@/styles/theme";
 import { Ionicons } from "@expo/vector-icons";
 import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
-
-const TRANSPORT_MODES: Array<{
-  value: Trip["transport_mode"] | "all";
-  label: string;
-  icon: keyof typeof Ionicons.glyphMap;
-}> = [
-  { value: "all", label: "All", icon: "apps" },
-  { value: "flight", label: "Flight", icon: "airplane" },
-  { value: "train", label: "Train", icon: "train" },
-  { value: "bus", label: "Bus", icon: "bus" },
-  { value: "car", label: "Car", icon: "car" },
-];
 
 export default function TransportModeFilter() {
   const colors = useThemeColors();
   const { filters, setFilters } = useSearchStore();
 
-  const handleModeSelect = (mode: Trip["transport_mode"] | "all") => {
+  const handleModeSelect = (mode: TransportModeWithAll) => {
     haptics.selection();
     setFilters({ transportMode: mode });
   };
@@ -38,12 +29,12 @@ export default function TransportModeFilter() {
         showsHorizontalScrollIndicator={false}
         contentContainerStyle={styles.scrollContent}
       >
-        {TRANSPORT_MODES.map((mode) => {
-          const isActive = filters.transportMode === mode.value;
+        {Object.entries(TRANSPORT_CONFIG_WITH_ALL).map(([mode, config]) => {
+          const isActive = filters.transportMode === mode;
 
           return (
             <Pressable
-              key={mode.value}
+              key={mode}
               style={({ pressed }) => [
                 styles.modeButton,
                 {
@@ -53,18 +44,17 @@ export default function TransportModeFilter() {
                   borderColor: isActive
                     ? colors.primary
                     : colors.border.default,
-                  // Android press state
                   opacity: pressed ? 0.7 : 1,
                 },
               ]}
-              onPress={() => handleModeSelect(mode.value)}
+              onPress={() => handleModeSelect(mode as TransportModeWithAll)}
               android_ripple={{
-                color: colors.primary + "30",
+                color: withOpacity(colors.primary, "medium"),
                 borderless: false,
               }}
             >
               <Ionicons
-                name={mode.icon}
+                name={config.icon}
                 size={20}
                 color={isActive ? colors.text.inverse : colors.text.secondary}
               />
@@ -81,7 +71,7 @@ export default function TransportModeFilter() {
                   },
                 ]}
               >
-                {mode.label}
+                {config.label}
               </Text>
             </Pressable>
           );
@@ -92,9 +82,7 @@ export default function TransportModeFilter() {
 }
 
 const styles = StyleSheet.create({
-  container: {
-    // No marginBottom - parent controls spacing
-  },
+  container: {},
   label: {
     fontSize: Typography.sizes.sm,
     fontWeight: Typography.weights.medium,
@@ -109,11 +97,10 @@ const styles = StyleSheet.create({
     alignItems: "center",
     gap: Spacing.xs,
     paddingHorizontal: Spacing.md,
-    paddingVertical: Spacing.sm + 2, // 10px
+    paddingVertical: Spacing.sm + 2,
     borderRadius: BorderRadius.lg,
     borderWidth: 1.5,
     minHeight: 40,
-    // Overflow hidden for ripple effect on Android
     overflow: "hidden",
   },
   modeText: {

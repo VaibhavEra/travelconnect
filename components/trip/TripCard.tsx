@@ -1,7 +1,20 @@
+import {
+  TRANSPORT_CONFIG,
+  TRIP_STATUS_CONFIG,
+  TripStatus,
+  UI,
+} from "@/lib/constants";
 import { CATEGORY_CONFIG } from "@/lib/constants/categories";
+import { formatDate, formatTime, isFuture } from "@/lib/utils/dateTime";
 import { haptics } from "@/lib/utils/haptics";
 import { Trip } from "@/stores/tripStore";
-import { BorderRadius, Spacing, Typography } from "@/styles";
+import {
+  Animations,
+  BorderRadius,
+  Spacing,
+  Typography,
+  withOpacity,
+} from "@/styles";
 import { useThemeColors } from "@/styles/theme";
 import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
@@ -16,89 +29,17 @@ interface TripCardProps {
   trip: Trip;
 }
 
-type TripStatus = "open" | "in_progress" | "completed" | "cancelled";
-
-const TRANSPORT_ICONS: Record<
-  Trip["transport_mode"],
-  keyof typeof Ionicons.glyphMap
-> = {
-  train: "train",
-  bus: "bus",
-  flight: "airplane",
-  car: "car",
-};
-
-const STATUS_CONFIG: Record<
-  TripStatus,
-  {
-    label: string;
-    icon: keyof typeof Ionicons.glyphMap;
-    getColor: (colors: any) => string;
-  }
-> = {
-  open: {
-    label: "Open",
-    icon: "checkmark-circle",
-    getColor: (colors) => colors.success,
-  },
-  in_progress: {
-    label: "In Progress",
-    icon: "time",
-    getColor: (colors) => colors.warning,
-  },
-  completed: {
-    label: "Completed",
-    icon: "checkmark-done-circle",
-    getColor: (colors) => colors.success,
-  },
-  cancelled: {
-    label: "Cancelled",
-    icon: "close-circle",
-    getColor: (colors) => colors.error,
-  },
-};
-
 export default function TripCard({ trip }: TripCardProps) {
   const colors = useThemeColors();
   const scale = useSharedValue(1);
 
-  const formatDate = (date: string) => {
-    const d = new Date(date);
-    const today = new Date();
-    const tomorrow = new Date(today);
-    tomorrow.setDate(tomorrow.getDate() + 1);
-
-    const isToday = d.toDateString() === today.toDateString();
-    const isTomorrow = d.toDateString() === tomorrow.toDateString();
-
-    if (isToday) return "Today";
-    if (isTomorrow) return "Tomorrow";
-
-    return d.toLocaleDateString("en-US", {
-      month: "short",
-      day: "numeric",
-    });
-  };
-
-  const formatTime = (time: string) => {
-    const [hours, minutes] = time.split(":");
-    const hour = parseInt(hours);
-    const ampm = hour >= 12 ? "PM" : "AM";
-    const displayHour = hour % 12 || 12;
-    return `${displayHour}:${minutes} ${ampm}`;
-  };
-
-  const isUpcoming = () => {
-    const now = new Date();
-    const departureDateTime = new Date(
-      `${trip.departure_date}T${trip.departure_time}`,
-    );
-    return departureDateTime > now && trip.status === "open";
-  };
+  const isUpcoming =
+    isFuture(trip.departure_date, trip.departure_time) &&
+    trip.status === "open";
 
   const renderSlots = () => {
     const slots = [];
-    const maxSlots = Math.min(trip.total_slots, 5);
+    const maxSlots = Math.min(trip.total_slots, UI.MAX_VISIBLE_SLOTS);
 
     for (let i = 0; i < maxSlots; i++) {
       const isAvailable = i < trip.available_slots;
@@ -110,7 +51,7 @@ export default function TripCard({ trip }: TripCardProps) {
             {
               backgroundColor: isAvailable
                 ? colors.success
-                : colors.text.tertiary + "40",
+                : withOpacity(colors.text.tertiary, "strong"),
             },
           ]}
         />,
@@ -125,7 +66,7 @@ export default function TripCard({ trip }: TripCardProps) {
   };
 
   const handlePressIn = () => {
-    scale.value = withSpring(0.98);
+    scale.value = withSpring(Animations.scale.card);
   };
 
   const handlePressOut = () => {
@@ -137,8 +78,8 @@ export default function TripCard({ trip }: TripCardProps) {
   }));
 
   const status = trip.status as TripStatus;
-  const statusConfig = STATUS_CONFIG[status];
-  const statusColor = statusConfig.getColor(colors);
+  const statusConfig = TRIP_STATUS_CONFIG[status];
+  const statusColor = colors[statusConfig.colorKey];
   const isCancelled = trip.status === "cancelled";
 
   return (
@@ -158,18 +99,21 @@ export default function TripCard({ trip }: TripCardProps) {
       >
         {/* Status Banner */}
         <View
-          style={[styles.statusBanner, { backgroundColor: statusColor + "15" }]}
+          style={[
+            styles.statusBanner,
+            { backgroundColor: withOpacity(statusColor, "light") },
+          ]}
         >
           <Ionicons name={statusConfig.icon} size={16} color={statusColor} />
           <Text style={[styles.statusText, { color: statusColor }]}>
             {statusConfig.label}
           </Text>
-          {isUpcoming() && (
+          {isUpcoming && (
             <>
               <View
                 style={[
                   styles.separator,
-                  { backgroundColor: statusColor + "30" },
+                  { backgroundColor: withOpacity(statusColor, "medium") },
                 ]}
               />
               <Ionicons name="time" size={14} color={statusColor} />
@@ -206,11 +150,11 @@ export default function TripCard({ trip }: TripCardProps) {
               <View
                 style={[
                   styles.transportIcon,
-                  { backgroundColor: colors.primary + "15" },
+                  { backgroundColor: withOpacity(colors.primary, "light") },
                 ]}
               >
                 <Ionicons
-                  name={TRANSPORT_ICONS[trip.transport_mode]}
+                  name={TRANSPORT_CONFIG[trip.transport_mode].icon}
                   size={18}
                   color={colors.primary}
                 />
@@ -255,26 +199,28 @@ export default function TripCard({ trip }: TripCardProps) {
 
             {/* Categories */}
             <View style={styles.categoriesContainer}>
-              {trip.allowed_categories.slice(0, 3).map((category) => {
-                const config =
-                  CATEGORY_CONFIG[category as keyof typeof CATEGORY_CONFIG];
-                return (
-                  <Ionicons
-                    key={category}
-                    name={config?.icon || "cube"}
-                    size={14}
-                    color={colors.text.tertiary}
-                  />
-                );
-              })}
-              {trip.allowed_categories.length > 3 && (
+              {trip.allowed_categories
+                .slice(0, UI.MAX_VISIBLE_CATEGORIES)
+                .map((category) => {
+                  const config =
+                    CATEGORY_CONFIG[category as keyof typeof CATEGORY_CONFIG];
+                  return (
+                    <Ionicons
+                      key={category}
+                      name={config?.icon || "cube"}
+                      size={14}
+                      color={colors.text.tertiary}
+                    />
+                  );
+                })}
+              {trip.allowed_categories.length > UI.MAX_VISIBLE_CATEGORIES && (
                 <Text
                   style={[
                     styles.moreCategoriesText,
                     { color: colors.text.tertiary },
                   ]}
                 >
-                  +{trip.allowed_categories.length - 3}
+                  +{trip.allowed_categories.length - UI.MAX_VISIBLE_CATEGORIES}
                 </Text>
               )}
             </View>

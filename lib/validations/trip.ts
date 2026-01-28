@@ -34,11 +34,13 @@ export const tripSchema = z
       message: "Please select a valid transport mode",
     }),
 
-    // Schedule
+    // Schedule - departure is required
     departure_date: z.string().min(1, "Departure date is required"),
     departure_time: z.string().min(1, "Departure time is required"),
-    arrival_date: z.string().min(1, "Arrival date is required"),
-    arrival_time: z.string().min(1, "Arrival time is required"),
+
+    // Arrival is optional (can be null or empty string)
+    arrival_date: z.string().nullable(),
+    arrival_time: z.string().nullable(),
 
     // Capacity
     total_slots: z
@@ -66,6 +68,11 @@ export const tripSchema = z
   })
   .refine(
     (data) => {
+      // Only validate arrival if both date and time are provided
+      if (!data.arrival_date || !data.arrival_time) {
+        return true; // Skip validation if arrival not set
+      }
+
       // Validate arrival is after departure
       const departureDateTime = new Date(
         `${data.departure_date}T${data.departure_time}`,
@@ -77,15 +84,12 @@ export const tripSchema = z
     },
     {
       message: "Arrival must be after departure",
-      path: ["arrival_date"], // Show error on arrival_date field
+      path: ["arrival_date"],
     },
   )
   .refine(
     (data) => {
-      // ============================================================================
-      // UPDATED: Validate departure is not in the past (5-minute grace period)
-      // Matches server-side validation in validate_trip_dates()
-      // ============================================================================
+      // Validate departure is not in the past (5-minute grace period)
       const departureDateTime = new Date(
         `${data.departure_date}T${data.departure_time}`,
       );
@@ -96,6 +100,19 @@ export const tripSchema = z
     {
       message: "Departure cannot be in the past",
       path: ["departure_date"],
+    },
+  )
+  .refine(
+    (data) => {
+      // Ensure source and destination are different
+      return (
+        data.source.toLowerCase().trim() !==
+        data.destination.toLowerCase().trim()
+      );
+    },
+    {
+      message: "Source and destination must be different",
+      path: ["destination"],
     },
   );
 
@@ -113,14 +130,14 @@ export const formatTripForDatabase = (
     transport_mode: data.transport_mode,
     departure_date: data.departure_date,
     departure_time: data.departure_time,
-    arrival_date: data.arrival_date,
-    arrival_time: data.arrival_time,
+    arrival_date: data.arrival_date || null,
+    arrival_time: data.arrival_time || null,
     total_slots: data.total_slots,
     available_slots: data.total_slots,
     allowed_categories: data.allowed_categories,
     pnr_number: data.pnr_number.trim(),
     ticket_file_url: data.ticket_file_url,
-    notes: data.notes || null, // Still optional
+    notes: data.notes || null,
     status: "open" as const,
   };
 };

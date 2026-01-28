@@ -1,7 +1,15 @@
+import {
+  REQUEST_STATUS_CONFIG,
+  RequestStatus,
+  TRANSPORT_CONFIG,
+  TransportMode,
+} from "@/lib/constants";
+
 import { CATEGORY_CONFIG, SIZE_CONFIG } from "@/lib/constants/categories";
+import { formatDate, formatTime } from "@/lib/utils/dateTime";
 import { haptics } from "@/lib/utils/haptics";
 import { ParcelRequest } from "@/stores/requestStore";
-import { BorderRadius, Spacing, Typography } from "@/styles";
+import { BorderRadius, Spacing, Typography, withOpacity } from "@/styles";
 import { useThemeColors } from "@/styles/theme";
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
@@ -16,91 +24,10 @@ interface RequestCardProps {
   request: ParcelRequest;
 }
 
-type RequestStatus =
-  | "pending"
-  | "accepted"
-  | "rejected"
-  | "picked_up"
-  | "delivered"
-  | "cancelled";
-
-const STATUS_CONFIG: Record<
-  RequestStatus,
-  {
-    label: string;
-    icon: keyof typeof Ionicons.glyphMap;
-    getColor: (colors: any) => string;
-  }
-> = {
-  pending: {
-    label: "Pending",
-    icon: "time",
-    getColor: (colors) => colors.warning,
-  },
-  accepted: {
-    label: "Accepted",
-    icon: "checkmark-circle",
-    getColor: (colors) => colors.success,
-  },
-  rejected: {
-    label: "Rejected",
-    icon: "close-circle",
-    getColor: (colors) => colors.error,
-  },
-  picked_up: {
-    label: "Picked Up",
-    icon: "hand-left",
-    getColor: (colors) => colors.primary,
-  },
-  delivered: {
-    label: "Delivered",
-    icon: "checkmark-done-circle",
-    getColor: (colors) => colors.success,
-  },
-  cancelled: {
-    label: "Cancelled",
-    icon: "ban",
-    getColor: (colors) => colors.text.tertiary,
-  },
-};
-
-const TRANSPORT_ICONS: Record<string, keyof typeof Ionicons.glyphMap> = {
-  flight: "airplane",
-  train: "train",
-  bus: "bus",
-};
-
 export default function RequestCard({ request }: RequestCardProps) {
   const colors = useThemeColors();
   const router = useRouter();
   const scale = useSharedValue(1);
-
-  const formatDate = (date: string) => {
-    const d = new Date(date);
-    const today = new Date();
-    const tomorrow = new Date(today);
-    tomorrow.setDate(tomorrow.getDate() + 1);
-
-    const isToday = d.toDateString() === today.toDateString();
-    const isTomorrow = d.toDateString() === tomorrow.toDateString();
-
-    if (isToday) return "Today";
-    if (isTomorrow) return "Tomorrow";
-
-    return d.toLocaleDateString("en-US", {
-      weekday: "short",
-      month: "short",
-      day: "numeric",
-    });
-  };
-
-  const formatTime = (time: string) => {
-    const [hours, minutes] = time.split(":");
-    const hour = parseInt(hours);
-    const ampm = hour >= 12 ? "PM" : "AM";
-    const displayHour = hour % 12 || 12;
-    return `${displayHour}:${minutes} ${ampm}`;
-  };
 
   const handlePress = () => {
     haptics.light();
@@ -120,8 +47,8 @@ export default function RequestCard({ request }: RequestCardProps) {
   }));
 
   const status = request.status as RequestStatus;
-  const statusConfig = STATUS_CONFIG[status] || STATUS_CONFIG.pending;
-  const statusColor = statusConfig.getColor(colors);
+  const statusConfig = REQUEST_STATUS_CONFIG[status];
+  const statusColor = colors[statusConfig.colorKey];
 
   const isCancelled =
     request.status === "cancelled" || request.status === "rejected";
@@ -147,7 +74,10 @@ export default function RequestCard({ request }: RequestCardProps) {
       >
         {/* Status Banner */}
         <View
-          style={[styles.statusBanner, { backgroundColor: statusColor + "15" }]}
+          style={[
+            styles.statusBanner,
+            { backgroundColor: withOpacity(statusColor, "light") },
+          ]}
         >
           <Ionicons name={statusConfig.icon} size={16} color={statusColor} />
           <Text style={[styles.statusText, { color: statusColor }]}>
@@ -175,13 +105,14 @@ export default function RequestCard({ request }: RequestCardProps) {
                 <View
                   style={[
                     styles.transportIcon,
-                    { backgroundColor: colors.primary + "15" },
+                    { backgroundColor: withOpacity(colors.primary, "light") },
                   ]}
                 >
                   <Ionicons
                     name={
-                      TRANSPORT_ICONS[request.trip.transport_mode] ||
-                      "arrow-forward"
+                      TRANSPORT_CONFIG[
+                        request.trip.transport_mode as TransportMode
+                      ]?.icon || "arrow-forward"
                     }
                     size={16}
                     color={colors.primary}
@@ -257,7 +188,7 @@ export default function RequestCard({ request }: RequestCardProps) {
             <View
               style={[
                 styles.detailChip,
-                { backgroundColor: colors.primary + "10" },
+                { backgroundColor: withOpacity(colors.primary, "subtle") },
               ]}
             >
               <Ionicons

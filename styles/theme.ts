@@ -180,3 +180,75 @@ export const Layout = {
   contentMaxWidth: 600,
   minTouchSize: 44,
 } as const;
+
+// styles/theme.ts
+// ... (keep all existing code above)
+
+// NEW: Opacity/Alpha values for consistent transparency
+export const Opacity = {
+  transparent: "00",
+  subtle: "10",
+  light: "15",
+  medium: "30",
+  strong: "40",
+} as const;
+
+// NEW: Helper function to add opacity to hex colors
+export const withOpacity = (
+  color: string,
+  opacity: keyof typeof Opacity,
+): string => {
+  return color + Opacity[opacity];
+};
+
+// NEW: Modal overlay colors
+export const Overlays = {
+  light: "rgba(0, 0, 0, 0.5)",
+  dark: "rgba(0, 0, 0, 0.7)",
+  heavy: "rgba(0, 0, 0, 0.95)",
+} as const;
+
+// NEW: Animation configs for consistent motion
+export const Animations = {
+  spring: {
+    gentle: { damping: 15, stiffness: 150 },
+    default: { damping: 20, stiffness: 200 },
+    bouncy: { damping: 12, stiffness: 180 },
+  },
+  timing: {
+    fast: 150,
+    normal: 250,
+    slow: 350,
+  },
+  scale: {
+    pressed: 0.97,
+    card: 0.98,
+  },
+} as const;
+
+// NEW: Common dimensions
+export const Dimensions = {
+  icons: {
+    xs: 12,
+    sm: 14,
+    md: 16,
+    lg: 18,
+    xl: 20,
+    xxl: 24,
+  },
+  avatars: {
+    sm: 28,
+    md: 36,
+    lg: 48,
+    xl: 64,
+  },
+  touchTarget: {
+    min: 44, // iOS minimum
+    comfortable: 48,
+  },
+  slots: {
+    dotSize: 12,
+    dotRadius: 6,
+    maxVisible: 5,
+  },
+} as const;

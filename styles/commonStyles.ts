@@ -2,223 +2,240 @@
 import { StyleSheet } from "react-native";
 import {
   BorderRadius,
-  Colors,
   Layout,
   Shadows,
   Spacing,
   Typography,
+  useThemeColors,
 } from "./theme";
 
-export const commonStyles = StyleSheet.create({
-  // LAYOUT
-  container: {
-    flex: 1,
-    backgroundColor: Colors.background.primary,
-  },
+/**
+ * Factory function that creates theme-aware common styles
+ * This allows styles to respond to dark/light mode changes
+ */
+export const createCommonStyles = (
+  colors: ReturnType<typeof useThemeColors>,
+) => {
+  return StyleSheet.create({
+    // LAYOUT
+    container: {
+      flex: 1,
+      backgroundColor: colors.background.primary,
+    },
 
-  contentContainer: {
-    flex: 1,
-    padding: Layout.screenPadding,
-  },
+    contentContainer: {
+      flex: 1,
+      padding: Layout.screenPadding,
+    },
 
-  scrollContent: {
-    flexGrow: 1,
-  },
+    scrollContent: {
+      flexGrow: 1,
+    },
 
-  centerContent: {
-    flex: 1,
-    justifyContent: "center",
-    alignItems: "center",
-  },
+    centerContent: {
+      flex: 1,
+      justifyContent: "center",
+      alignItems: "center",
+    },
 
-  row: {
-    flexDirection: "row",
-    alignItems: "center",
-  },
+    row: {
+      flexDirection: "row",
+      alignItems: "center",
+    },
 
-  rowBetween: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-  },
+    rowBetween: {
+      flexDirection: "row",
+      justifyContent: "space-between",
+      alignItems: "center",
+    },
 
-  // CARDS & SURFACES
-  card: {
-    backgroundColor: Colors.background.primary,
-    borderRadius: BorderRadius.md,
-    padding: Spacing.md,
-    ...Shadows.md,
-  },
+    // CARDS & SURFACES
+    card: {
+      backgroundColor: colors.background.primary,
+      borderRadius: BorderRadius.md,
+      padding: Spacing.md,
+      ...Shadows.md,
+    },
 
-  cardFlat: {
-    backgroundColor: Colors.background.secondary,
-    borderRadius: BorderRadius.md,
-    padding: Spacing.md,
-  },
+    cardFlat: {
+      backgroundColor: colors.background.secondary,
+      borderRadius: BorderRadius.md,
+      padding: Spacing.md,
+    },
 
-  infoBox: {
-    flexDirection: "row",
-    alignItems: "flex-start",
-    backgroundColor: Colors.background.secondary,
-    padding: Spacing.sm + 4,
-    borderRadius: BorderRadius.md,
-    gap: Spacing.sm,
-  },
+    infoBox: {
+      flexDirection: "row",
+      alignItems: "flex-start",
+      backgroundColor: colors.background.secondary,
+      padding: Spacing.sm + 4,
+      borderRadius: BorderRadius.md,
+      gap: Spacing.sm,
+    },
 
-  // TYPOGRAPHY
-  title: {
-    fontSize: Typography.sizes.xxxl,
-    fontWeight: Typography.weights.bold,
-    color: Colors.text.primary,
-  },
+    // TYPOGRAPHY
+    title: {
+      fontSize: Typography.sizes.xxxl,
+      fontWeight: Typography.weights.bold,
+      color: colors.text.primary,
+    },
 
-  heading: {
-    fontSize: Typography.sizes.xl,
-    fontWeight: Typography.weights.semibold,
-    color: Colors.text.primary,
-  },
+    heading: {
+      fontSize: Typography.sizes.xl,
+      fontWeight: Typography.weights.semibold,
+      color: colors.text.primary,
+    },
 
-  subheading: {
-    fontSize: Typography.sizes.lg,
-    fontWeight: Typography.weights.semibold,
-    color: Colors.text.primary,
-  },
+    subheading: {
+      fontSize: Typography.sizes.lg,
+      fontWeight: Typography.weights.semibold,
+      color: colors.text.primary,
+    },
 
-  body: {
-    fontSize: Typography.sizes.md,
-    fontWeight: Typography.weights.normal,
-    color: Colors.text.primary,
-  },
+    body: {
+      fontSize: Typography.sizes.md,
+      fontWeight: Typography.weights.normal,
+      color: colors.text.primary,
+    },
 
-  bodySecondary: {
-    fontSize: Typography.sizes.md,
-    fontWeight: Typography.weights.normal,
-    color: Colors.text.secondary,
-  },
+    bodySecondary: {
+      fontSize: Typography.sizes.md,
+      fontWeight: Typography.weights.normal,
+      color: colors.text.secondary,
+    },
 
-  caption: {
-    fontSize: Typography.sizes.sm,
-    fontWeight: Typography.weights.normal,
-    color: Colors.text.secondary,
-  },
+    caption: {
+      fontSize: Typography.sizes.sm,
+      fontWeight: Typography.weights.normal,
+      color: colors.text.secondary,
+    },
 
-  small: {
-    fontSize: Typography.sizes.xs,
-    fontWeight: Typography.weights.normal,
-    color: Colors.text.tertiary,
-  },
+    small: {
+      fontSize: Typography.sizes.xs,
+      fontWeight: Typography.weights.normal,
+      color: colors.text.tertiary,
+    },
 
-  // BUTTONS
-  button: {
-    paddingVertical: Spacing.md,
-    paddingHorizontal: Spacing.lg,
-    borderRadius: BorderRadius.md,
-    alignItems: "center",
-    justifyContent: "center",
-    minHeight: Layout.minTouchSize,
-  },
+    // BUTTONS
+    button: {
+      paddingVertical: Spacing.md,
+      paddingHorizontal: Spacing.lg,
+      borderRadius: BorderRadius.md,
+      alignItems: "center",
+      justifyContent: "center",
+      minHeight: Layout.minTouchSize,
+    },
 
-  buttonPrimary: {
-    backgroundColor: Colors.primary,
-  },
+    buttonPrimary: {
+      backgroundColor: colors.primary,
+    },
 
-  buttonSecondary: {
-    backgroundColor: Colors.secondary,
-  },
+    buttonSecondary: {
+      backgroundColor: colors.secondary,
+    },
 
-  buttonSuccess: {
-    backgroundColor: Colors.success,
-  },
+    buttonSuccess: {
+      backgroundColor: colors.success,
+    },
 
-  buttonError: {
-    backgroundColor: Colors.error,
-  },
+    buttonError: {
+      backgroundColor: colors.error,
+    },
 
-  buttonOutline: {
-    backgroundColor: "transparent",
-    borderWidth: 1,
-    borderColor: Colors.border.default,
-  },
+    buttonOutline: {
+      backgroundColor: "transparent",
+      borderWidth: 1,
+      borderColor: colors.border.default,
+    },
 
-  buttonDisabled: {
-    opacity: 0.6,
-  },
+    buttonDisabled: {
+      opacity: 0.6,
+    },
 
-  buttonText: {
-    fontSize: Typography.sizes.md,
-    fontWeight: Typography.weights.semibold,
-    color: Colors.text.inverse,
-  },
+    buttonText: {
+      fontSize: Typography.sizes.md,
+      fontWeight: Typography.weights.semibold,
+      color: colors.text.inverse,
+    },
 
-  buttonTextOutline: {
-    color: Colors.text.primary,
-  },
+    buttonTextOutline: {
+      color: colors.text.primary,
+    },
 
-  // INPUTS
-  inputContainer: {
-    marginBottom: Spacing.md,
-  },
+    // INPUTS
+    inputContainer: {
+      marginBottom: Spacing.md,
+    },
 
-  inputLabel: {
-    fontSize: Typography.sizes.sm,
-    fontWeight: Typography.weights.semibold,
-    color: Colors.text.primary,
-    marginBottom: Spacing.sm,
-  },
+    inputLabel: {
+      fontSize: Typography.sizes.sm,
+      fontWeight: Typography.weights.semibold,
+      color: colors.text.primary,
+      marginBottom: Spacing.sm,
+    },
 
-  input: {
-    borderWidth: 1,
-    borderColor: Colors.border.default,
-    borderRadius: BorderRadius.md,
-    paddingHorizontal: Spacing.md,
-    paddingVertical: Spacing.sm + 6,
-    fontSize: Typography.sizes.md,
-    backgroundColor: Colors.background.primary,
-    color: Colors.text.primary,
-  },
+    input: {
+      borderWidth: 1,
+      borderColor: colors.border.default,
+      borderRadius: BorderRadius.md,
+      paddingHorizontal: Spacing.md,
+      paddingVertical: Spacing.sm + 6,
+      fontSize: Typography.sizes.md,
+      backgroundColor: colors.background.primary,
+      color: colors.text.primary,
+    },
 
-  inputFocused: {
-    borderColor: Colors.border.focus,
-    borderWidth: 2,
-  },
+    inputFocused: {
+      borderColor: colors.border.focus,
+      borderWidth: 2,
+    },
 
-  inputError: {
-    borderColor: Colors.border.error,
-  },
+    inputError: {
+      borderColor: colors.border.error,
+    },
 
-  inputErrorText: {
-    color: Colors.error,
-    fontSize: Typography.sizes.xs,
-    marginTop: Spacing.xs,
-  },
+    inputErrorText: {
+      color: colors.error,
+      fontSize: Typography.sizes.xs,
+      marginTop: Spacing.xs,
+    },
 
-  // MISC
-  divider: {
-    height: 1,
-    backgroundColor: Colors.border.light,
-    marginVertical: Spacing.md,
-  },
+    // MISC
+    divider: {
+      height: 1,
+      backgroundColor: colors.border.light,
+      marginVertical: Spacing.md,
+    },
 
-  badge: {
-    paddingHorizontal: Spacing.sm,
-    paddingVertical: Spacing.xs,
-    borderRadius: BorderRadius.full,
-    backgroundColor: Colors.primary,
-  },
+    badge: {
+      paddingHorizontal: Spacing.sm,
+      paddingVertical: Spacing.xs,
+      borderRadius: BorderRadius.full,
+      backgroundColor: colors.primary,
+    },
 
-  badgeText: {
-    color: Colors.text.inverse,
-    fontSize: Typography.sizes.xs,
-    fontWeight: Typography.weights.semibold,
-  },
+    badgeText: {
+      color: colors.text.inverse,
+      fontSize: Typography.sizes.xs,
+      fontWeight: Typography.weights.semibold,
+    },
 
-  link: {
-    color: Colors.primary,
-    fontWeight: Typography.weights.semibold,
-  },
+    link: {
+      color: colors.primary,
+      fontWeight: Typography.weights.semibold,
+    },
 
-  overlay: {
-    ...StyleSheet.absoluteFillObject,
-    backgroundColor: Colors.overlay,
-  },
-});
+    overlay: {
+      ...StyleSheet.absoluteFillObject,
+      backgroundColor: colors.overlay,
+    },
+  });
+};
+
+/**
+ * Hook to get theme-aware common styles
+ * Use this in your components instead of importing commonStyles directly
+ */
+export const useCommonStyles = () => {
+  const colors = useThemeColors();
+  return createCommonStyles(colors);
+};

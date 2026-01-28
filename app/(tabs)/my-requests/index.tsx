@@ -1,4 +1,5 @@
 import RequestCard from "@/components/request/RequestCard";
+import FilterChip from "@/components/shared/FilterChip";
 import ModeSwitcher from "@/components/shared/ModeSwitcher";
 import { haptics } from "@/lib/utils/haptics";
 import { useAuthStore } from "@/stores/authStore";
@@ -10,7 +11,6 @@ import { useFocusEffect } from "expo-router";
 import { useCallback, useState } from "react";
 import {
   ActivityIndicator,
-  Pressable,
   RefreshControl,
   ScrollView,
   StyleSheet,
@@ -224,14 +224,14 @@ export default function MyRequestsScreen() {
               return (
                 <FilterChip
                   key={filterConfig.key}
-                  config={filterConfig}
+                  label={filterConfig.label}
+                  icon={filterConfig.icon}
                   count={count}
                   active={isActive}
                   onPress={() => {
                     haptics.selection();
                     setFilter(filterConfig.key);
                   }}
-                  colors={colors}
                 />
               );
             })}
@@ -283,77 +283,6 @@ export default function MyRequestsScreen() {
         <View style={{ height: Spacing.xxxl }} />
       </ScrollView>
     </SafeAreaView>
-  );
-}
-
-function FilterChip({
-  config,
-  count,
-  active,
-  onPress,
-  colors,
-}: {
-  config: (typeof FILTER_CONFIG)[0];
-  count: number;
-  active: boolean;
-  onPress: () => void;
-  colors: any;
-}) {
-  return (
-    <Pressable
-      style={[
-        styles.filterChip,
-        {
-          backgroundColor: active
-            ? colors.primary
-            : colors.background.secondary,
-          borderColor: active ? colors.primary : colors.border.default,
-        },
-      ]}
-      onPress={onPress}
-    >
-      <Ionicons
-        name={config.icon}
-        size={16}
-        color={active ? colors.text.inverse : colors.text.secondary}
-      />
-      <Text
-        style={[
-          styles.filterChipText,
-          {
-            color: active ? colors.text.inverse : colors.text.secondary,
-            fontWeight: active
-              ? Typography.weights.semibold
-              : Typography.weights.medium,
-          },
-        ]}
-      >
-        {config.label}
-      </Text>
-      {count > 0 && (
-        <View
-          style={[
-            styles.filterCount,
-            {
-              backgroundColor: active
-                ? colors.text.inverse + "20"
-                : colors.primary + "15",
-            },
-          ]}
-        >
-          <Text
-            style={[
-              styles.filterCountText,
-              {
-                color: active ? colors.text.inverse : colors.primary,
-              },
-            ]}
-          >
-            {count}
-          </Text>
-        </View>
-      )}
-    </Pressable>
   );
 }
 
@@ -420,29 +349,6 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     gap: Spacing.sm,
     paddingVertical: Spacing.xs,
-  },
-  filterChip: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: Spacing.xs,
-    paddingHorizontal: Spacing.md,
-    paddingVertical: Spacing.sm,
-    borderRadius: BorderRadius.full,
-    borderWidth: 1.5,
-  },
-  filterChipText: {
-    fontSize: Typography.sizes.sm,
-  },
-  filterCount: {
-    paddingHorizontal: 7,
-    paddingVertical: 2,
-    borderRadius: BorderRadius.full,
-    minWidth: 22,
-    alignItems: "center",
-  },
-  filterCountText: {
-    fontSize: 11,
-    fontWeight: Typography.weights.bold,
   },
   emptyState: {
     alignItems: "center",

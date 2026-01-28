@@ -1,6 +1,9 @@
+import { TRANSPORT_CONFIG, UI } from "@/lib/constants";
+import { formatDate, formatTime } from "@/lib/utils/dateTime";
 import { haptics } from "@/lib/utils/haptics";
+import { capitalize } from "@/lib/utils/string";
 import { Trip } from "@/stores/tripStore";
-import { BorderRadius, Spacing, Typography } from "@/styles";
+import { BorderRadius, Spacing, Typography, withOpacity } from "@/styles";
 import { useThemeColors } from "@/styles/theme";
 import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
@@ -10,42 +13,8 @@ interface AvailableTripCardProps {
   trip: Trip;
 }
 
-const TRANSPORT_ICONS: Record<
-  Trip["transport_mode"],
-  keyof typeof Ionicons.glyphMap
-> = {
-  train: "train",
-  bus: "bus",
-  flight: "airplane",
-  car: "car",
-};
-
-const TRANSPORT_LABELS: Record<Trip["transport_mode"], string> = {
-  train: "Train",
-  bus: "Bus",
-  flight: "Flight",
-  car: "Car",
-};
-
 export default function AvailableTripCard({ trip }: AvailableTripCardProps) {
   const colors = useThemeColors();
-
-  const formatDate = (date: string) => {
-    const d = new Date(date);
-    return d.toLocaleDateString("en-US", {
-      weekday: "short",
-      day: "numeric",
-      month: "short",
-    });
-  };
-
-  const formatTime = (time: string) => {
-    const [hours, minutes] = time.split(":");
-    const hour = parseInt(hours);
-    const ampm = hour >= 12 ? "PM" : "AM";
-    const displayHour = hour % 12 || 12;
-    return `${displayHour}:${minutes} ${ampm}`;
-  };
 
   const handlePress = () => {
     haptics.light();
@@ -58,7 +27,7 @@ export default function AvailableTripCard({ trip }: AvailableTripCardProps) {
   // Render slot dots (max 5)
   const renderSlots = () => {
     const slots = [];
-    const maxSlots = Math.min(trip.total_slots, 5);
+    const maxSlots = Math.min(trip.total_slots, UI.MAX_VISIBLE_SLOTS);
 
     for (let i = 0; i < maxSlots; i++) {
       const isAvailable = i < trip.available_slots;
@@ -70,7 +39,7 @@ export default function AvailableTripCard({ trip }: AvailableTripCardProps) {
             {
               backgroundColor: isAvailable
                 ? colors.success
-                : colors.text.tertiary + "40",
+                : withOpacity(colors.text.tertiary, "strong"),
             },
           ]}
         />,
@@ -95,20 +64,20 @@ export default function AvailableTripCard({ trip }: AvailableTripCardProps) {
       <View
         style={[
           styles.transportHeader,
-          { backgroundColor: colors.primary + "10" },
+          { backgroundColor: withOpacity(colors.primary, "subtle") },
         ]}
       >
         <View
           style={[styles.transportBadge, { backgroundColor: colors.primary }]}
         >
           <Ionicons
-            name={TRANSPORT_ICONS[trip.transport_mode]}
+            name={TRANSPORT_CONFIG[trip.transport_mode].icon}
             size={20}
             color={colors.text.inverse}
           />
         </View>
         <Text style={[styles.transportLabel, { color: colors.primary }]}>
-          {TRANSPORT_LABELS[trip.transport_mode]}
+          {TRANSPORT_CONFIG[trip.transport_mode].label}
         </Text>
       </View>
 
@@ -170,28 +139,32 @@ export default function AvailableTripCard({ trip }: AvailableTripCardProps) {
             Allowed Items
           </Text>
           <View style={styles.categoriesRow}>
-            {trip.allowed_categories.slice(0, 3).map((cat) => (
+            {trip.allowed_categories
+              .slice(0, UI.MAX_VISIBLE_CATEGORIES)
+              .map((cat) => (
+                <View
+                  key={cat}
+                  style={[
+                    styles.categoryChip,
+                    { backgroundColor: withOpacity(colors.primary, "subtle") },
+                  ]}
+                >
+                  <Text
+                    style={[styles.categoryText, { color: colors.primary }]}
+                  >
+                    {capitalize(cat)}
+                  </Text>
+                </View>
+              ))}
+            {trip.allowed_categories.length > UI.MAX_VISIBLE_CATEGORIES && (
               <View
-                key={cat}
                 style={[
                   styles.categoryChip,
-                  { backgroundColor: colors.primary + "10" },
+                  { backgroundColor: withOpacity(colors.primary, "subtle") },
                 ]}
               >
                 <Text style={[styles.categoryText, { color: colors.primary }]}>
-                  {cat.charAt(0).toUpperCase() + cat.slice(1)}
-                </Text>
-              </View>
-            ))}
-            {trip.allowed_categories.length > 3 && (
-              <View
-                style={[
-                  styles.categoryChip,
-                  { backgroundColor: colors.primary + "10" },
-                ]}
-              >
-                <Text style={[styles.categoryText, { color: colors.primary }]}>
-                  +{trip.allowed_categories.length - 3}
+                  +{trip.allowed_categories.length - UI.MAX_VISIBLE_CATEGORIES}
                 </Text>
               </View>
             )}

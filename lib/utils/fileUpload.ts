@@ -1,14 +1,6 @@
+import { FILE_UPLOAD } from "@/lib/constants/upload";
 import { supabase } from "@/lib/supabase";
-
-// Allowed file types
-const ALLOWED_MIME_TYPES = [
-  "image/jpeg",
-  "image/jpg",
-  "image/png",
-  "application/pdf",
-];
-
-const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5MB
+import { logger } from "./logger";
 
 interface UploadResult {
   url: string;
@@ -26,6 +18,7 @@ interface UploadError {
  * @param fileName - Original file name
  * @param fileSize - File size in bytes
  * @param userId - Current user's ID (for folder organization)
+ * @param bucketName - Storage bucket name (default: trip-tickets)
  * @returns Public URL of uploaded file or error
  */
 export async function uploadTicketFile(
@@ -34,22 +27,26 @@ export async function uploadTicketFile(
   fileName: string,
   fileSize: number,
   userId: string,
+  bucketName: string = FILE_UPLOAD.BUCKET_NAMES.tripTickets,
 ): Promise<UploadResult | UploadError> {
   try {
-    console.log("[FileUpload] Starting upload:", {
+    logger.info("Starting file upload", {
       uri,
       mimeType,
       fileName,
       fileSize,
+      bucketName,
     });
 
     // Validate file size
-    if (fileSize > MAX_FILE_SIZE) {
-      return { error: "File size exceeds 5MB limit" };
+    if (fileSize > FILE_UPLOAD.MAX_SIZE) {
+      return {
+        error: `File size exceeds ${FILE_UPLOAD.MAX_SIZE_MB}MB limit`,
+      };
     }
 
     // Validate MIME type
-    if (!ALLOWED_MIME_TYPES.includes(mimeType)) {
+    if (!(FILE_UPLOAD.ALLOWED_TYPES as readonly string[]).includes(mimeType)) {
       return {
         error: "Invalid file type. Only JPG, PNG, and PDF are allowed",
       };
@@ -70,7 +67,7 @@ export async function uploadTicketFile(
     const uniqueFileName = `${Date.now()}-${Math.random().toString(36).substring(7)}.${fileExt}`;
     const filePath = `${userId}/${uniqueFileName}`;
 
-    console.log("[FileUpload] Uploading to path:", filePath);
+    logger.info("Uploading to storage", { filePath, bucketName });
 
     // Upload using fetch (Supabase client doesn't handle FormData well in RN)
     const {
@@ -82,7 +79,7 @@ export async function uploadTicketFile(
     }
 
     const supabaseUrl = process.env.EXPO_PUBLIC_SUPABASE_URL;
-    const uploadUrl = `${supabaseUrl}/storage/v1/object/trip-tickets/${filePath}`;
+    const uploadUrl = `${supabaseUrl}/storage/v1/object/${bucketName}/${filePath}`;
 
     const response = await fetch(uploadUrl, {
       method: "POST",
@@ -94,26 +91,27 @@ export async function uploadTicketFile(
 
     if (!response.ok) {
       const errorText = await response.text();
-      console.error("[FileUpload] Upload failed:", errorText);
+      logger.error("File upload failed", {
+        status: response.status,
+        errorText,
+      });
       return { error: `Upload failed: ${response.status}` };
     }
 
     const result = await response.json();
-    console.log("[FileUpload] Upload successful:", result);
+    logger.info("File upload successful", result);
 
     // Get public URL
     const {
       data: { publicUrl },
-    } = supabase.storage.from("trip-tickets").getPublicUrl(filePath);
-
-    console.log("[FileUpload] Public URL:", publicUrl);
+    } = supabase.storage.from(bucketName).getPublicUrl(filePath);
 
     return {
       url: publicUrl,
       path: filePath,
     };
   } catch (error: any) {
-    console.error("[FileUpload] Exception:", error);
+    logger.error("File upload exception", error);
     return {
       error: error?.message || "An unexpected error occurred during upload",
     };
@@ -123,17 +121,50 @@ export async function uploadTicketFile(
 /**
  * Delete ticket file from Supabase Storage
  * @param path - File path in storage (from upload result)
+ * @param bucketName - Storage bucket name (default: trip-tickets)
  */
-export async function deleteTicketFile(path: string): Promise<void> {
+export async function deleteTicketFile(
+  path: string,
+  bucketName: string = FILE_UPLOAD.BUCKET_NAMES.tripTickets,
+): Promise<void> {
   try {
-    const { error } = await supabase.storage
-      .from("trip-tickets")
-      .remove([path]);
+    const { error } = await supabase.storage.from(bucketName).remove([path]);
 
     if (error) {
-      console.error("[FileUpload] Delete error:", error);
+      logger.error("File delete failed", { path, bucketName, error });
+    } else {
+      logger.info("File deleted successfully", { path, bucketName });
     }
   } catch (error) {
-    console.error("[FileUpload] Delete exception:", error);
+    logger.error("File delete exception", { path, bucketName, error });
   }
+}
+
+/**
+ * Upload parcel photo to Supabase Storage
+ * Convenience wrapper for parcel photos
+ */
+export async function uploadParcelPhoto(
+  uri: string,
+  mimeType: string,
+  fileName: string,
+  fileSize: number,
+  userId: string,
+): Promise<UploadResult | UploadError> {
+  return uploadTicketFile(
+    uri,
+    mimeType,
+    fileName,
+    fileSize,
+    userId,
+    FILE_UPLOAD.BUCKET_NAMES.parcelPhotos,
+  );
+}
+
+/**
+ * Delete parcel photo from Supabase Storage
+ * Convenience wrapper for parcel photos
+ */
+export async function deleteParcelPhoto(path: string): Promise<void> {
+  return deleteTicketFile(path, FILE_UPLOAD.BUCKET_NAMES.parcelPhotos);
 }

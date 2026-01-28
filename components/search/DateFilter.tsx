@@ -1,6 +1,7 @@
+import { formatDateLong } from "@/lib/utils/dateTime";
 import { haptics } from "@/lib/utils/haptics";
 import { useSearchStore } from "@/stores/searchStore";
-import { BorderRadius, Spacing, Typography } from "@/styles";
+import { BorderRadius, Overlays, Spacing, Typography } from "@/styles";
 import { useThemeColors } from "@/styles/theme";
 import { Ionicons } from "@expo/vector-icons";
 import DateTimePicker, {
@@ -24,14 +25,9 @@ export default function DateFilter() {
   const [showPicker, setShowPicker] = useState(false);
   const [tempDate, setTempDate] = useState<Date | null>(null);
 
-  const formatDate = (dateString: string | null) => {
+  const formatDateDisplay = (dateString: string | null) => {
     if (!dateString) return "Any date";
-    const date = new Date(dateString);
-    return date.toLocaleDateString("en-US", {
-      month: "short",
-      day: "numeric",
-      year: "numeric",
-    });
+    return formatDateLong(dateString);
   };
 
   const handleDateChange = (
@@ -127,7 +123,7 @@ export default function DateFilter() {
               },
             ]}
           >
-            {formatDate(filters.departureDate)}
+            {formatDateDisplay(filters.departureDate)}
           </Text>
         </View>
         {filters.departureDate ? (
@@ -158,7 +154,10 @@ export default function DateFilter() {
           statusBarTranslucent
         >
           <View style={styles.modalOverlay}>
-            <Pressable style={styles.backdrop} onPress={handleIOSCancel} />
+            <Pressable
+              style={[styles.backdrop, { backgroundColor: Overlays.light }]}
+              onPress={handleIOSCancel}
+            />
 
             <View
               style={[
@@ -257,14 +256,13 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   iconPlaceholder: {
-    width: 20, // Same as close icon to prevent layout shift
+    width: 20,
   },
   modalOverlay: {
     flex: 1,
   },
   backdrop: {
     flex: 1,
-    backgroundColor: "rgba(0, 0, 0, 0.5)",
   },
   modalContent: {
     borderTopLeftRadius: BorderRadius.xl,
@@ -295,12 +293,12 @@ const styles = StyleSheet.create({
   clearText: {
     fontSize: Typography.sizes.md,
     fontWeight: Typography.weights.medium,
-    width: 60, // Fixed width for symmetry
+    width: 60,
   },
   doneText: {
     fontSize: Typography.sizes.md,
     fontWeight: Typography.weights.semibold,
-    width: 60, // Fixed width for symmetry
+    width: 60,
     textAlign: "right",
   },
   pickerContainer: {

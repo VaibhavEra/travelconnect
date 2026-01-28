@@ -1,5 +1,5 @@
 import { haptics } from "@/lib/utils/haptics";
-import { BorderRadius, Spacing, Typography } from "@/styles";
+import { BorderRadius, Overlays, Spacing, Typography } from "@/styles";
 import { useThemeColors } from "@/styles/theme";
 import { Ionicons } from "@expo/vector-icons";
 import DateTimePicker from "@react-native-community/datetimepicker";
@@ -15,9 +15,10 @@ import {
 
 interface TimePickerInputProps {
   label: string;
-  value: Date;
+  value: Date | null;
   onChange: (time: Date) => void;
   error?: string;
+  placeholder?: string;
 }
 
 export default function TimePickerInput({
@@ -25,9 +26,13 @@ export default function TimePickerInput({
   value,
   onChange,
   error,
+  placeholder = "Select time",
 }: TimePickerInputProps) {
   const colors = useThemeColors();
   const [show, setShow] = useState(false);
+
+  // Use current time for picker display when value is null
+  const pickerValue = value || new Date();
 
   const handleChange = (event: any, selectedTime?: Date) => {
     if (Platform.OS === "android") {
@@ -44,13 +49,25 @@ export default function TimePickerInput({
     setShow(false);
   };
 
-  const formatTime = (date: Date) => {
+  // Format time for display
+  const formatTime = (date: Date | null) => {
+    if (!date) {
+      return placeholder;
+    }
+
+    // Validate date before formatting
+    if (isNaN(date.getTime())) {
+      return placeholder;
+    }
+
     return date.toLocaleTimeString("en-US", {
       hour: "numeric",
       minute: "2-digit",
       hour12: true,
     });
   };
+
+  const hasValue = value !== null;
 
   return (
     <View style={styles.container}>
@@ -71,7 +88,14 @@ export default function TimePickerInput({
           setShow(true);
         }}
       >
-        <Text style={[styles.inputText, { color: colors.text.primary }]}>
+        <Text
+          style={[
+            styles.inputText,
+            {
+              color: hasValue ? colors.text.primary : colors.text.tertiary,
+            },
+          ]}
+        >
           {formatTime(value)}
         </Text>
         <Ionicons name="time" size={20} color={colors.text.secondary} />
@@ -88,7 +112,9 @@ export default function TimePickerInput({
           animationType="fade"
           onRequestClose={() => setShow(false)}
         >
-          <View style={styles.modalOverlay}>
+          <View
+            style={[styles.modalOverlay, { backgroundColor: Overlays.light }]}
+          >
             <View
               style={[
                 styles.modalContent,
@@ -104,7 +130,7 @@ export default function TimePickerInput({
               </View>
 
               <DateTimePicker
-                value={value}
+                value={pickerValue}
                 mode="time"
                 display="spinner"
                 onChange={handleChange}
@@ -133,7 +159,7 @@ export default function TimePickerInput({
       ) : (
         show && (
           <DateTimePicker
-            value={value}
+            value={pickerValue}
             mode="time"
             display="default"
             onChange={handleChange}
@@ -171,7 +197,6 @@ const styles = StyleSheet.create({
   },
   modalOverlay: {
     flex: 1,
-    backgroundColor: "rgba(0, 0, 0, 0.5)",
     justifyContent: "flex-end",
   },
   modalContent: {

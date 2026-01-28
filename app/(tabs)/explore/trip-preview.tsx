@@ -1,5 +1,7 @@
+import { TRANSPORT_ICONS } from "@/lib/constants/transport";
+import { formatDate, formatTime } from "@/lib/utils/dateTime";
 import { haptics } from "@/lib/utils/haptics";
-import { Trip, useTripStore } from "@/stores/tripStore";
+import { useTripStore } from "@/stores/tripStore";
 import { BorderRadius, Spacing, Typography } from "@/styles";
 import { useThemeColors } from "@/styles/theme";
 import { Ionicons } from "@expo/vector-icons";
@@ -15,16 +17,6 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
-const TRANSPORT_ICONS: Record<
-  Trip["transport_mode"],
-  keyof typeof Ionicons.glyphMap
-> = {
-  train: "train",
-  bus: "bus",
-  flight: "airplane",
-  car: "car",
-};
-
 export default function TripPreviewScreen() {
   const colors = useThemeColors();
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -35,24 +27,6 @@ export default function TripPreviewScreen() {
       getTripById(id);
     }
   }, [id]);
-
-  const formatDate = (date: string) => {
-    const d = new Date(date);
-    return d.toLocaleDateString("en-US", {
-      weekday: "short",
-      day: "numeric",
-      month: "short",
-      year: "numeric",
-    });
-  };
-
-  const formatTime = (time: string) => {
-    const [hours, minutes] = time.split(":");
-    const hour = parseInt(hours);
-    const ampm = hour >= 12 ? "PM" : "AM";
-    const displayHour = hour % 12 || 12;
-    return `${displayHour}:${minutes} ${ampm}`;
-  };
 
   const handleRequestParcel = () => {
     haptics.selection();

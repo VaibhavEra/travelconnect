@@ -1,7 +1,7 @@
 import AuthLayout from "@/components/auth/AuthLayout";
 import OtpInput from "@/components/auth/OtpInput";
+import { parseSupabaseError } from "@/lib/utils/errorHandling";
 import { haptics } from "@/lib/utils/haptics";
-import { parseSupabaseError } from "@/lib/utils/parseSupabaseError";
 import { rateLimitConfigs, rateLimiter } from "@/lib/utils/rateLimit";
 import { AuthFlowState, useAuthStore } from "@/stores/authStore";
 import { BorderRadius, Spacing, Typography } from "@/styles";

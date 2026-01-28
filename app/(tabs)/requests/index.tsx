@@ -1,7 +1,7 @@
 import DeliveryCard from "@/components/delivery/DeliveryCard";
-import VerifyDeliveryOtpModal from "@/components/modals/VerifyDeliveryOtpModal";
-import VerifyPickupOtpModal from "@/components/modals/VerifyPickupOtpModal";
+import VerifyOtpModal from "@/components/modals/VerifyOtpModal";
 import IncomingRequestCard from "@/components/request/IncomingRequestCard";
+import FilterChip from "@/components/shared/FilterChip";
 import ModeSwitcher from "@/components/shared/ModeSwitcher";
 import { haptics } from "@/lib/utils/haptics";
 import { useAuthStore } from "@/stores/authStore";
@@ -35,6 +35,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 type RequestFilter = "all" | "pending" | "accepted" | "rejected";
 type DeliveryFilter = "all" | "ready" | "transit" | "completed";
 type ViewMode = "incoming" | "accepted";
+type OtpType = "pickup" | "delivery";
 
 export default function RequestsScreen() {
   const colors = useThemeColors();
@@ -54,16 +55,12 @@ export default function RequestsScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const [viewMode, setViewMode] = useState<ViewMode>("incoming");
 
-  // OTP Modal states
-  const [pickupOtpModalVisible, setPickupOtpModalVisible] = useState(false);
-  const [deliveryOtpModalVisible, setDeliveryOtpModalVisible] = useState(false);
+  // Unified OTP Modal states
+  const [otpModalVisible, setOtpModalVisible] = useState(false);
+  const [otpType, setOtpType] = useState<OtpType>("pickup");
   const [selectedRequestId, setSelectedRequestId] = useState<string>("");
-  const [selectedRequestSender, setSelectedRequestSender] =
-    useState<string>("");
-  const [selectedRequestReceiver, setSelectedRequestReceiver] =
-    useState<string>("");
-  const [pickupOtpExpiry, setPickupOtpExpiry] = useState<string>("");
-  const [deliveryOtpExpiry, setDeliveryOtpExpiry] = useState<string>("");
+  const [selectedUserName, setSelectedUserName] = useState<string>("");
+  const [otpExpiry, setOtpExpiry] = useState<string>("");
 
   // Animated header for scroll
   const scrollY = useSharedValue(0);
@@ -135,9 +132,10 @@ export default function RequestsScreen() {
     const request = acceptedRequests.find((r) => r.id === requestId);
     if (request) {
       setSelectedRequestId(requestId);
-      setSelectedRequestSender(request.sender?.full_name || "Sender");
-      setPickupOtpExpiry(request.pickup_otp_expiry || "");
-      setPickupOtpModalVisible(true);
+      setSelectedUserName(request.sender?.full_name || "Sender");
+      setOtpExpiry(request.pickup_otp_expiry || "");
+      setOtpType("pickup");
+      setOtpModalVisible(true);
     }
   };
 
@@ -145,38 +143,33 @@ export default function RequestsScreen() {
     const request = acceptedRequests.find((r) => r.id === requestId);
     if (request) {
       setSelectedRequestId(requestId);
-      setSelectedRequestReceiver(request.delivery_contact_name);
-      setDeliveryOtpExpiry(request.delivery_otp_expiry || "");
-      setDeliveryOtpModalVisible(true);
+      setSelectedUserName(request.delivery_contact_name);
+      setOtpExpiry(request.delivery_otp_expiry || "");
+      setOtpType("delivery");
+      setOtpModalVisible(true);
     }
   };
 
-  const handleVerifyPickup = async (otp: string) => {
+  const handleVerifyOtp = async (otp: string) => {
     try {
-      const isValid = await verifyPickupOtp(selectedRequestId, otp);
+      const isValid =
+        otpType === "pickup"
+          ? await verifyPickupOtp(selectedRequestId, otp)
+          : await verifyDeliveryOtp(selectedRequestId, otp);
+
       if (isValid && user) {
-        setPickupOtpModalVisible(false);
-        Alert.alert("Success", "Parcel marked as picked up!");
+        setOtpModalVisible(false);
+        Alert.alert(
+          "Success",
+          otpType === "pickup"
+            ? "Parcel marked as picked up!"
+            : "Parcel marked as delivered!",
+        );
         await getAcceptedRequests(user.id);
       }
       return isValid;
     } catch (error) {
-      console.error("Verify pickup failed:", error);
-      throw error;
-    }
-  };
-
-  const handleVerifyDelivery = async (otp: string) => {
-    try {
-      const isValid = await verifyDeliveryOtp(selectedRequestId, otp);
-      if (isValid && user) {
-        setDeliveryOtpModalVisible(false);
-        Alert.alert("Success", "Parcel marked as delivered!");
-        await getAcceptedRequests(user.id);
-      }
-      return isValid;
-    } catch (error) {
-      console.error("Verify delivery failed:", error);
+      console.error(`Verify ${otpType} failed:`, error);
       throw error;
     }
   };
@@ -689,96 +682,16 @@ export default function RequestsScreen() {
         <View style={{ height: Spacing.xxxl }} />
       </ScrollView>
 
-      {/* OTP Verification Modals */}
-      <VerifyPickupOtpModal
-        visible={pickupOtpModalVisible}
-        onClose={() => setPickupOtpModalVisible(false)}
-        onVerify={handleVerifyPickup}
-        senderName={selectedRequestSender}
-        otpExpiry={pickupOtpExpiry}
-      />
-
-      <VerifyDeliveryOtpModal
-        visible={deliveryOtpModalVisible}
-        onClose={() => setDeliveryOtpModalVisible(false)}
-        onVerify={handleVerifyDelivery}
-        receiverName={selectedRequestReceiver}
-        otpExpiry={deliveryOtpExpiry}
+      {/* Unified OTP Verification Modal */}
+      <VerifyOtpModal
+        visible={otpModalVisible}
+        onClose={() => setOtpModalVisible(false)}
+        onVerify={handleVerifyOtp}
+        type={otpType}
+        userName={selectedUserName}
+        otpExpiry={otpExpiry}
       />
     </SafeAreaView>
-  );
-}
-
-function FilterChip({
-  label,
-  icon,
-  count,
-  active,
-  onPress,
-}: {
-  label: string;
-  icon: keyof typeof Ionicons.glyphMap;
-  count: number;
-  active: boolean;
-  onPress: () => void;
-}) {
-  const colors = useThemeColors();
-
-  return (
-    <Pressable
-      style={[
-        styles.filterChip,
-        {
-          backgroundColor: active
-            ? colors.primary
-            : colors.background.secondary,
-          borderColor: active ? colors.primary : colors.border.default,
-        },
-      ]}
-      onPress={onPress}
-    >
-      <Ionicons
-        name={icon}
-        size={16}
-        color={active ? colors.text.inverse : colors.text.secondary}
-      />
-      <Text
-        style={[
-          styles.filterChipText,
-          {
-            color: active ? colors.text.inverse : colors.text.secondary,
-            fontWeight: active
-              ? Typography.weights.semibold
-              : Typography.weights.medium,
-          },
-        ]}
-      >
-        {label}
-      </Text>
-      {count > 0 && (
-        <View
-          style={[
-            styles.filterCount,
-            {
-              backgroundColor: active
-                ? colors.text.inverse + "20"
-                : colors.primary + "15",
-            },
-          ]}
-        >
-          <Text
-            style={[
-              styles.filterCountText,
-              {
-                color: active ? colors.text.inverse : colors.primary,
-              },
-            ]}
-          >
-            {count}
-          </Text>
-        </View>
-      )}
-    </Pressable>
   );
 }
 
@@ -876,29 +789,6 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     gap: Spacing.sm,
     paddingVertical: Spacing.xs,
-  },
-  filterChip: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: Spacing.xs,
-    paddingHorizontal: Spacing.md,
-    paddingVertical: Spacing.sm,
-    borderRadius: BorderRadius.full,
-    borderWidth: 1.5,
-  },
-  filterChipText: {
-    fontSize: Typography.sizes.sm,
-  },
-  filterCount: {
-    paddingHorizontal: 7,
-    paddingVertical: 2,
-    borderRadius: BorderRadius.full,
-    minWidth: 22,
-    alignItems: "center",
-  },
-  filterCountText: {
-    fontSize: 11,
-    fontWeight: Typography.weights.bold,
   },
   emptyState: {
     alignItems: "center",

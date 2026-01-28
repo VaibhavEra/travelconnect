@@ -1,3 +1,9 @@
+import { logger } from "./logger";
+
+/**
+ * Parse Supabase errors into user-friendly messages
+ * Consolidates all error parsing logic in one place
+ */
 export function parseSupabaseError(error: any): string {
   const message = error?.message || "";
 
@@ -9,16 +15,32 @@ export function parseSupabaseError(error: any): string {
     return "Please verify your email before logging in";
   }
 
+  // OTP-specific errors
+  if (message.includes("Token has expired") || message.includes("expired")) {
+    return "Verification code has expired. Please request a new one";
+  }
+
+  if (message.includes("Invalid token") || message.includes("invalid")) {
+    return "Invalid verification code. Please check and try again";
+  }
+
+  if (message.includes("Token already used")) {
+    return "This verification code has already been used. Please request a new one";
+  }
+
   // Auth errors
   if (message.includes("Invalid login credentials")) {
     return "Invalid email or password";
   }
+
   if (message.includes("Email not confirmed")) {
     return "Please verify your email before logging in";
   }
+
   if (message.includes("Email rate limit exceeded")) {
     return "Too many attempts. Please wait a few minutes";
   }
+
   if (message.includes("User already registered")) {
     return "Email already registered. Please login instead";
   }
@@ -37,7 +59,7 @@ export function parseSupabaseError(error: any): string {
     return "This value is already in use";
   }
 
-  // PostgreSQL error codes (for trips and other operations)
+  // PostgreSQL error codes
   if (error?.code) {
     switch (error.code) {
       case "23503": // Foreign key violation
@@ -63,6 +85,15 @@ export function parseSupabaseError(error: any): string {
 
   if (message.includes("timeout")) {
     return "Request timed out. Please try again";
+  }
+
+  // Catch-all for unknown Supabase/PostgreSQL errors
+  if (
+    error?.code?.startsWith("PGRST") ||
+    message.toLowerCase().includes("supabase")
+  ) {
+    logger.error("Unhandled Supabase error", error);
+    return "An error occurred. Please try again";
   }
 
   // Generic fallback

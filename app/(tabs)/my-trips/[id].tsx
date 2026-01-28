@@ -1,6 +1,9 @@
 import { CATEGORY_CONFIG } from "@/lib/constants/categories";
+import { TRIP_STATUS_CONFIG, TripStatus } from "@/lib/constants/status";
+import { TRANSPORT_ICONS } from "@/lib/constants/transport";
+import { formatDate, formatTime } from "@/lib/utils/dateTime";
 import { haptics } from "@/lib/utils/haptics";
-import { Trip, useTripStore } from "@/stores/tripStore";
+import { useTripStore } from "@/stores/tripStore";
 import { BorderRadius, Spacing, Typography } from "@/styles";
 import { useThemeColors } from "@/styles/theme";
 import { Ionicons } from "@expo/vector-icons";
@@ -18,48 +21,6 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
-const TRANSPORT_ICONS: Record<
-  Trip["transport_mode"],
-  keyof typeof Ionicons.glyphMap
-> = {
-  train: "train",
-  bus: "bus",
-  flight: "airplane",
-  car: "car",
-};
-
-type TripStatus = "open" | "in_progress" | "completed" | "cancelled";
-
-const STATUS_CONFIG: Record<
-  TripStatus,
-  {
-    label: string;
-    icon: keyof typeof Ionicons.glyphMap;
-    getColor: (colors: any) => string;
-  }
-> = {
-  open: {
-    label: "Open",
-    icon: "checkmark-circle",
-    getColor: (colors) => colors.success,
-  },
-  in_progress: {
-    label: "In Progress",
-    icon: "time",
-    getColor: (colors) => colors.warning,
-  },
-  completed: {
-    label: "Completed",
-    icon: "checkmark-done-circle",
-    getColor: (colors) => colors.success,
-  },
-  cancelled: {
-    label: "Cancelled",
-    icon: "close-circle",
-    getColor: (colors) => colors.error,
-  },
-};
-
 export default function TripDetailsScreen() {
   const colors = useThemeColors();
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -72,34 +33,6 @@ export default function TripDetailsScreen() {
       getTripById(id);
     }
   }, [id]);
-
-  const formatDate = (date: string) => {
-    const d = new Date(date);
-    const today = new Date();
-    const tomorrow = new Date(today);
-    tomorrow.setDate(tomorrow.getDate() + 1);
-
-    const isToday = d.toDateString() === today.toDateString();
-    const isTomorrow = d.toDateString() === tomorrow.toDateString();
-
-    if (isToday) return "Today";
-    if (isTomorrow) return "Tomorrow";
-
-    return d.toLocaleDateString("en-US", {
-      weekday: "short",
-      day: "numeric",
-      month: "short",
-      year: "numeric",
-    });
-  };
-
-  const formatTime = (time: string) => {
-    const [hours, minutes] = time.split(":");
-    const hour = parseInt(hours);
-    const ampm = hour >= 12 ? "PM" : "AM";
-    const displayHour = hour % 12 || 12;
-    return `${displayHour}:${minutes} ${ampm}`;
-  };
 
   const renderSlots = () => {
     const slots = [];
@@ -214,8 +147,8 @@ export default function TripDetailsScreen() {
   }
 
   const status = currentTrip.status as TripStatus;
-  const statusConfig = STATUS_CONFIG[status];
-  const statusColor = statusConfig.getColor(colors);
+  const statusConfig = TRIP_STATUS_CONFIG[status];
+  const statusColor = colors[statusConfig.colorKey];
   const canPerformActions = status === "open" || status === "in_progress";
 
   return (

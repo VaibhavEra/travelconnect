@@ -1,6 +1,8 @@
 import AcceptRequestModal from "@/components/modals/AcceptRequestModal";
 import RejectRequestModal from "@/components/modals/RejectRequestModal";
 import { CATEGORY_CONFIG, SIZE_CONFIG } from "@/lib/constants/categories";
+import { REQUEST_STATUS_CONFIG, RequestStatus } from "@/lib/constants/status";
+import { TRANSPORT_ICONS, TransportMode } from "@/lib/constants/transport";
 import { haptics } from "@/lib/utils/haptics";
 import { useRequestStore } from "@/stores/requestStore";
 import { BorderRadius, Spacing, Typography } from "@/styles";
@@ -27,61 +29,6 @@ import Animated, {
   withSpring,
 } from "react-native-reanimated";
 import { SafeAreaView } from "react-native-safe-area-context";
-
-type RequestStatus =
-  | "pending"
-  | "accepted"
-  | "rejected"
-  | "picked_up"
-  | "delivered"
-  | "cancelled";
-
-const STATUS_CONFIG: Record<
-  RequestStatus,
-  {
-    label: string;
-    icon: keyof typeof Ionicons.glyphMap;
-    getColor: (colors: any) => string;
-  }
-> = {
-  pending: {
-    label: "Pending Review",
-    icon: "time",
-    getColor: (colors) => colors.warning,
-  },
-  accepted: {
-    label: "Accepted",
-    icon: "checkmark-circle",
-    getColor: (colors) => colors.success,
-  },
-  rejected: {
-    label: "Rejected",
-    icon: "close-circle",
-    getColor: (colors) => colors.error,
-  },
-  picked_up: {
-    label: "Picked Up",
-    icon: "hand-left",
-    getColor: (colors) => colors.primary,
-  },
-  delivered: {
-    label: "Delivered",
-    icon: "checkmark-done-circle",
-    getColor: (colors) => colors.success,
-  },
-  cancelled: {
-    label: "Cancelled",
-    icon: "ban",
-    getColor: (colors) => colors.text.tertiary,
-  },
-};
-
-const TRANSPORT_ICONS: Record<string, keyof typeof Ionicons.glyphMap> = {
-  flight: "airplane",
-  train: "train",
-  bus: "bus",
-  car: "car",
-};
 
 export default function IncomingRequestDetailsScreen() {
   const colors = useThemeColors();
@@ -158,8 +105,8 @@ export default function IncomingRequestDetailsScreen() {
 
   const request = currentRequest;
   const status = request.status as RequestStatus;
-  const statusConfig = STATUS_CONFIG[status];
-  const statusColor = statusConfig.getColor(colors);
+  const statusConfig = REQUEST_STATUS_CONFIG[status];
+  const statusColor = colors[statusConfig.colorKey];
   const isPending = status === "pending";
   const isAccepted = status === "accepted";
   const isCancelled = status === "cancelled";
@@ -560,7 +507,11 @@ export default function IncomingRequestDetailsScreen() {
                   ]}
                 >
                   <Ionicons
-                    name={TRANSPORT_ICONS[request.trip.transport_mode] || "car"}
+                    name={
+                      TRANSPORT_ICONS[
+                        request.trip.transport_mode as TransportMode
+                      ] || "car"
+                    }
                     size={14}
                     color={colors.primary}
                   />
@@ -768,7 +719,7 @@ export default function IncomingRequestDetailsScreen() {
   );
 }
 
-// Helper Components
+// Helper Components (kept inline due to specific requirements)
 function PhotoThumbnail({
   uri,
   isSelected,

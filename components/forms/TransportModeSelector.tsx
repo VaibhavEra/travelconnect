@@ -1,6 +1,6 @@
+import { TRANSPORT_CONFIG, TransportMode } from "@/lib/constants";
 import { haptics } from "@/lib/utils/haptics";
-import { TRANSPORT_MODES, TransportMode } from "@/lib/validations/trip";
-import { BorderRadius, Spacing, Typography } from "@/styles";
+import { BorderRadius, Spacing, Typography, withOpacity } from "@/styles";
 import { useThemeColors } from "@/styles/theme";
 import { Ionicons } from "@expo/vector-icons";
 import { Pressable, StyleSheet, Text, View } from "react-native";
@@ -11,20 +11,6 @@ interface TransportModeSelectorProps {
   onChange: (mode: TransportMode) => void;
   error?: string;
 }
-
-const TRANSPORT_ICONS: Record<TransportMode, keyof typeof Ionicons.glyphMap> = {
-  train: "train",
-  bus: "bus",
-  flight: "airplane",
-  car: "car",
-};
-
-const TRANSPORT_LABELS: Record<TransportMode, string> = {
-  train: "Train",
-  bus: "Bus",
-  flight: "Flight",
-  car: "Car",
-};
 
 export default function TransportModeSelector({
   label,
@@ -46,7 +32,7 @@ export default function TransportModeSelector({
       </Text>
 
       <View style={styles.modesContainer}>
-        {TRANSPORT_MODES.map((mode) => {
+        {Object.entries(TRANSPORT_CONFIG).map(([mode, config]) => {
           const isSelected = value === mode;
           return (
             <Pressable
@@ -55,17 +41,17 @@ export default function TransportModeSelector({
                 styles.modeButton,
                 {
                   backgroundColor: isSelected
-                    ? colors.primary + "15"
+                    ? withOpacity(colors.primary, "light")
                     : colors.background.secondary,
                   borderColor: isSelected
                     ? colors.primary
                     : colors.border.default,
                 },
               ]}
-              onPress={() => handleSelect(mode)}
+              onPress={() => handleSelect(mode as TransportMode)}
             >
               <Ionicons
-                name={TRANSPORT_ICONS[mode]}
+                name={config.icon}
                 size={24}
                 color={isSelected ? colors.primary : colors.text.secondary}
               />
@@ -79,7 +65,7 @@ export default function TransportModeSelector({
                   },
                 ]}
               >
-                {TRANSPORT_LABELS[mode]}
+                {config.label}
               </Text>
             </Pressable>
           );

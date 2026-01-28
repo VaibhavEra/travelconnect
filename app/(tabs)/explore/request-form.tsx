@@ -1,5 +1,7 @@
 import ImagePicker from "@/components/forms/ImagePicker";
 import TextInput from "@/components/forms/TextInput";
+import { SIZE_ICONS } from "@/lib/constants/parcel";
+import { formatDate } from "@/lib/utils/dateTime";
 import { haptics } from "@/lib/utils/haptics";
 import {
   PARCEL_SIZES,
@@ -29,13 +31,6 @@ import {
   View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-
-// Size icons mapping
-const SIZE_ICONS: Record<string, keyof typeof Ionicons.glyphMap> = {
-  small: "bag-handle-outline",
-  medium: "briefcase-outline",
-  large: "cube-outline",
-};
 
 export default function RequestFormScreen() {
   const colors = useThemeColors();
@@ -123,15 +118,6 @@ export default function RequestFormScreen() {
       </SafeAreaView>
     );
   }
-
-  const formatDate = (date: string) => {
-    const d = new Date(date);
-    return d.toLocaleDateString("en-US", {
-      weekday: "short",
-      day: "numeric",
-      month: "short",
-    });
-  };
 
   const isFormDisabled = !isValid || requestLoading;
   const photoCount = watch("parcel_photos")?.length || 0;

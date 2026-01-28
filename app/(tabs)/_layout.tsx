@@ -7,21 +7,22 @@ export default function TabsLayout() {
   const colors = useThemeColors();
   const { currentMode } = useModeStore();
 
+  // Shared screen options for both modes
+  const commonScreenOptions = {
+    tabBarActiveTintColor: colors.primary,
+    tabBarInactiveTintColor: colors.text.tertiary,
+    tabBarStyle: {
+      backgroundColor: colors.background.primary,
+      borderTopColor: colors.border.default,
+      borderTopWidth: 1,
+    },
+    headerShown: false,
+  };
+
   // Sender mode tabs
   if (currentMode === "sender") {
     return (
-      <Tabs
-        screenOptions={{
-          tabBarActiveTintColor: colors.primary,
-          tabBarInactiveTintColor: colors.text.tertiary,
-          tabBarStyle: {
-            backgroundColor: colors.background.primary,
-            borderTopColor: colors.border.default,
-            borderTopWidth: 1,
-          },
-          headerShown: false,
-        }}
-      >
+      <Tabs screenOptions={commonScreenOptions}>
         <Tabs.Screen
           name="explore"
           options={{
@@ -60,18 +61,7 @@ export default function TabsLayout() {
 
   // Traveller mode tabs
   return (
-    <Tabs
-      screenOptions={{
-        tabBarActiveTintColor: colors.primary,
-        tabBarInactiveTintColor: colors.text.tertiary,
-        tabBarStyle: {
-          backgroundColor: colors.background.primary,
-          borderTopColor: colors.border.default,
-          borderTopWidth: 1,
-        },
-        headerShown: false,
-      }}
-    >
+    <Tabs screenOptions={commonScreenOptions}>
       <Tabs.Screen
         name="create-trip"
         options={{

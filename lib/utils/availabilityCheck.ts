@@ -1,34 +1,43 @@
-// lib/utils/availabilityCheck.ts
 import { supabase } from "@/lib/supabase";
+import { logger } from "./logger";
+
+interface AvailabilityResult {
+  available: boolean;
+  error?: string;
+}
 
 export const availabilityCheck = {
   /**
    * Check if email is available
    */
-  email: async (
-    email: string,
-  ): Promise<{ available: boolean; error?: string }> => {
+  email: async (email: string): Promise<AvailabilityResult> => {
     try {
       const { data, error } = await supabase.rpc("check_email_available", {
         check_email: email,
       });
 
       if (error) {
-        return { available: true }; // Fail open to not block users
+        logger.error("Email availability check failed", error);
+        return {
+          available: true,
+          error: "Unable to verify email availability",
+        };
       }
 
       return { available: data as boolean };
     } catch (error) {
-      return { available: true };
+      logger.error("Email availability check exception", error);
+      return {
+        available: true,
+        error: "Unable to verify email availability",
+      };
     }
   },
 
   /**
    * Check if phone is available
    */
-  phone: async (
-    phone: string,
-  ): Promise<{ available: boolean; error?: string }> => {
+  phone: async (phone: string): Promise<AvailabilityResult> => {
     try {
       // Ensure phone has country code
       const phoneWithCode = phone.startsWith("+91") ? phone : `+91${phone}`;
@@ -38,33 +47,47 @@ export const availabilityCheck = {
       });
 
       if (error) {
-        return { available: true }; // Fail open
+        logger.error("Phone availability check failed", error);
+        return {
+          available: true,
+          error: "Unable to verify phone availability",
+        };
       }
 
       return { available: data as boolean };
     } catch (error) {
-      return { available: true };
+      logger.error("Phone availability check exception", error);
+      return {
+        available: true,
+        error: "Unable to verify phone availability",
+      };
     }
   },
 
   /**
    * Check if username is available
    */
-  username: async (
-    username: string,
-  ): Promise<{ available: boolean; error?: string }> => {
+  username: async (username: string): Promise<AvailabilityResult> => {
     try {
       const { data, error } = await supabase.rpc("check_username_available", {
         check_username: username,
       });
 
       if (error) {
-        return { available: true };
+        logger.error("Username availability check failed", error);
+        return {
+          available: true,
+          error: "Unable to verify username availability",
+        };
       }
 
       return { available: data as boolean };
     } catch (error) {
-      return { available: true };
+      logger.error("Username availability check exception", error);
+      return {
+        available: true,
+        error: "Unable to verify username availability",
+      };
     }
   },
 };

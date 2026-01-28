@@ -2,9 +2,9 @@ import AuthLayout from "@/components/auth/AuthLayout";
 import FormInput from "@/components/auth/FormInput";
 import ProgressIndicator from "@/components/auth/ProgressIndicator";
 import { availabilityCheck } from "@/lib/utils/availabilityCheck";
+import { parseSupabaseError } from "@/lib/utils/errorHandling";
 import { haptics } from "@/lib/utils/haptics";
 import { useNetworkStatus } from "@/lib/utils/network";
-import { parseSupabaseError } from "@/lib/utils/parseSupabaseError";
 import { rateLimitConfigs, rateLimiter } from "@/lib/utils/rateLimit";
 import { sanitize } from "@/lib/utils/sanitize";
 import {

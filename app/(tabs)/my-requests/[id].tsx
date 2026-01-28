@@ -1,4 +1,6 @@
 import { CATEGORY_CONFIG, SIZE_CONFIG } from "@/lib/constants/categories";
+import { REQUEST_STATUS_CONFIG, RequestStatus } from "@/lib/constants/status";
+import { formatDate, formatTime } from "@/lib/utils/dateTime";
 import { haptics } from "@/lib/utils/haptics";
 import { useAuthStore } from "@/stores/authStore";
 import { useRequestStore } from "@/stores/requestStore";
@@ -20,54 +22,6 @@ import {
   View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-
-type RequestStatus =
-  | "pending"
-  | "accepted"
-  | "rejected"
-  | "picked_up"
-  | "delivered"
-  | "cancelled";
-
-const STATUS_CONFIG: Record<
-  RequestStatus,
-  {
-    label: string;
-    icon: keyof typeof Ionicons.glyphMap;
-    getColor: (colors: any) => string;
-  }
-> = {
-  pending: {
-    label: "Pending Approval",
-    icon: "time",
-    getColor: (colors) => colors.warning,
-  },
-  accepted: {
-    label: "Accepted",
-    icon: "checkmark-circle",
-    getColor: (colors) => colors.success,
-  },
-  rejected: {
-    label: "Rejected",
-    icon: "close-circle",
-    getColor: (colors) => colors.error,
-  },
-  picked_up: {
-    label: "Picked Up",
-    icon: "hand-left",
-    getColor: (colors) => colors.primary,
-  },
-  delivered: {
-    label: "Delivered",
-    icon: "checkmark-done-circle",
-    getColor: (colors) => colors.success,
-  },
-  cancelled: {
-    label: "Cancelled",
-    icon: "ban",
-    getColor: (colors) => colors.text.tertiary,
-  },
-};
 
 const TRANSPORT_ICONS: Record<string, keyof typeof Ionicons.glyphMap> = {
   flight: "airplane",
@@ -290,33 +244,6 @@ export default function RequestDetailsScreen() {
     }
   }, [id]);
 
-  const formatDate = (date: string) => {
-    const d = new Date(date);
-    const today = new Date();
-    const tomorrow = new Date(today);
-    tomorrow.setDate(tomorrow.getDate() + 1);
-
-    const isToday = d.toDateString() === today.toDateString();
-    const isTomorrow = d.toDateString() === tomorrow.toDateString();
-
-    if (isToday) return "Today";
-    if (isTomorrow) return "Tomorrow";
-
-    return d.toLocaleDateString("en-US", {
-      weekday: "short",
-      month: "short",
-      day: "numeric",
-    });
-  };
-
-  const formatTime = (time: string) => {
-    const [hours, minutes] = time.split(":");
-    const hour = parseInt(hours);
-    const ampm = hour >= 12 ? "PM" : "AM";
-    const displayHour = hour % 12 || 12;
-    return `${displayHour}:${minutes} ${ampm}`;
-  };
-
   const handleCancel = async (reason?: string) => {
     try {
       await cancelRequest(id, reason);
@@ -362,8 +289,9 @@ export default function RequestDetailsScreen() {
   }
 
   const status = currentRequest.status as RequestStatus;
-  const statusConfig = STATUS_CONFIG[status] || STATUS_CONFIG.pending;
-  const statusColor = statusConfig.getColor(colors);
+  const statusConfig =
+    REQUEST_STATUS_CONFIG[status] || REQUEST_STATUS_CONFIG.pending;
+  const statusColor = colors[statusConfig.colorKey];
   const canCancel = currentRequest.status === "pending";
 
   const categoryConfig =

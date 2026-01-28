@@ -1,7 +1,7 @@
 import AuthLayout from "@/components/auth/AuthLayout";
 import FormInput from "@/components/auth/FormInput";
+import { parseSupabaseError } from "@/lib/utils/errorHandling";
 import { haptics } from "@/lib/utils/haptics";
-import { parseSupabaseError } from "@/lib/utils/parseSupabaseError";
 import { getPasswordStrength } from "@/lib/utils/passwordStrength";
 import { NewPasswordFormData, newPasswordSchema } from "@/lib/validations/auth";
 import { AuthFlowState, useAuthStore } from "@/stores/authStore";

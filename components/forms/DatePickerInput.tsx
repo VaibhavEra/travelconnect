@@ -1,5 +1,6 @@
+import { formatDateLong } from "@/lib/utils/dateTime";
 import { haptics } from "@/lib/utils/haptics";
-import { BorderRadius, Spacing, Typography } from "@/styles";
+import { BorderRadius, Overlays, Spacing, Typography } from "@/styles";
 import { useThemeColors } from "@/styles/theme";
 import { Ionicons } from "@expo/vector-icons";
 import DateTimePicker from "@react-native-community/datetimepicker";
@@ -15,11 +16,12 @@ import {
 
 interface DatePickerInputProps {
   label: string;
-  value: Date;
+  value: Date | null;
   onChange: (date: Date) => void;
   error?: string;
   minimumDate?: Date;
   maximumDate?: Date;
+  placeholder?: string;
 }
 
 export default function DatePickerInput({
@@ -29,9 +31,13 @@ export default function DatePickerInput({
   error,
   minimumDate,
   maximumDate,
+  placeholder = "Select date",
 }: DatePickerInputProps) {
   const colors = useThemeColors();
   const [show, setShow] = useState(false);
+
+  // Use current date for picker display when value is null
+  const pickerValue = value || new Date();
 
   const handleChange = (event: any, selectedDate?: Date) => {
     if (Platform.OS === "android") {
@@ -48,23 +54,22 @@ export default function DatePickerInput({
     setShow(false);
   };
 
-  const formatDate = (date: Date) => {
-    const today = new Date();
-    const tomorrow = new Date(today);
-    tomorrow.setDate(tomorrow.getDate() + 1);
+  // Format Date object to ISO string for formatDateLong
+  const formatDisplayDate = (date: Date | null) => {
+    if (!date) {
+      return placeholder;
+    }
 
-    const isToday = date.toDateString() === today.toDateString();
-    const isTomorrow = date.toDateString() === tomorrow.toDateString();
+    // Validate date before formatting
+    if (isNaN(date.getTime())) {
+      return placeholder;
+    }
 
-    if (isToday) return "Today";
-    if (isTomorrow) return "Tomorrow";
-
-    return date.toLocaleDateString("en-US", {
-      weekday: "short",
-      month: "short",
-      day: "numeric",
-    });
+    const isoString = date.toISOString().split("T")[0];
+    return formatDateLong(isoString);
   };
+
+  const hasValue = value !== null;
 
   return (
     <View style={styles.container}>
@@ -85,8 +90,15 @@ export default function DatePickerInput({
           setShow(true);
         }}
       >
-        <Text style={[styles.inputText, { color: colors.text.primary }]}>
-          {formatDate(value)}
+        <Text
+          style={[
+            styles.inputText,
+            {
+              color: hasValue ? colors.text.primary : colors.text.tertiary,
+            },
+          ]}
+        >
+          {formatDisplayDate(value)}
         </Text>
         <Ionicons name="calendar" size={20} color={colors.text.secondary} />
       </Pressable>
@@ -102,7 +114,9 @@ export default function DatePickerInput({
           animationType="fade"
           onRequestClose={() => setShow(false)}
         >
-          <View style={styles.modalOverlay}>
+          <View
+            style={[styles.modalOverlay, { backgroundColor: Overlays.light }]}
+          >
             <View
               style={[
                 styles.modalContent,
@@ -118,7 +132,7 @@ export default function DatePickerInput({
               </View>
 
               <DateTimePicker
-                value={value}
+                value={pickerValue}
                 mode="date"
                 display="spinner"
                 onChange={handleChange}
@@ -149,7 +163,7 @@ export default function DatePickerInput({
       ) : (
         show && (
           <DateTimePicker
-            value={value}
+            value={pickerValue}
             mode="date"
             display="default"
             onChange={handleChange}
@@ -189,7 +203,6 @@ const styles = StyleSheet.create({
   },
   modalOverlay: {
     flex: 1,
-    backgroundColor: "rgba(0, 0, 0, 0.5)",
     justifyContent: "flex-end",
   },
   modalContent: {

@@ -7,6 +7,7 @@ import TextInput from "@/components/forms/TextInput";
 import TimePickerInput from "@/components/forms/TimePickerInput";
 import TransportModeSelector from "@/components/forms/TransportModeSelector";
 import ModeSwitcher from "@/components/shared/ModeSwitcher";
+import { dateToISO, dateToTimeString } from "@/lib/utils/dateTime";
 import { haptics } from "@/lib/utils/haptics";
 import {
   PackageCategory,
@@ -40,13 +41,6 @@ const getDefaultDepartureDate = () => {
   tomorrow.setDate(tomorrow.getDate() + 1);
   tomorrow.setHours(0, 0, 0, 0);
   return tomorrow.toISOString().split("T")[0];
-};
-
-const getDefaultArrivalDate = () => {
-  const dayAfterTomorrow = new Date();
-  dayAfterTomorrow.setDate(dayAfterTomorrow.getDate() + 2);
-  dayAfterTomorrow.setHours(0, 0, 0, 0);
-  return dayAfterTomorrow.toISOString().split("T")[0];
 };
 
 const getErrorMessage = (error: any): { title: string; message: string } => {
@@ -130,9 +124,9 @@ export default function CreateTripScreen() {
       destination: "",
       transport_mode: "train",
       departure_date: getDefaultDepartureDate(),
-      departure_time: "10:00",
-      arrival_date: getDefaultArrivalDate(),
-      arrival_time: "18:00",
+      departure_time: "",
+      arrival_date: null,
+      arrival_time: null,
       total_slots: 3,
       allowed_categories: [],
       pnr_number: "",
@@ -141,28 +135,29 @@ export default function CreateTripScreen() {
     },
   });
 
-  // ADD THIS: Guard against null user during sign out
+  // Guard against null user during sign out
   if (!user) {
     return null;
   }
 
   const departureDate = watch("departure_date");
 
-  const formatDate = (date: Date): string => {
-    return date.toISOString().split("T")[0];
-  };
-
-  const formatTime = (date: Date): string => {
-    const hours = date.getHours().toString().padStart(2, "0");
-    const minutes = date.getMinutes().toString().padStart(2, "0");
-    return `${hours}:${minutes}`;
-  };
-
-  const parseDate = (dateString: string, timeString?: string): Date => {
-    if (timeString) {
-      return new Date(`${dateString}T${timeString}`);
+  const parseDate = (
+    dateString: string | null,
+    timeString?: string | null,
+  ): Date | null => {
+    // Return null for empty/null values
+    if (!dateString || dateString.trim() === "") {
+      return null;
     }
-    return new Date(dateString);
+
+    if (timeString && timeString.trim() !== "") {
+      const date = new Date(`${dateString}T${timeString}`);
+      return isNaN(date.getTime()) ? null : date;
+    }
+
+    const date = new Date(dateString);
+    return isNaN(date.getTime()) ? null : date;
   };
 
   const onSubmit = async (data: TripFormData) => {
@@ -176,9 +171,9 @@ export default function CreateTripScreen() {
         destination: "",
         transport_mode: "train",
         departure_date: getDefaultDepartureDate(),
-        departure_time: "10:00",
-        arrival_date: getDefaultArrivalDate(),
-        arrival_time: "18:00",
+        departure_time: "",
+        arrival_date: null,
+        arrival_time: null,
         total_slots: 3,
         allowed_categories: [],
         pnr_number: "",
@@ -351,9 +346,10 @@ export default function CreateTripScreen() {
                     <DatePickerInput
                       label="Date"
                       value={parseDate(value)}
-                      onChange={(date) => onChange(formatDate(date))}
+                      onChange={(date) => onChange(dateToISO(date))}
                       error={errors.departure_date?.message}
                       minimumDate={new Date()}
+                      placeholder="Select departure date"
                     />
                   )}
                 />
@@ -365,9 +361,14 @@ export default function CreateTripScreen() {
                   render={({ field: { onChange, value } }) => (
                     <TimePickerInput
                       label="Time"
-                      value={parseDate("2000-01-01", value)}
-                      onChange={(date) => onChange(formatTime(date))}
+                      value={
+                        value && value.trim() !== ""
+                          ? parseDate("2000-01-01", value)
+                          : null
+                      }
+                      onChange={(date) => onChange(dateToTimeString(date))}
                       error={errors.departure_time?.message}
+                      placeholder="Select departure time"
                     />
                   )}
                 />
@@ -388,9 +389,10 @@ export default function CreateTripScreen() {
                     <DatePickerInput
                       label="Date"
                       value={parseDate(value)}
-                      onChange={(date) => onChange(formatDate(date))}
+                      onChange={(date) => onChange(dateToISO(date))}
                       error={errors.arrival_date?.message}
-                      minimumDate={parseDate(departureDate)}
+                      minimumDate={parseDate(departureDate) || undefined}
+                      placeholder="Select arrival date"
                     />
                   )}
                 />
@@ -402,9 +404,14 @@ export default function CreateTripScreen() {
                   render={({ field: { onChange, value } }) => (
                     <TimePickerInput
                       label="Time"
-                      value={parseDate("2000-01-01", value)}
-                      onChange={(date) => onChange(formatTime(date))}
+                      value={
+                        value && value.trim() !== ""
+                          ? parseDate("2000-01-01", value)
+                          : null
+                      }
+                      onChange={(date) => onChange(dateToTimeString(date))}
                       error={errors.arrival_time?.message}
+                      placeholder="Select arrival time"
                     />
                   )}
                 />
