@@ -177,6 +177,8 @@ export default function LoginScreen() {
               touched={touchedFields.password}
               secureTextEntry={!showPassword}
               autoCapitalize="none"
+              autoCorrect={false}
+              autoComplete="password"
               textContentType="password"
               returnKeyType="done"
               editable={!loading}

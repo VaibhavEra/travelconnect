@@ -146,6 +146,7 @@ export default function ResetNewPasswordScreen() {
                 touched={touchedFields.password}
                 secureTextEntry={!showPassword}
                 autoCapitalize="none"
+                autoCorrect={false}
                 autoComplete="password-new"
                 textContentType="newPassword"
                 returnKeyType="next"
@@ -167,6 +168,7 @@ export default function ResetNewPasswordScreen() {
                   </TouchableOpacity>
                 }
               />
+
               {passwordStrength.text && value && (
                 <Text
                   style={[
@@ -196,6 +198,7 @@ export default function ResetNewPasswordScreen() {
               touched={touchedFields.confirmPassword}
               secureTextEntry={!showConfirmPassword}
               autoCapitalize="none"
+              autoCorrect={false}
               autoComplete="password-new"
               textContentType="newPassword"
               returnKeyType="done"

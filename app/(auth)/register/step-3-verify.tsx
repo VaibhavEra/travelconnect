@@ -9,7 +9,7 @@ import { BorderRadius, Spacing, Typography } from "@/styles";
 import { useThemeColors } from "@/styles/theme";
 import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
@@ -41,8 +41,14 @@ export default function RegisterStep3Screen() {
     }
   }, [resendCooldown]);
 
-  // Redirect if no pending verification
+  // Redirect if no pending verification - CHECK ONLY ON MOUNT
+  const hasCheckedInitialState = useRef(false);
+
   useEffect(() => {
+    if (hasCheckedInitialState.current) return;
+
+    hasCheckedInitialState.current = true;
+
     if (flowState !== AuthFlowState.SIGNUP_OTP_SENT || !email) {
       Alert.alert("Error", "No pending verification. Please register again.", [
         {
@@ -52,10 +58,6 @@ export default function RegisterStep3Screen() {
       ]);
     }
   }, [flowState, email]);
-
-  if (flowState !== AuthFlowState.SIGNUP_OTP_SENT || !email) {
-    return null;
-  }
 
   const handleVerify = async () => {
     if (otp.length !== 6) {

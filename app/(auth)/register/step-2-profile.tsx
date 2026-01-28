@@ -252,7 +252,6 @@ export default function RegisterStep2Screen() {
 
   return (
     <AuthLayout showBackButton>
-      {" "}
       {/* UPDATED: Pass prop */}
       {/* Back Button - FIXED POSITIONING */}
       <TouchableOpacity

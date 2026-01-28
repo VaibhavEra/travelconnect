@@ -45,8 +45,8 @@ export const sanitize = {
    */
   name: (input: string): string => {
     return input
-      .trim()
       .replace(/[^a-zA-Z\s]/g, "") // Only letters and spaces
-      .replace(/\s+/g, " "); // Replace multiple spaces with single space
+      .replace(/\s+/g, " ") // Replace multiple spaces with single space
+      .replace(/^\s+/, ""); // Remove leading spaces only (not trailing)
   },
 };

@@ -196,6 +196,8 @@ export default function RegisterStep1Screen() {
                 touched={touchedFields.password}
                 secureTextEntry={!showPassword}
                 autoCapitalize="none"
+                autoCorrect={false}
+                autoComplete="password-new"
                 textContentType="newPassword"
                 returnKeyType="next"
                 onSubmitEditing={() => confirmPasswordRef.current?.focus()}
@@ -215,6 +217,7 @@ export default function RegisterStep1Screen() {
                   </TouchableOpacity>
                 }
               />
+
               {passwordStrength.text && value && (
                 <Text
                   style={[
@@ -244,6 +247,8 @@ export default function RegisterStep1Screen() {
               touched={touchedFields.confirmPassword}
               secureTextEntry={!showConfirmPassword}
               autoCapitalize="none"
+              autoCorrect={false}
+              autoComplete="password-new"
               textContentType="newPassword"
               returnKeyType="done"
               onSubmitEditing={handleSubmit(onSubmit)}
