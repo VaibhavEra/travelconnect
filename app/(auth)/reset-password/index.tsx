@@ -284,6 +284,7 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     gap: Spacing.sm,
     paddingVertical: Spacing.md + 4,
+    paddingHorizontal: Spacing.lg,
     borderRadius: BorderRadius.lg,
     marginTop: Spacing.sm,
     minHeight: 52,

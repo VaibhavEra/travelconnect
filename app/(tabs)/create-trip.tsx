@@ -113,7 +113,7 @@ const getErrorMessage = (error: any): { title: string; message: string } => {
 
 export default function CreateTripScreen() {
   const colors = useThemeColors();
-  const { user } = useAuthStore();
+  const user = useAuthStore((state) => state.user);
   const { createTrip, loading } = useTripStore();
 
   const {
@@ -141,6 +141,11 @@ export default function CreateTripScreen() {
     },
   });
 
+  // ADD THIS: Guard against null user during sign out
+  if (!user) {
+    return null;
+  }
+
   const departureDate = watch("departure_date");
 
   const formatDate = (date: Date): string => {
@@ -164,7 +169,7 @@ export default function CreateTripScreen() {
     try {
       haptics.light();
 
-      await createTrip(data, user!.id);
+      await createTrip(data, user.id);
 
       reset({
         source: "",
@@ -507,7 +512,7 @@ export default function CreateTripScreen() {
                   label="Ticket File"
                   value={value}
                   onChange={onChange}
-                  userId={user!.id}
+                  userId={user.id}
                   error={errors.ticket_file_url?.message}
                 />
               )}
