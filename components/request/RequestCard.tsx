@@ -83,6 +83,11 @@ export default function RequestCard({ request }: RequestCardProps) {
           <Text style={[styles.statusText, { color: statusColor }]}>
             {statusConfig.label}
           </Text>
+          {request.status === "accepted" && request.pickup_otp && (
+            <View style={styles.otpIndicator}>
+              <Ionicons name="key-outline" size={12} color={statusColor} />
+            </View>
+          )}
         </View>
 
         {/* Route Section */}
@@ -134,7 +139,7 @@ export default function RequestCard({ request }: RequestCardProps) {
             </View>
           </View>
 
-          {/* Departure & Arrival Details */}
+          {/* Departure & Arrival Details - FIXED with proper type */}
           {request.trip && (
             <View style={styles.tripTimings}>
               <View style={styles.timingItem}>
@@ -144,7 +149,12 @@ export default function RequestCard({ request }: RequestCardProps) {
                   color={colors.text.tertiary}
                 />
                 <Text
-                  style={[styles.timingText, { color: colors.text.tertiary }]}
+                  style={[styles.timingLabel, { color: colors.text.tertiary }]}
+                >
+                  Departs:
+                </Text>
+                <Text
+                  style={[styles.timingText, { color: colors.text.secondary }]}
                 >
                   {formatDate(request.trip.departure_date)} •{" "}
                   {formatTime(request.trip.departure_time)}
@@ -160,8 +170,16 @@ export default function RequestCard({ request }: RequestCardProps) {
                     />
                     <Text
                       style={[
-                        styles.timingText,
+                        styles.timingLabel,
                         { color: colors.text.tertiary },
+                      ]}
+                    >
+                      Arrives:
+                    </Text>
+                    <Text
+                      style={[
+                        styles.timingText,
+                        { color: colors.text.secondary },
                       ]}
                     >
                       {formatDate((request.trip as any).arrival_date)} •{" "}
@@ -173,7 +191,7 @@ export default function RequestCard({ request }: RequestCardProps) {
           )}
         </View>
 
-        {/* Divider */}
+        {/* Rest stays the same... */}
         <View
           style={[styles.divider, { backgroundColor: colors.border.light }]}
         />
@@ -268,13 +286,16 @@ const styles = StyleSheet.create({
     fontSize: Typography.sizes.sm,
     fontWeight: Typography.weights.semibold,
   },
+  otpIndicator: {
+    marginLeft: Spacing.xs,
+  },
   routeSection: {
     padding: Spacing.lg,
   },
   routeRow: {
     flexDirection: "row",
     alignItems: "center",
-    marginBottom: Spacing.sm,
+    marginBottom: Spacing.md,
   },
   cityContainer: {
     flex: 1,
@@ -301,15 +322,20 @@ const styles = StyleSheet.create({
     marginHorizontal: -8,
   },
   tripTimings: {
-    gap: Spacing.xs,
+    gap: Spacing.sm,
   },
   timingItem: {
     flexDirection: "row",
     alignItems: "center",
     gap: Spacing.xs,
   },
+  timingLabel: {
+    fontSize: Typography.sizes.xs,
+    fontWeight: Typography.weights.medium,
+  },
   timingText: {
     fontSize: Typography.sizes.xs,
+    flex: 1,
   },
   divider: {
     height: 1,
