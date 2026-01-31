@@ -63,9 +63,11 @@ export type Database = {
       parcel_requests: {
         Row: {
           accepted_at: string | null
+          cancellation_otp: string | null
+          cancellation_otp_expiry: string | null
           cancelled_by: string | null
           category: string
-          created_at: string | null
+          created_at: string
           delivered_at: string | null
           delivery_blocked_until: string | null
           delivery_contact_name: string
@@ -84,18 +86,17 @@ export type Database = {
           rejected_at: string | null
           rejection_reason: string | null
           sender_id: string
-          sender_notes: string | null
-          size: string
           status: string
-          traveller_notes: string | null
           trip_id: string
-          updated_at: string | null
+          updated_at: string
         }
         Insert: {
           accepted_at?: string | null
+          cancellation_otp?: string | null
+          cancellation_otp_expiry?: string | null
           cancelled_by?: string | null
           category: string
-          created_at?: string | null
+          created_at?: string
           delivered_at?: string | null
           delivery_blocked_until?: string | null
           delivery_contact_name: string
@@ -114,18 +115,17 @@ export type Database = {
           rejected_at?: string | null
           rejection_reason?: string | null
           sender_id: string
-          sender_notes?: string | null
-          size: string
           status?: string
-          traveller_notes?: string | null
           trip_id: string
-          updated_at?: string | null
+          updated_at?: string
         }
         Update: {
           accepted_at?: string | null
+          cancellation_otp?: string | null
+          cancellation_otp_expiry?: string | null
           cancelled_by?: string | null
           category?: string
-          created_at?: string | null
+          created_at?: string
           delivered_at?: string | null
           delivery_blocked_until?: string | null
           delivery_contact_name?: string
@@ -144,12 +144,9 @@ export type Database = {
           rejected_at?: string | null
           rejection_reason?: string | null
           sender_id?: string
-          sender_notes?: string | null
-          size?: string
           status?: string
-          traveller_notes?: string | null
           trip_id?: string
-          updated_at?: string | null
+          updated_at?: string
         }
         Relationships: [
           {
@@ -206,64 +203,61 @@ export type Database = {
       }
       trips: {
         Row: {
-          allowed_categories: string[] | null
+          allowed_categories: string[]
           arrival_date: string
           arrival_time: string
-          available_slots: number | null
-          created_at: string | null
+          created_at: string
           departure_date: string
           departure_time: string
           destination: string
           id: string
           notes: string | null
+          parcel_size_capacity: string
           pnr_number: string
           source: string
-          status: string | null
+          status: string
           ticket_file_url: string
-          total_slots: number | null
           transport_mode: string
           traveller_id: string
-          updated_at: string | null
+          updated_at: string
         }
         Insert: {
-          allowed_categories?: string[] | null
+          allowed_categories?: string[]
           arrival_date: string
           arrival_time: string
-          available_slots?: number | null
-          created_at?: string | null
+          created_at?: string
           departure_date: string
           departure_time: string
           destination: string
           id?: string
           notes?: string | null
+          parcel_size_capacity: string
           pnr_number: string
           source: string
-          status?: string | null
+          status?: string
           ticket_file_url: string
-          total_slots?: number | null
           transport_mode: string
           traveller_id: string
-          updated_at?: string | null
+          updated_at?: string
         }
         Update: {
-          allowed_categories?: string[] | null
+          allowed_categories?: string[]
           arrival_date?: string
           arrival_time?: string
-          available_slots?: number | null
-          created_at?: string | null
+          created_at?: string
           departure_date?: string
           departure_time?: string
           destination?: string
           id?: string
           notes?: string | null
+          parcel_size_capacity?: string
           pnr_number?: string
           source?: string
-          status?: string | null
+          status?: string
           ticket_file_url?: string
-          total_slots?: number | null
           transport_mode?: string
           traveller_id?: string
-          updated_at?: string | null
+          updated_at?: string
         }
         Relationships: [
           {
@@ -280,11 +274,13 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      accept_request_atomic: {
-        Args: { p_request_id: string; p_traveller_notes?: string }
-        Returns: Json
+      accept_request_atomic: { Args: { p_request_id: string }; Returns: Json }
+      can_edit_request_details: {
+        Args: { p_request_id: string }
+        Returns: boolean
       }
       can_edit_trip: { Args: { p_trip_id: string }; Returns: boolean }
+      can_edit_trip_dates: { Args: { p_trip_id: string }; Returns: boolean }
       cancel_request_with_validation: {
         Args: {
           p_cancellation_reason?: string
@@ -310,29 +306,45 @@ export type Database = {
           p_delivery_contact_phone: string
           p_item_description: string
           p_parcel_photos: string[]
-          p_sender_notes?: string
-          p_size: string
           p_trip_id: string
         }
         Returns: string
       }
-      create_trip_with_validation: {
-        Args: {
-          p_allowed_categories: string[]
-          p_arrival_date: string
-          p_arrival_time: string
-          p_departure_date: string
-          p_departure_time: string
-          p_destination: string
-          p_notes?: string
-          p_pnr_number: string
-          p_source: string
-          p_ticket_file_url: string
-          p_total_slots: number
-          p_transport_mode: string
-        }
-        Returns: string
-      }
+      create_trip_with_validation:
+        | {
+            Args: {
+              p_allowed_categories: string[]
+              p_arrival_date: string
+              p_arrival_time: string
+              p_departure_date: string
+              p_departure_time: string
+              p_destination: string
+              p_notes?: string
+              p_parcel_size_capacity: string
+              p_pnr_number: string
+              p_source: string
+              p_ticket_file_url: string
+              p_transport_mode: string
+            }
+            Returns: string
+          }
+        | {
+            Args: {
+              p_allowed_categories: string[]
+              p_arrival_date: string
+              p_arrival_time: string
+              p_departure_date: string
+              p_departure_time: string
+              p_destination: string
+              p_notes?: string
+              p_pnr_number: string
+              p_source: string
+              p_ticket_file_url: string
+              p_total_slots: number
+              p_transport_mode: string
+            }
+            Returns: string
+          }
       expire_old_requests: {
         Args: never
         Returns: {
@@ -340,6 +352,11 @@ export type Database = {
           expired_requests_count: number
           expired_trips_count: number
         }[]
+      }
+      expire_pending_requests_on_trip_start: { Args: never; Returns: number }
+      generate_cancellation_otp: {
+        Args: { p_request_id: string }
+        Returns: string
       }
       generate_otp: { Args: never; Returns: string }
       generate_pickup_otp: { Args: { request_id: string }; Returns: string }
@@ -350,9 +367,24 @@ export type Database = {
         Args: { user_email: string; user_ip?: string }
         Returns: undefined
       }
-      validate_slot_reduction: {
-        Args: { p_new_total_slots: number; p_trip_id: string }
-        Returns: boolean
+      regenerate_delivery_otp: {
+        Args: { p_request_id: string }
+        Returns: string
+      }
+      regenerate_pickup_otp: { Args: { p_request_id: string }; Returns: string }
+      reject_request: {
+        Args: { p_rejection_reason?: string; p_request_id: string }
+        Returns: Json
+      }
+      transition_trips_to_in_progress: { Args: never; Returns: number }
+      update_request_details: {
+        Args: {
+          p_category: string
+          p_item_description: string
+          p_parcel_photos: string[]
+          p_request_id: string
+        }
+        Returns: Json
       }
       validate_trip_dates: {
         Args: {
@@ -362,6 +394,10 @@ export type Database = {
           p_departure_time: string
         }
         Returns: boolean
+      }
+      verify_cancellation_otp_and_cancel_trip: {
+        Args: { p_otp: string; p_trip_id: string }
+        Returns: Json
       }
       verify_delivery_otp: {
         Args: { p_otp: string; p_request_id: string }
