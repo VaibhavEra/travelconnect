@@ -96,10 +96,13 @@ export default function RequestsScreen() {
     scrollY.value = event.nativeEvent.contentOffset.y;
   };
 
-  const filteredRequests = incomingRequests.filter((request) => {
-    if (requestFilter === "all") return true;
-    return request.status === requestFilter;
-  });
+  // FIXED: Filter out accepted requests from incoming view
+  const filteredRequests = incomingRequests
+    .filter((request) => request.status !== "accepted") // Don't show accepted in incoming
+    .filter((request) => {
+      if (requestFilter === "all") return true;
+      return request.status === requestFilter;
+    });
 
   const filteredDeliveries = acceptedRequests.filter((request) => {
     if (deliveryFilter === "all") return true;
@@ -110,8 +113,11 @@ export default function RequestsScreen() {
   });
 
   const getRequestFilterCount = (filterType: RequestFilter) => {
-    if (filterType === "all") return incomingRequests.length;
-    return incomingRequests.filter((r) => r.status === filterType).length;
+    const filteredIncoming = incomingRequests.filter(
+      (r) => r.status !== "accepted",
+    );
+    if (filterType === "all") return filteredIncoming.length;
+    return filteredIncoming.filter((r) => r.status === filterType).length;
   };
 
   const getDeliveryFilterCount = (filterType: DeliveryFilter) => {
@@ -158,7 +164,7 @@ export default function RequestsScreen() {
           : await verifyDeliveryOtp(selectedRequestId, otp);
 
       if (isValid && user) {
-        setOtpModalVisible(false);
+        setOtpModalVisible(false); // Close modal on success
         Alert.alert(
           "Success",
           otpType === "pickup"
@@ -182,6 +188,11 @@ export default function RequestsScreen() {
   ).length;
   const inTransitCount = acceptedRequests.filter(
     (r) => r.status === "picked_up",
+  ).length;
+
+  // FIXED: Calculate incoming count (excluding accepted)
+  const incomingCount = incomingRequests.filter(
+    (r) => r.status !== "accepted",
   ).length;
 
   if (loading && !refreshing) {
@@ -208,8 +219,8 @@ export default function RequestsScreen() {
       style={[styles.container, { backgroundColor: colors.background.primary }]}
       edges={["top"]}
     >
-      {/* Simplified Header */}
-      <View style={styles.header}>
+      {/* FIXED: Header with border */}
+      <View style={[styles.header, { borderBottomColor: colors.border.light }]}>
         <View>
           <Text style={[styles.headerTitle, { color: colors.text.primary }]}>
             {viewMode === "incoming" ? "Requests" : "Deliveries"}
@@ -218,7 +229,7 @@ export default function RequestsScreen() {
             style={[styles.headerSubtitle, { color: colors.text.secondary }]}
           >
             {viewMode === "incoming"
-              ? `${incomingRequests.length} ${incomingRequests.length === 1 ? "request" : "requests"}`
+              ? `${incomingCount} ${incomingCount === 1 ? "request" : "requests"}`
               : `${acceptedRequests.length} active`}
           </Text>
         </View>
@@ -241,7 +252,7 @@ export default function RequestsScreen() {
         }
       >
         {/* Stats Cards - Hide on scroll */}
-        {(incomingRequests.length > 0 || acceptedRequests.length > 0) && (
+        {(incomingCount > 0 || acceptedRequests.length > 0) && (
           <Animated.View style={[styles.statsContainer, headerOpacity]}>
             <View
               style={[
@@ -251,7 +262,7 @@ export default function RequestsScreen() {
             >
               <Ionicons name="mail" size={20} color={colors.primary} />
               <Text style={[styles.statNumber, { color: colors.primary }]}>
-                {incomingRequests.length}
+                {incomingCount}
               </Text>
               <Text style={[styles.statLabel, { color: colors.primary }]}>
                 Incoming
@@ -359,7 +370,7 @@ export default function RequestsScreen() {
               >
                 Incoming
               </Text>
-              {incomingRequests.length > 0 && (
+              {incomingCount > 0 && (
                 <View
                   style={[
                     styles.viewBadge,
@@ -382,7 +393,7 @@ export default function RequestsScreen() {
                       },
                     ]}
                   >
-                    {incomingRequests.length}
+                    {incomingCount}
                   </Text>
                 </View>
               )}
@@ -484,16 +495,6 @@ export default function RequestsScreen() {
                   onPress={() => {
                     haptics.selection();
                     setRequestFilter("pending");
-                  }}
-                />
-                <FilterChip
-                  label="Accepted"
-                  icon="checkmark-circle"
-                  count={getRequestFilterCount("accepted")}
-                  active={requestFilter === "accepted"}
-                  onPress={() => {
-                    haptics.selection();
-                    setRequestFilter("accepted");
                   }}
                 />
                 <FilterChip
@@ -714,6 +715,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     paddingHorizontal: Spacing.lg,
     paddingVertical: Spacing.md,
+    borderBottomWidth: 1, // FIXED: Added border
   },
   headerTitle: {
     fontSize: Typography.sizes.xl,
