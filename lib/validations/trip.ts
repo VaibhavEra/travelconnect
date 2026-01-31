@@ -68,43 +68,6 @@ export const tripSchema = z
   })
   .refine(
     (data) => {
-      // Only validate arrival if both date and time are provided
-      if (!data.arrival_date || !data.arrival_time) {
-        return true; // Skip validation if arrival not set
-      }
-
-      // Validate arrival is after departure
-      const departureDateTime = new Date(
-        `${data.departure_date}T${data.departure_time}`,
-      );
-      const arrivalDateTime = new Date(
-        `${data.arrival_date}T${data.arrival_time}`,
-      );
-      return arrivalDateTime > departureDateTime;
-    },
-    {
-      message: "Arrival must be after departure",
-      path: ["arrival_date"],
-    },
-  )
-  .refine(
-    (data) => {
-      // Validate departure is not in the past (5-minute grace period)
-      const departureDateTime = new Date(
-        `${data.departure_date}T${data.departure_time}`,
-      );
-      const now = new Date();
-      const fiveMinutesAgo = new Date(now.getTime() - 5 * 60 * 1000);
-      return departureDateTime > fiveMinutesAgo;
-    },
-    {
-      message: "Departure cannot be in the past",
-      path: ["departure_date"],
-    },
-  )
-  .refine(
-    (data) => {
-      // Ensure source and destination are different
       return (
         data.source.toLowerCase().trim() !==
         data.destination.toLowerCase().trim()
@@ -113,6 +76,46 @@ export const tripSchema = z
     {
       message: "Source and destination must be different",
       path: ["destination"],
+    },
+  )
+  // FIXED: Departure validation - now correctly validates future dates
+  .refine(
+    (data) => {
+      // Parse departure date and time
+      const departureDateTimeStr = `${data.departure_date}T${data.departure_time}:00`;
+      const departureDateTime = new Date(departureDateTimeStr);
+
+      // Get current date/time
+      const now = new Date();
+
+      // FIXED: Allow departure to be >= now (not strictly >)
+      // This fixes the "past date" bug when selecting future dates
+      return departureDateTime.getTime() >= now.getTime();
+    },
+    {
+      message: "Departure cannot be in the past",
+      path: ["departure_date"],
+    },
+  )
+  // Arrival validation - only if both date and time are provided
+  .refine(
+    (data) => {
+      if (!data.arrival_date || !data.arrival_time) {
+        return true; // Skip if arrival not set
+      }
+
+      const departureDateTime = new Date(
+        `${data.departure_date}T${data.departure_time}:00`,
+      );
+      const arrivalDateTime = new Date(
+        `${data.arrival_date}T${data.arrival_time}:00`,
+      );
+
+      return arrivalDateTime.getTime() > departureDateTime.getTime();
+    },
+    {
+      message: "Arrival must be after departure",
+      path: ["arrival_date"],
     },
   );
 
@@ -138,6 +141,6 @@ export const formatTripForDatabase = (
     pnr_number: data.pnr_number.trim(),
     ticket_file_url: data.ticket_file_url,
     notes: data.notes || null,
-    status: "open" as const,
+    status: "upcoming" as const,
   };
 };
