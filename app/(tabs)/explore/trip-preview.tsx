@@ -1,3 +1,4 @@
+import { CATEGORY_CONFIG } from "@/lib/constants/categories";
 import { TRANSPORT_ICONS } from "@/lib/constants/transport";
 import { formatDate, formatTime } from "@/lib/utils/dateTime";
 import { haptics } from "@/lib/utils/haptics";
@@ -88,7 +89,7 @@ export default function TripPreviewScreen() {
       style={[styles.container, { backgroundColor: colors.background.primary }]}
       edges={["top"]}
     >
-      {/* Header */}
+      {/* Header - LEFT ALIGNED */}
       <View style={styles.header}>
         <Pressable
           onPress={handleBack}
@@ -100,10 +101,11 @@ export default function TripPreviewScreen() {
         >
           <Ionicons name="arrow-back" size={24} color={colors.text.primary} />
         </Pressable>
-        <Text style={[styles.headerTitle, { color: colors.text.primary }]}>
-          Trip Details
-        </Text>
-        <View style={styles.headerSpacer} />
+        <View style={styles.headerContent}>
+          <Text style={[styles.headerTitle, { color: colors.text.primary }]}>
+            Trip Details
+          </Text>
+        </View>
       </View>
 
       <ScrollView
@@ -314,7 +316,7 @@ export default function TripPreviewScreen() {
             style={[styles.divider, { backgroundColor: colors.border.light }]}
           />
 
-          {/* Categories */}
+          {/* Categories WITH ICONS AND LABELS */}
           <View style={styles.categoriesSection}>
             <Text
               style={[styles.categoriesTitle, { color: colors.text.primary }]}
@@ -322,47 +324,32 @@ export default function TripPreviewScreen() {
               Allowed Categories
             </Text>
             <View style={styles.categoriesGrid}>
-              {currentTrip.allowed_categories.map((category) => (
-                <View
-                  key={category}
-                  style={[
-                    styles.categoryChip,
-                    { backgroundColor: colors.primary + "10" },
-                  ]}
-                >
-                  <Text
-                    style={[styles.categoryText, { color: colors.primary }]}
+              {currentTrip.allowed_categories.map((category) => {
+                const categoryConfig =
+                  CATEGORY_CONFIG[category as keyof typeof CATEGORY_CONFIG];
+                return (
+                  <View
+                    key={category}
+                    style={[
+                      styles.categoryChip,
+                      { backgroundColor: colors.primary + "10" },
+                    ]}
                   >
-                    {category.charAt(0).toUpperCase() + category.slice(1)}
-                  </Text>
-                </View>
-              ))}
+                    <Ionicons
+                      name={categoryConfig?.icon || "cube-outline"}
+                      size={16}
+                      color={colors.primary}
+                    />
+                    <Text
+                      style={[styles.categoryText, { color: colors.primary }]}
+                    >
+                      {categoryConfig?.label || category}
+                    </Text>
+                  </View>
+                );
+              })}
             </View>
           </View>
-
-          {/* Notes */}
-          {currentTrip.notes && (
-            <>
-              <View
-                style={[
-                  styles.divider,
-                  { backgroundColor: colors.border.light },
-                ]}
-              />
-              <View style={styles.notesSection}>
-                <Text
-                  style={[styles.notesTitle, { color: colors.text.primary }]}
-                >
-                  Traveller's Notes
-                </Text>
-                <Text
-                  style={[styles.notesText, { color: colors.text.secondary }]}
-                >
-                  {currentTrip.notes}
-                </Text>
-              </View>
-            </>
-          )}
         </View>
       </ScrollView>
 
@@ -410,7 +397,7 @@ const styles = StyleSheet.create({
   header: {
     flexDirection: "row",
     alignItems: "center",
-    justifyContent: "space-between",
+    gap: Spacing.sm,
     paddingHorizontal: Spacing.lg,
     paddingVertical: Spacing.md,
   },
@@ -421,12 +408,12 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
+  headerContent: {
+    flex: 1,
+  },
   headerTitle: {
     fontSize: Typography.sizes.lg,
     fontWeight: Typography.weights.bold,
-  },
-  headerSpacer: {
-    width: 40,
   },
   scrollView: {
     flex: 1,
@@ -565,23 +552,16 @@ const styles = StyleSheet.create({
     gap: Spacing.xs,
   },
   categoryChip: {
+    flexDirection: "row", // NEW: Row layout
+    alignItems: "center",
+    gap: 6, // NEW: Gap between icon and text
     paddingHorizontal: Spacing.sm,
-    paddingVertical: 4,
+    paddingVertical: 6,
     borderRadius: BorderRadius.sm,
   },
   categoryText: {
     fontSize: Typography.sizes.xs,
     fontWeight: Typography.weights.semibold,
-  },
-  notesSection: {},
-  notesTitle: {
-    fontSize: Typography.sizes.sm,
-    fontWeight: Typography.weights.semibold,
-    marginBottom: Spacing.sm,
-  },
-  notesText: {
-    fontSize: Typography.sizes.sm,
-    lineHeight: Typography.sizes.sm * 1.5,
   },
   footer: {
     padding: Spacing.lg,
