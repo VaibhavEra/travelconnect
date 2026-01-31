@@ -50,7 +50,7 @@ const normalizeTrip = (dbTrip: any): Trip => {
     pnr_number: dbTrip.pnr_number,
     ticket_file_url: dbTrip.ticket_file_url,
     notes: dbTrip.notes,
-    status: (dbTrip.status as Trip["status"]) ?? "open",
+    status: (dbTrip.status as Trip["status"]) ?? "upcoming", // UPDATED
     created_at: dbTrip.created_at ?? new Date().toISOString(),
     updated_at: dbTrip.updated_at ?? new Date().toISOString(),
   };
@@ -87,7 +87,7 @@ export const useSearchStore = create<SearchState>((set, get) => ({
       let query = supabase
         .from("trips")
         .select("*")
-        .eq("status", "open")
+        .eq("status", "upcoming") // UPDATED from "open"
         .gt("available_slots", 0)
         .gte("departure_date", new Date().toISOString().split("T")[0]) // Future trips only
         .neq("traveller_id", user?.id || "") // NEW: Filter out own trips
