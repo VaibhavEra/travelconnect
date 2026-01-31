@@ -34,6 +34,11 @@ export default function ExploreResultsScreen() {
     router.back();
   };
 
+  const handleModifySearch = () => {
+    haptics.light();
+    router.back();
+  };
+
   const handleClearAndNewSearch = () => {
     haptics.light();
     clearFilters();
@@ -86,6 +91,17 @@ export default function ExploreResultsScreen() {
             {filters.source} → {filters.destination}
           </Text>
         </View>
+        {/* NEW: Modify Search Button */}
+        <Pressable
+          onPress={handleModifySearch}
+          hitSlop={10}
+          style={[
+            styles.modifyButton,
+            { backgroundColor: colors.background.secondary },
+          ]}
+        >
+          <Ionicons name="options-outline" size={20} color={colors.primary} />
+        </Pressable>
       </View>
 
       <ScrollView
@@ -141,7 +157,7 @@ export default function ExploreResultsScreen() {
               <Text
                 style={[styles.emptyButtonText, { color: colors.text.inverse }]}
               >
-                Try Different Search
+                Modify Search
               </Text>
             </Pressable>
           </View>
@@ -187,6 +203,14 @@ const styles = StyleSheet.create({
   },
   headerSubtitle: {
     fontSize: Typography.sizes.sm,
+  },
+  // NEW: Modify button
+  modifyButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    alignItems: "center",
+    justifyContent: "center",
   },
   loadingContainer: {
     flex: 1,
