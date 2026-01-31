@@ -32,10 +32,12 @@ export default function CategoryCheckboxes({
 
   return (
     <View style={styles.container}>
+      {/* FIXED: Bigger label */}
       <Text style={[styles.label, { color: colors.text.primary }]}>
         {label}
       </Text>
 
+      {/* FIXED: Better spacing, removed whitespace */}
       <View style={styles.categoriesContainer}>
         {PACKAGE_CATEGORIES.map((category) => {
           const isSelected = value.includes(category);
@@ -67,10 +69,13 @@ export default function CategoryCheckboxes({
                 <Text
                   style={[
                     styles.categoryText,
-                    { color: colors.text.secondary },
-                    isSelected && {
-                      color: colors.primary,
-                      fontWeight: Typography.weights.semibold,
+                    {
+                      color: isSelected
+                        ? colors.primary
+                        : colors.text.secondary,
+                      fontWeight: isSelected
+                        ? Typography.weights.semibold
+                        : Typography.weights.medium,
                     },
                   ]}
                 >
@@ -80,7 +85,7 @@ export default function CategoryCheckboxes({
               {isSelected && (
                 <Ionicons
                   name="checkmark-circle"
-                  size={18}
+                  size={20}
                   color={colors.primary}
                 />
               )}
@@ -101,30 +106,29 @@ const styles = StyleSheet.create({
     marginBottom: Spacing.md,
   },
   label: {
-    fontSize: Typography.sizes.sm,
-    fontWeight: Typography.weights.medium,
+    fontSize: Typography.sizes.md, // FIXED: Bigger label
+    fontWeight: Typography.weights.semibold,
     marginBottom: Spacing.sm,
   },
   categoriesContainer: {
-    gap: Spacing.xs,
+    gap: Spacing.sm, // FIXED: Better spacing
   },
   categoryButton: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    borderRadius: BorderRadius.md,
-    paddingVertical: Spacing.sm,
+    borderRadius: BorderRadius.lg, // FIXED: Better radius
+    paddingVertical: Spacing.md, // FIXED: Better padding
     paddingHorizontal: Spacing.md,
     borderWidth: 1.5,
   },
   categoryContent: {
     flexDirection: "row",
     alignItems: "center",
-    gap: Spacing.sm,
+    gap: Spacing.md, // FIXED: Better spacing
   },
   categoryText: {
-    fontSize: Typography.sizes.sm,
-    fontWeight: Typography.weights.medium,
+    fontSize: Typography.sizes.md, // FIXED: Better size
   },
   error: {
     fontSize: Typography.sizes.xs,
