@@ -16,6 +16,18 @@ export const PACKAGE_CATEGORIES = [
 
 export type PackageCategory = (typeof PACKAGE_CATEGORIES)[number];
 
+// NEW: Parcel size capacity enum
+export const PARCEL_SIZE_CAPACITY = ["small", "medium", "large"] as const;
+
+export type ParcelSizeCapacity = (typeof PARCEL_SIZE_CAPACITY)[number];
+
+// NEW: Size descriptions for UI (what traveller can carry)
+export const SIZE_CAPACITY_DESCRIPTIONS: Record<ParcelSizeCapacity, string> = {
+  small: "Less than 1 kg",
+  medium: "1-3 kg",
+  large: "Up to 5 kg",
+};
+
 // Trip creation schema
 export const tripSchema = z
   .object({
@@ -42,12 +54,12 @@ export const tripSchema = z
     arrival_date: z.string().nullable(),
     arrival_time: z.string().nullable(),
 
-    // Capacity
-    total_slots: z
-      .number()
-      .int()
-      .min(1, "At least 1 slot required")
-      .max(5, "Maximum 5 slots allowed"),
+    // NEW: Parcel size capacity (replaces total_slots)
+    parcel_size_capacity: z.enum(PARCEL_SIZE_CAPACITY, {
+      message: "Please select parcel size capacity",
+    }),
+
+    // REMOVED: total_slots
 
     // Categories
     allowed_categories: z
@@ -126,7 +138,7 @@ export const tripSchema = z
 
 export type TripFormData = z.infer<typeof tripSchema>;
 
-// Helper to convert form data to database format
+// Helper to convert form data to database format (UPDATED)
 export const formatTripForDatabase = (
   data: TripFormData,
   travellerId: string,
@@ -140,12 +152,12 @@ export const formatTripForDatabase = (
     departure_time: data.departure_time,
     arrival_date: data.arrival_date || null,
     arrival_time: data.arrival_time || null,
-    total_slots: data.total_slots,
-    available_slots: data.total_slots,
+    parcel_size_capacity: data.parcel_size_capacity, // NEW
     allowed_categories: data.allowed_categories,
     pnr_number: data.pnr_number.trim(),
     ticket_file_url: data.ticket_file_url,
     notes: data.notes || null,
     status: "upcoming" as const,
+    // REMOVED: total_slots, available_slots
   };
 };
