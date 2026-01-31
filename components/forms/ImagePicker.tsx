@@ -23,6 +23,7 @@ interface ImagePickerProps {
   maxImages?: number;
   exactCount?: number;
   error?: string;
+  disableCropping?: boolean; // NEW
 }
 
 export default function ImagePicker({
@@ -31,6 +32,7 @@ export default function ImagePicker({
   maxImages = 5,
   exactCount,
   error,
+  disableCropping = false, // NEW: Default false
 }: ImagePickerProps) {
   const colors = useThemeColors();
   const [uploading, setUploading] = useState(false);
@@ -38,7 +40,7 @@ export default function ImagePicker({
   const effectiveMax = exactCount || maxImages;
   const requiresExact = !!exactCount;
 
-  const takePhoto = async () => {
+  const showImageSourceOptions = () => {
     if (images.length >= effectiveMax) {
       Alert.alert(
         "Limit Reached",
@@ -49,6 +51,28 @@ export default function ImagePicker({
       return;
     }
 
+    Alert.alert(
+      "Add Photo",
+      "Choose how to add your photo",
+      [
+        {
+          text: "Take Photo",
+          onPress: takePhoto,
+        },
+        {
+          text: "Choose from Gallery",
+          onPress: pickFromGallery,
+        },
+        {
+          text: "Cancel",
+          style: "cancel",
+        },
+      ],
+      { cancelable: true },
+    );
+  };
+
+  const takePhoto = async () => {
     const { status } = await ExpoImagePicker.requestCameraPermissionsAsync();
     if (status !== "granted") {
       Alert.alert(
@@ -59,13 +83,43 @@ export default function ImagePicker({
     }
 
     const result = await ExpoImagePicker.launchCameraAsync({
-      allowsEditing: true,
+      allowsEditing: !disableCropping, // NEW: Respect disableCropping
       aspect: [4, 3],
       quality: 0.7,
     });
 
     if (!result.canceled && result.assets[0]) {
       await uploadImage(result.assets[0].uri);
+    }
+  };
+
+  const pickFromGallery = async () => {
+    const { status } =
+      await ExpoImagePicker.requestMediaLibraryPermissionsAsync();
+    if (status !== "granted") {
+      Alert.alert(
+        "Gallery Permission Required",
+        "Please allow gallery access to choose photos.",
+      );
+      return;
+    }
+
+    const remaining = effectiveMax - images.length;
+
+    const result = await ExpoImagePicker.launchImageLibraryAsync({
+      mediaTypes: ExpoImagePicker.MediaTypeOptions.Images,
+      allowsMultipleSelection: remaining > 1,
+      selectionLimit: remaining,
+      allowsEditing: !disableCropping && remaining === 1, // NEW: Only allow editing if cropping enabled and single selection
+      aspect: [4, 3],
+      quality: 0.8,
+    });
+
+    if (!result.canceled && result.assets.length > 0) {
+      // Upload all selected images
+      for (const asset of result.assets) {
+        await uploadImage(asset.uri);
+      }
     }
   };
 
@@ -215,7 +269,7 @@ export default function ImagePicker({
                   : colors.background.primary,
               },
             ]}
-            onPress={takePhoto}
+            onPress={showImageSourceOptions}
             disabled={uploading}
           >
             {uploading ? (
@@ -223,7 +277,7 @@ export default function ImagePicker({
             ) : (
               <>
                 <Ionicons
-                  name="camera"
+                  name="images-outline"
                   size={32}
                   color={needsMorePhotos ? colors.warning : colors.primary}
                 />
@@ -238,7 +292,7 @@ export default function ImagePicker({
                     },
                   ]}
                 >
-                  {images.length === 0 ? "Take Photos" : "Take Photo"}
+                  {images.length === 0 ? "Add Photos" : "Add Photo"}
                 </Text>
               </>
             )}
