@@ -7,6 +7,20 @@ import { create } from "zustand";
 // Type for parcel request from database
 type DbParcelRequest = Database["public"]["Tables"]["parcel_requests"]["Row"];
 
+// NEW: Type definitions for RPC function returns
+type PickupOtpVerificationResult = {
+  request_id: string;
+  status: string;
+  delivery_otp: string;
+  delivery_otp_expiry: string;
+};
+
+type DeliveryOtpVerificationResult = {
+  request_id: string;
+  status: string;
+  delivered_at: string;
+};
+
 // Extended type with trip information
 export interface ParcelRequest extends DbParcelRequest {
   trip?: {
@@ -14,6 +28,8 @@ export interface ParcelRequest extends DbParcelRequest {
     destination: string;
     departure_date: string;
     departure_time: string;
+    arrival_date: string;
+    arrival_time: string;
     transport_mode: string;
   } | null;
   sender?: {
@@ -62,6 +78,13 @@ interface RequestState {
   verifyDeliveryOtp: (requestId: string, otp: string) => Promise<boolean>;
   getPickupOtp: (requestId: string) => Promise<string | null>;
   getDeliveryOtp: (requestId: string) => Promise<string | null>;
+
+  // NEW: Update receiver details
+  updateReceiverDetails: (
+    requestId: string,
+    delivery_contact_name: string,
+    delivery_contact_phone: string,
+  ) => Promise<void>;
 
   clearError: () => void;
 }
@@ -112,7 +135,7 @@ export const useRequestStore = create<RequestState>((set, get) => ({
         .select(
           `
           *,
-          trip:trips(source, destination, departure_date, departure_time, transport_mode)
+          trip:trips(source, destination, departure_date, departure_time, arrival_date, arrival_time, transport_mode)
         `,
         )
         .eq("id", requestId)
@@ -144,7 +167,7 @@ export const useRequestStore = create<RequestState>((set, get) => ({
         .select(
           `
           *,
-          trip:trips(source, destination, departure_date, departure_time, transport_mode)
+          trip:trips(source, destination, departure_date, departure_time, arrival_date, arrival_time, transport_mode)
         `,
         )
         .eq("sender_id", senderId)
@@ -171,7 +194,7 @@ export const useRequestStore = create<RequestState>((set, get) => ({
         .select(
           `
           *,
-          trip:trips!inner(source, destination, departure_date, departure_time, transport_mode),
+          trip:trips!inner(source, destination, departure_date, departure_time, arrival_date, arrival_time, transport_mode),
           sender:profiles!parcel_requests_sender_id_fkey(full_name, phone)
         `,
         )
@@ -204,7 +227,7 @@ export const useRequestStore = create<RequestState>((set, get) => ({
         .select(
           `
           *,
-          trip:trips!inner(source, destination, departure_date, departure_time, transport_mode),
+          trip:trips!inner(source, destination, departure_date, departure_time, arrival_date, arrival_time, transport_mode),
           sender:profiles!parcel_requests_sender_id_fkey(full_name, phone)
         `,
         )
@@ -238,7 +261,7 @@ export const useRequestStore = create<RequestState>((set, get) => ({
         .select(
           `
           *,
-          trip:trips(source, destination, departure_date, departure_time, transport_mode),
+          trip:trips(source, destination, departure_date, departure_time, arrival_date, arrival_time, transport_mode),
           sender:profiles!parcel_requests_sender_id_fkey(full_name, phone)
         `,
         )
@@ -260,18 +283,17 @@ export const useRequestStore = create<RequestState>((set, get) => ({
   },
 
   // ============================================================================
-  // UPDATED: Accept request with atomic slot decrement
+  // UPDATED: Accept request with atomic slot decrement + trip refresh
   // ============================================================================
   acceptRequest: async (requestId: string, travellerNotes?: string) => {
     try {
       set({ loading: true, error: null });
 
-      // Prepare RPC parameters (only include p_traveller_notes if it has a value)
+      // Prepare RPC parameters
       const rpcParams: any = {
         p_request_id: requestId,
       };
 
-      // Only add p_traveller_notes if it exists
       if (travellerNotes) {
         rpcParams.p_traveller_notes = travellerNotes;
       }
@@ -286,7 +308,16 @@ export const useRequestStore = create<RequestState>((set, get) => ({
 
       logger.info("Request accepted atomically", { result });
 
-      // Refresh incoming and accepted requests
+      // Refresh the request to get latest data
+      const request = await get().getRequestById(requestId);
+
+      // NEW: Refresh the trip to get updated available_slots
+      if (request?.trip_id) {
+        const { useTripStore } = await import("./tripStore");
+        await useTripStore.getState().getTripById(request.trip_id);
+      }
+
+      // Update local state
       set((state) => ({
         incomingRequests: state.incomingRequests.map((req) =>
           req.id === requestId
@@ -453,13 +484,16 @@ export const useRequestStore = create<RequestState>((set, get) => ({
   },
 
   // ============================================================================
-  // UPDATED: Verify pickup OTP (new signature, returns JSON with delivery OTP)
+  // OTP VERIFICATION METHODS
+  // ============================================================================
+
+  // ============================================================================
+  // UPDATED: Verify pickup OTP (now returns JSON directly from DB)
   // ============================================================================
   verifyPickupOtp: async (requestId: string, otp: string) => {
     try {
       set({ loading: true, error: null });
 
-      // Use new RPC signature (returns JSON with delivery OTP)
       const { data, error } = await supabase.rpc("verify_pickup_otp", {
         p_request_id: requestId,
         p_otp: otp,
@@ -467,26 +501,22 @@ export const useRequestStore = create<RequestState>((set, get) => ({
 
       if (error) throw error;
 
-      // New function returns JSON: { request_id, status, delivery_otp, delivery_otp_expiry }
-      const result = data as {
-        request_id: string;
-        status: string;
-        delivery_otp: string;
-        delivery_otp_expiry: string;
-      };
+      if (!data) {
+        throw new Error("No data returned from verification");
+      }
+
+      const result = data as unknown as PickupOtpVerificationResult;
 
       logger.info("Pickup verified, delivery OTP generated", {
         requestId,
         deliveryOtp: result.delivery_otp,
       });
 
-      if (result && result.status === "picked_up") {
-        // Refresh current request if it's the one being updated
+      if (result.status === "picked_up") {
         if (get().currentRequest?.id === requestId) {
           await get().getRequestById(requestId);
         }
 
-        // Refresh accepted requests list
         set((state) => ({
           acceptedRequests: state.acceptedRequests.map((req) =>
             req.id === requestId
@@ -510,13 +540,12 @@ export const useRequestStore = create<RequestState>((set, get) => ({
   },
 
   // ============================================================================
-  // UPDATED: Verify delivery OTP (new signature, returns JSON)
+  // UPDATED: Verify delivery OTP (now returns JSON directly from DB)
   // ============================================================================
   verifyDeliveryOtp: async (requestId: string, otp: string) => {
     try {
       set({ loading: true, error: null });
 
-      // Use new RPC signature (returns JSON)
       const { data, error } = await supabase.rpc("verify_delivery_otp", {
         p_request_id: requestId,
         p_otp: otp,
@@ -524,25 +553,22 @@ export const useRequestStore = create<RequestState>((set, get) => ({
 
       if (error) throw error;
 
-      // New function returns JSON: { request_id, status, delivered_at }
-      const result = data as {
-        request_id: string;
-        status: string;
-        delivered_at: string;
-      };
+      if (!data) {
+        throw new Error("No data returned from verification");
+      }
+
+      const result = data as unknown as DeliveryOtpVerificationResult;
 
       logger.info("Delivery verified", {
         requestId,
         deliveredAt: result.delivered_at,
       });
 
-      if (result && result.status === "delivered") {
-        // Refresh current request if it's the one being updated
+      if (result.status === "delivered") {
         if (get().currentRequest?.id === requestId) {
           await get().getRequestById(requestId);
         }
 
-        // Refresh accepted requests list
         set((state) => ({
           acceptedRequests: state.acceptedRequests.map((req) =>
             req.id === requestId
@@ -596,6 +622,60 @@ export const useRequestStore = create<RequestState>((set, get) => ({
     } catch (error) {
       logger.error("Get delivery OTP failed", error);
       return null;
+    }
+  },
+
+  // ============================================================================
+  // NEW: Update receiver details (only allowed before acceptance)
+  // ============================================================================
+  updateReceiverDetails: async (
+    requestId: string,
+    delivery_contact_name: string,
+    delivery_contact_phone: string,
+  ) => {
+    try {
+      set({ loading: true, error: null });
+
+      // Check current status first
+      const { data: request, error: fetchError } = await supabase
+        .from("parcel_requests")
+        .select("status")
+        .eq("id", requestId)
+        .single();
+
+      if (fetchError) throw fetchError;
+
+      if (request.status !== "pending") {
+        throw new Error("Can only edit receiver details before acceptance");
+      }
+
+      const { error } = await supabase
+        .from("parcel_requests")
+        .update({
+          delivery_contact_name,
+          delivery_contact_phone,
+          updated_at: new Date().toISOString(),
+        })
+        .eq("id", requestId);
+
+      if (error) throw error;
+
+      // Update local state
+      set((state) => ({
+        myRequests: state.myRequests.map((req) =>
+          req.id === requestId
+            ? { ...req, delivery_contact_name, delivery_contact_phone }
+            : req,
+        ),
+        loading: false,
+      }));
+
+      logger.info("Receiver details updated", { requestId });
+    } catch (error: any) {
+      const errorMessage = parseSupabaseError(error);
+      logger.error("Update receiver details failed", error);
+      set({ loading: false, error: errorMessage });
+      throw new Error(errorMessage);
     }
   },
 
