@@ -18,16 +18,25 @@ const IMAGE_WIDTH = SCREEN_WIDTH - Spacing.lg * 2;
 
 interface PhotoGalleryProps {
   photos: string[];
+  mode?: "inline" | "thumbnail"; // NEW: Display mode
+  thumbnailSize?: number; // NEW: Size for thumbnail mode
 }
 
-export default function PhotoGallery({ photos }: PhotoGalleryProps) {
+export default function PhotoGallery({
+  photos,
+  mode = "inline",
+  thumbnailSize = 80,
+}: PhotoGalleryProps) {
   const colors = useThemeColors();
   const [currentIndex, setCurrentIndex] = useState(0);
   const [modalVisible, setModalVisible] = useState(false);
 
   const handleScroll = (event: any) => {
     const scrollPosition = event.nativeEvent.contentOffset.x;
-    const index = Math.round(scrollPosition / IMAGE_WIDTH);
+    const index =
+      mode === "inline"
+        ? Math.round(scrollPosition / IMAGE_WIDTH)
+        : Math.round(scrollPosition / SCREEN_WIDTH);
     setCurrentIndex(index);
   };
 
@@ -35,6 +44,114 @@ export default function PhotoGallery({ photos }: PhotoGalleryProps) {
     return null;
   }
 
+  // Thumbnail mode - small clickable previews
+  if (mode === "thumbnail") {
+    return (
+      <>
+        <View style={styles.thumbnailContainer}>
+          {photos.map((photo, index) => (
+            <Pressable
+              key={index}
+              onPress={() => {
+                setCurrentIndex(index);
+                setModalVisible(true);
+              }}
+              style={[
+                styles.thumbnail,
+                { width: thumbnailSize, height: thumbnailSize },
+              ]}
+            >
+              <Image source={{ uri: photo }} style={styles.thumbnailImage} />
+              {photos.length > 1 && (
+                <View
+                  style={[
+                    styles.thumbnailBadge,
+                    { backgroundColor: colors.background.overlay },
+                  ]}
+                >
+                  <Ionicons
+                    name="images-outline"
+                    size={12}
+                    color={colors.text.inverse}
+                  />
+                  <Text
+                    style={[
+                      styles.thumbnailBadgeText,
+                      { color: colors.text.inverse },
+                    ]}
+                  >
+                    {index + 1}/{photos.length}
+                  </Text>
+                </View>
+              )}
+            </Pressable>
+          ))}
+        </View>
+
+        {/* Full Screen Modal */}
+        <Modal
+          visible={modalVisible}
+          transparent={true}
+          animationType="fade"
+          onRequestClose={() => setModalVisible(false)}
+        >
+          <View
+            style={[styles.modalContainer, { backgroundColor: Overlays.heavy }]}
+          >
+            <Pressable
+              style={styles.closeButton}
+              onPress={() => setModalVisible(false)}
+            >
+              <Ionicons name="close" size={32} color={colors.text.inverse} />
+            </Pressable>
+
+            <ScrollView
+              horizontal
+              pagingEnabled
+              showsHorizontalScrollIndicator={false}
+              style={styles.modalScroll}
+              onScroll={handleScroll}
+              scrollEventThrottle={16}
+              contentOffset={{ x: currentIndex * SCREEN_WIDTH, y: 0 }}
+            >
+              {photos.map((photo, index) => (
+                <View key={index} style={styles.modalImageContainer}>
+                  <Image
+                    source={{ uri: photo }}
+                    style={styles.modalImage}
+                    resizeMode="contain"
+                  />
+                </View>
+              ))}
+            </ScrollView>
+
+            <View
+              style={[
+                styles.modalPagination,
+                { backgroundColor: colors.background.overlay },
+              ]}
+            >
+              <Ionicons
+                name="images-outline"
+                size={20}
+                color={colors.text.inverse}
+              />
+              <Text
+                style={[
+                  styles.modalPaginationText,
+                  { color: colors.text.inverse },
+                ]}
+              >
+                {currentIndex + 1} / {photos.length}
+              </Text>
+            </View>
+          </View>
+        </Modal>
+      </>
+    );
+  }
+
+  // Inline mode - original behavior
   return (
     <>
       <View style={styles.container}>
@@ -108,6 +225,8 @@ export default function PhotoGallery({ photos }: PhotoGalleryProps) {
             pagingEnabled
             showsHorizontalScrollIndicator={false}
             style={styles.modalScroll}
+            onScroll={handleScroll}
+            scrollEventThrottle={16}
           >
             {photos.map((photo, index) => (
               <View key={index} style={styles.modalImageContainer}>
@@ -126,6 +245,11 @@ export default function PhotoGallery({ photos }: PhotoGalleryProps) {
               { backgroundColor: colors.background.overlay },
             ]}
           >
+            <Ionicons
+              name="images-outline"
+              size={20}
+              color={colors.text.inverse}
+            />
             <Text
               style={[
                 styles.modalPaginationText,
@@ -174,6 +298,36 @@ const styles = StyleSheet.create({
     padding: Spacing.xs,
     borderRadius: BorderRadius.sm,
   },
+  // NEW: Thumbnail mode styles
+  thumbnailContainer: {
+    flexDirection: "row",
+    gap: Spacing.sm,
+    flexWrap: "wrap",
+  },
+  thumbnail: {
+    borderRadius: BorderRadius.md,
+    overflow: "hidden",
+    position: "relative",
+  },
+  thumbnailImage: {
+    width: "100%",
+    height: "100%",
+  },
+  thumbnailBadge: {
+    position: "absolute",
+    bottom: 4,
+    right: 4,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: BorderRadius.sm,
+  },
+  thumbnailBadgeText: {
+    fontSize: 10,
+    fontWeight: "600",
+  },
   modalContainer: {
     flex: 1,
   },
@@ -200,6 +354,9 @@ const styles = StyleSheet.create({
     position: "absolute",
     bottom: 50,
     alignSelf: "center",
+    flexDirection: "row",
+    alignItems: "center",
+    gap: Spacing.sm,
     paddingHorizontal: Spacing.md,
     paddingVertical: Spacing.sm,
     borderRadius: BorderRadius.md,
