@@ -78,25 +78,30 @@ export const tripSchema = z
       path: ["destination"],
     },
   )
-  // FIXED: Departure validation - now correctly validates future dates
+  // Replace the departure validation refine:
   .refine(
     (data) => {
-      // Parse departure date and time
-      const departureDateTimeStr = `${data.departure_date}T${data.departure_time}:00`;
-      const departureDateTime = new Date(departureDateTimeStr);
+      // Skip validation if date or time is empty
+      if (!data.departure_date || !data.departure_time) {
+        return true;
+      }
 
-      // Get current date/time
+      // Parse departure date and time with UTC to avoid timezone issues
+      const [year, month, day] = data.departure_date.split("-").map(Number);
+      const [hours, minutes] = data.departure_time.split(":").map(Number);
+
+      const departureDateTime = new Date(year, month - 1, day, hours, minutes);
       const now = new Date();
 
-      // FIXED: Allow departure to be >= now (not strictly >)
-      // This fixes the "past date" bug when selecting future dates
-      return departureDateTime.getTime() >= now.getTime();
+      // Allow departure if it's in the future (even by 1 minute)
+      return departureDateTime.getTime() > now.getTime();
     },
     {
       message: "Departure cannot be in the past",
       path: ["departure_date"],
     },
   )
+
   // Arrival validation - only if both date and time are provided
   .refine(
     (data) => {

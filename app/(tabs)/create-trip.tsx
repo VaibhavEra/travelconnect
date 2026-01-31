@@ -36,13 +36,6 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
-const getDefaultDepartureDate = () => {
-  const tomorrow = new Date();
-  tomorrow.setDate(tomorrow.getDate() + 1);
-  tomorrow.setHours(0, 0, 0, 0);
-  return tomorrow.toISOString().split("T")[0];
-};
-
 const getErrorMessage = (error: any): { title: string; message: string } => {
   const errorMessage = error.message || "";
 
@@ -124,7 +117,7 @@ export default function CreateTripScreen() {
       source: "",
       destination: "",
       transport_mode: "train",
-      departure_date: getDefaultDepartureDate(),
+      departure_date: "",
       departure_time: "",
       arrival_date: null,
       arrival_time: null,
@@ -180,7 +173,7 @@ export default function CreateTripScreen() {
         source: "",
         destination: "",
         transport_mode: "train",
-        departure_date: getDefaultDepartureDate(),
+        departure_date: "",
         departure_time: "",
         arrival_date: null,
         arrival_time: null,
@@ -239,6 +232,7 @@ export default function CreateTripScreen() {
           showsVerticalScrollIndicator={false}
           keyboardShouldPersistTaps="handled"
         >
+          {/* Route & Transport */}
           <View
             style={[
               styles.card,
@@ -259,27 +253,37 @@ export default function CreateTripScreen() {
               </Text>
             </View>
 
-            <View style={styles.citiesRow}>
-              <View style={styles.cityWrapper}>
-                <Controller
-                  control={control}
-                  name="source"
-                  render={({ field: { onChange, value } }) => (
-                    <CityDropdown
-                      label="Source City"
-                      value={value}
-                      onChange={onChange}
-                      placeholder="Select source city"
-                      error={errors.source?.message}
-                    />
-                  )}
-                />
-              </View>
+            <View style={styles.cityWrapper}>
+              <Controller
+                control={control}
+                name="source"
+                render={({ field: { onChange, value } }) => (
+                  <CityDropdown
+                    label="From"
+                    value={value}
+                    onChange={onChange}
+                    placeholder="Select origin city"
+                    error={errors.source?.message}
+                  />
+                )}
+              />
+            </View>
 
+            <View style={styles.swapContainer}>
+              <View
+                style={[
+                  styles.swapLine,
+                  { backgroundColor: colors.border.default },
+                ]}
+              />
               <Pressable
                 style={[
                   styles.swapButton,
-                  { backgroundColor: colors.background.primary },
+                  {
+                    backgroundColor: colors.background.primary,
+                    borderColor: colors.border.default,
+                  },
+                  !source && !destination && styles.swapButtonDisabled,
                 ]}
                 onPress={handleCitySwap}
                 disabled={!source && !destination}
@@ -294,22 +298,28 @@ export default function CreateTripScreen() {
                   }
                 />
               </Pressable>
+              <View
+                style={[
+                  styles.swapLine,
+                  { backgroundColor: colors.border.default },
+                ]}
+              />
+            </View>
 
-              <View style={styles.cityWrapper}>
-                <Controller
-                  control={control}
-                  name="destination"
-                  render={({ field: { onChange, value } }) => (
-                    <CityDropdown
-                      label="Destination City"
-                      value={value}
-                      onChange={onChange}
-                      placeholder="Select destination city"
-                      error={errors.destination?.message}
-                    />
-                  )}
-                />
-              </View>
+            <View style={styles.cityWrapperLast}>
+              <Controller
+                control={control}
+                name="destination"
+                render={({ field: { onChange, value } }) => (
+                  <CityDropdown
+                    label="To"
+                    value={value}
+                    onChange={onChange}
+                    placeholder="Select destination city"
+                    error={errors.destination?.message}
+                  />
+                )}
+              />
             </View>
 
             <Controller
@@ -326,6 +336,7 @@ export default function CreateTripScreen() {
             />
           </View>
 
+          {/* Schedule */}
           <View
             style={[
               styles.card,
@@ -352,41 +363,37 @@ export default function CreateTripScreen() {
               Departure
             </Text>
             <View style={styles.dateTimeRow}>
-              <View style={styles.dateTimeItem}>
-                <Controller
-                  control={control}
-                  name="departure_date"
-                  render={({ field: { onChange, value } }) => (
-                    <DatePickerInput
-                      label="Date"
-                      value={parseDate(value)}
-                      onChange={(date) => onChange(dateToISO(date))}
-                      error={errors.departure_date?.message}
-                      minimumDate={new Date()}
-                      placeholder="Select date"
-                    />
-                  )}
-                />
-              </View>
-              <View style={styles.dateTimeItem}>
-                <Controller
-                  control={control}
-                  name="departure_time"
-                  render={({ field: { onChange, value } }) => (
-                    <TimePickerInput
-                      label="Time"
-                      value={
-                        value && value.trim() !== ""
-                          ? parseDate("2000-01-01", value)
-                          : null
-                      }
-                      onChange={(date) => onChange(dateToTimeString(date))}
-                      error={errors.departure_time?.message}
-                      placeholder="Select time"
-                    />
-                  )}
-                />
-              </View>
+              <Controller
+                control={control}
+                name="departure_date"
+                render={({ field: { onChange, value } }) => (
+                  <DatePickerInput
+                    value={parseDate(value)}
+                    onChange={(date) => onChange(date ? dateToISO(date) : "")}
+                    error={errors.departure_date?.message}
+                    minimumDate={new Date()}
+                    placeholder="Select date"
+                  />
+                )}
+              />
+              <Controller
+                control={control}
+                name="departure_time"
+                render={({ field: { onChange, value } }) => (
+                  <TimePickerInput
+                    value={
+                      value && value.trim() !== ""
+                        ? parseDate("2000-01-01", value)
+                        : null
+                    }
+                    onChange={(date) =>
+                      onChange(date ? dateToTimeString(date) : "")
+                    }
+                    error={errors.departure_time?.message}
+                    placeholder="Pick time"
+                  />
+                )}
+              />
             </View>
 
             <Text
@@ -395,44 +402,41 @@ export default function CreateTripScreen() {
               Arrival
             </Text>
             <View style={styles.dateTimeRow}>
-              <View style={styles.dateTimeItem}>
-                <Controller
-                  control={control}
-                  name="arrival_date"
-                  render={({ field: { onChange, value } }) => (
-                    <DatePickerInput
-                      label="Date"
-                      value={parseDate(value)}
-                      onChange={(date) => onChange(dateToISO(date))}
-                      error={errors.arrival_date?.message}
-                      minimumDate={parseDate(departureDate) || undefined}
-                      placeholder="Select date"
-                    />
-                  )}
-                />
-              </View>
-              <View style={styles.dateTimeItem}>
-                <Controller
-                  control={control}
-                  name="arrival_time"
-                  render={({ field: { onChange, value } }) => (
-                    <TimePickerInput
-                      label="Time"
-                      value={
-                        value && value.trim() !== ""
-                          ? parseDate("2000-01-01", value)
-                          : null
-                      }
-                      onChange={(date) => onChange(dateToTimeString(date))}
-                      error={errors.arrival_time?.message}
-                      placeholder="Select time"
-                    />
-                  )}
-                />
-              </View>
+              <Controller
+                control={control}
+                name="arrival_date"
+                render={({ field: { onChange, value } }) => (
+                  <DatePickerInput
+                    value={parseDate(value)}
+                    onChange={(date) => onChange(date ? dateToISO(date) : null)}
+                    error={errors.arrival_date?.message}
+                    minimumDate={parseDate(departureDate) || undefined}
+                    placeholder="Select date"
+                  />
+                )}
+              />
+              <Controller
+                control={control}
+                name="arrival_time"
+                render={({ field: { onChange, value } }) => (
+                  <TimePickerInput
+                    value={
+                      value && value.trim() !== ""
+                        ? parseDate("2000-01-01", value)
+                        : null
+                    }
+                    onChange={(date) =>
+                      onChange(date ? dateToTimeString(date) : null)
+                    }
+                    error={errors.arrival_time?.message}
+                    placeholder="Pick time"
+                  />
+                )}
+              />
             </View>
           </View>
 
+          {/* Capacity & Categories */}
           <View
             style={[
               styles.card,
@@ -650,14 +654,20 @@ const styles = StyleSheet.create({
     fontSize: Typography.sizes.md,
     fontWeight: Typography.weights.bold,
   },
-  citiesRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: Spacing.sm,
+  cityWrapper: {
+    // No flex needed for vertical layout
+  },
+  cityWrapperLast: {
     marginBottom: Spacing.md,
   },
-  cityWrapper: {
+  swapContainer: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginVertical: Spacing.xs,
+  },
+  swapLine: {
     flex: 1,
+    height: 1,
   },
   swapButton: {
     width: 40,
@@ -665,7 +675,11 @@ const styles = StyleSheet.create({
     borderRadius: 20,
     alignItems: "center",
     justifyContent: "center",
-    marginTop: 20,
+    borderWidth: 1,
+    marginHorizontal: Spacing.sm,
+  },
+  swapButtonDisabled: {
+    opacity: 0.5,
   },
   scheduleLabel: {
     fontSize: Typography.sizes.md,
@@ -675,11 +689,8 @@ const styles = StyleSheet.create({
   },
   dateTimeRow: {
     flexDirection: "row",
-    gap: Spacing.md,
+    gap: Spacing.sm,
     marginBottom: Spacing.sm,
-  },
-  dateTimeItem: {
-    flex: 1,
   },
   errorSummary: {
     flexDirection: "row",
