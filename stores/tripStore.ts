@@ -25,7 +25,13 @@ export type Trip = {
   pnr_number: string;
   ticket_file_url: string;
   notes: string | null;
-  status: "open" | "in_progress" | "completed" | "cancelled";
+  status:
+    | "upcoming"
+    | "locked"
+    | "in_progress"
+    | "completed"
+    | "cancelled"
+    | "expired"; // UPDATED
   created_at: string;
   updated_at: string;
 };
@@ -43,6 +49,7 @@ interface TripState {
   getMyTrips: (userId: string) => Promise<void>;
   getAvailableTrips: () => Promise<void>;
   getTripById: (tripId: string) => Promise<Trip | null>;
+  canEditTrip: (tripId: string) => Promise<boolean>; // NEW
   updateTrip: (tripId: string, updates: Partial<DbTrip>) => Promise<void>;
   updateTripStatus: (tripId: string, status: Trip["status"]) => Promise<void>;
   deleteTrip: (tripId: string) => Promise<void>;
@@ -70,7 +77,7 @@ const normalizeTrip = (dbTrip: DbTrip): Trip => {
     pnr_number: dbTrip.pnr_number,
     ticket_file_url: dbTrip.ticket_file_url,
     notes: dbTrip.notes,
-    status: validStatus ?? "open",
+    status: validStatus ?? "upcoming", // UPDATED
     created_at: dbTrip.created_at ?? new Date().toISOString(),
     updated_at: dbTrip.updated_at ?? new Date().toISOString(),
   };
@@ -185,7 +192,7 @@ export const useTripStore = create<TripState>((set, get) => ({
       const { data: trips, error } = await supabase
         .from("trips")
         .select("*")
-        .eq("status", "open")
+        .eq("status", "upcoming") // UPDATED
         .gte("departure_date", today)
         .gt("available_slots", 0)
         .neq("traveller_id", user?.id || "") // NEW: Filter out own trips
@@ -231,10 +238,36 @@ export const useTripStore = create<TripState>((set, get) => ({
     }
   },
 
-  // Update existing trip
+  // NEW: Check if trip can be edited
+  canEditTrip: async (tripId: string): Promise<boolean> => {
+    try {
+      const { data, error } = await supabase.rpc("can_edit_trip", {
+        p_trip_id: tripId,
+      });
+
+      if (error) {
+        logger.error("Check edit permission failed", error);
+        return false;
+      }
+
+      return data ?? false;
+    } catch (error) {
+      logger.error("canEditTrip error", error);
+      return false;
+    }
+  },
+
+  // UPDATED: With permission check
   updateTrip: async (tripId: string, updates: Partial<DbTrip>) => {
     try {
       set({ loading: true, error: null });
+
+      const canEdit = await get().canEditTrip(tripId);
+      if (!canEdit) {
+        throw new Error(
+          "Cannot edit trip within 24h of departure or with accepted requests",
+        );
+      }
 
       const { data: trip, error } = await supabase
         .from("trips")
