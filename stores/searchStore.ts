@@ -32,7 +32,7 @@ const initialFilters: SearchFilters = {
   transportMode: "all",
 };
 
-// Helper to normalize trip from database
+// UPDATED: Helper to normalize trip from database
 const normalizeTrip = (dbTrip: any): Trip => {
   return {
     id: dbTrip.id,
@@ -44,15 +44,16 @@ const normalizeTrip = (dbTrip: any): Trip => {
     departure_time: dbTrip.departure_time,
     arrival_date: dbTrip.arrival_date,
     arrival_time: dbTrip.arrival_time,
-    total_slots: dbTrip.total_slots ?? 0,
-    available_slots: dbTrip.available_slots ?? 0,
+    parcel_size_capacity:
+      dbTrip.parcel_size_capacity as Trip["parcel_size_capacity"], // NEW
     allowed_categories: dbTrip.allowed_categories ?? [],
     pnr_number: dbTrip.pnr_number,
     ticket_file_url: dbTrip.ticket_file_url,
     notes: dbTrip.notes,
-    status: (dbTrip.status as Trip["status"]) ?? "upcoming", // UPDATED
+    status: (dbTrip.status as Trip["status"]) ?? "upcoming",
     created_at: dbTrip.created_at ?? new Date().toISOString(),
     updated_at: dbTrip.updated_at ?? new Date().toISOString(),
+    // REMOVED: total_slots, available_slots
   };
 };
 
@@ -70,7 +71,7 @@ export const useSearchStore = create<SearchState>((set, get) => ({
     }));
   },
 
-  // Search trips with current filters
+  // UPDATED: Search trips with current filters
   searchTrips: async () => {
     try {
       set({ loading: true, error: null });
@@ -82,17 +83,17 @@ export const useSearchStore = create<SearchState>((set, get) => ({
         data: { user },
       } = await supabase.auth.getUser();
 
-      // Start with base query - only open trips with available slots
-      // Performance: Uses idx_trips_search_available composite index
+      // UPDATED: Start with base query - only upcoming trips (not locked)
+      // Slot system removed - trips are visible if status = 'upcoming'
       let query = supabase
         .from("trips")
         .select("*")
-        .eq("status", "upcoming") // UPDATED from "open"
-        .gt("available_slots", 0)
+        .eq("status", "upcoming") // Only upcoming, not locked
         .gte("departure_date", new Date().toISOString().split("T")[0]) // Future trips only
-        .neq("traveller_id", user?.id || "") // NEW: Filter out own trips
+        .neq("traveller_id", user?.id || "") // Filter out own trips
         .order("departure_date", { ascending: true })
         .order("departure_time", { ascending: true });
+      // REMOVED: .gt("available_slots", 0) - slot system removed
 
       // Apply source filter (required)
       if (filters.source) {
