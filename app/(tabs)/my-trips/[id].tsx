@@ -24,8 +24,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 export default function TripDetailsScreen() {
   const colors = useThemeColors();
   const { id } = useLocalSearchParams<{ id: string }>();
-  const { currentTrip, loading, getTripById, updateTripStatus, deleteTrip } =
-    useTripStore();
+  const { currentTrip, loading, getTripById, deleteTrip } = useTripStore();
   const [actionLoading, setActionLoading] = useState(false);
 
   useEffect(() => {
@@ -33,58 +32,6 @@ export default function TripDetailsScreen() {
       getTripById(id);
     }
   }, [id]);
-
-  const renderSlots = () => {
-    const slots = [];
-    const maxSlots = Math.min(currentTrip!.total_slots, 5);
-
-    for (let i = 0; i < maxSlots; i++) {
-      const isAvailable = i < currentTrip!.available_slots;
-      slots.push(
-        <View
-          key={i}
-          style={[
-            styles.slotDot,
-            {
-              backgroundColor: isAvailable
-                ? colors.success
-                : colors.text.tertiary + "40",
-            },
-          ]}
-        />,
-      );
-    }
-    return slots;
-  };
-
-  const handleCompleteTrip = () => {
-    haptics.light();
-    Alert.alert(
-      "Complete Trip",
-      "Mark this trip as completed? This action cannot be undone.",
-      [
-        { text: "Cancel", style: "cancel" },
-        {
-          text: "Complete",
-          style: "default",
-          onPress: async () => {
-            try {
-              setActionLoading(true);
-              haptics.success();
-              await updateTripStatus(id, "completed");
-              Alert.alert("Success", "Trip marked as completed");
-              router.back();
-            } catch (error) {
-              haptics.error();
-              Alert.alert("Error", "Failed to complete trip");
-            } finally {
-              setActionLoading(false);
-            }
-          },
-        },
-      ],
-    );
-  };
 
   const handleCancelTrip = () => {
     haptics.light();
@@ -149,15 +96,15 @@ export default function TripDetailsScreen() {
   const status = currentTrip.status as TripStatus;
   const statusConfig = TRIP_STATUS_CONFIG[status];
   const statusColor = colors[statusConfig.colorKey];
-  const canPerformActions = status === "open" || status === "in_progress";
+  const canCancel = status === "upcoming";
 
   return (
     <SafeAreaView
       style={[styles.container, { backgroundColor: colors.background.primary }]}
       edges={["top"]}
     >
-      {/* Header */}
-      <View style={styles.header}>
+      {/* FIXED: Header with status and left-aligned title */}
+      <View style={[styles.header, { borderBottomColor: colors.border.light }]}>
         <Pressable
           onPress={handleBack}
           hitSlop={10}
@@ -168,10 +115,18 @@ export default function TripDetailsScreen() {
         >
           <Ionicons name="arrow-back" size={24} color={colors.text.primary} />
         </Pressable>
-        <Text style={[styles.headerTitle, { color: colors.text.primary }]}>
-          Trip Details
-        </Text>
-        <View style={styles.headerSpacer} />
+        <View style={styles.headerContent}>
+          <Text style={[styles.headerTitle, { color: colors.text.primary }]}>
+            Trip Details
+          </Text>
+          {/* NEW: Status badge in header */}
+          <View style={styles.statusBadge}>
+            <Ionicons name={statusConfig.icon} size={14} color={statusColor} />
+            <Text style={[styles.statusBadgeText, { color: statusColor }]}>
+              {statusConfig.label}
+            </Text>
+          </View>
+        </View>
       </View>
 
       <ScrollView
@@ -179,16 +134,6 @@ export default function TripDetailsScreen() {
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
       >
-        {/* Status Badge */}
-        <View
-          style={[styles.statusBadge, { backgroundColor: statusColor + "15" }]}
-        >
-          <Ionicons name={statusConfig.icon} size={18} color={statusColor} />
-          <Text style={[styles.statusText, { color: statusColor }]}>
-            {statusConfig.label}
-          </Text>
-        </View>
-
         {/* Main Card */}
         <View
           style={[
@@ -374,16 +319,13 @@ export default function TripDetailsScreen() {
                 <Text
                   style={[styles.infoLabel, { color: colors.text.tertiary }]}
                 >
-                  Available Slots
+                  Slots
                 </Text>
-                <View style={styles.slotsInfo}>
-                  <View style={styles.slotsRow}>{renderSlots()}</View>
-                  <Text
-                    style={[styles.slotsCount, { color: colors.text.primary }]}
-                  >
-                    {currentTrip.available_slots}/{currentTrip.total_slots}
-                  </Text>
-                </View>
+                <Text
+                  style={[styles.infoValue, { color: colors.text.primary }]}
+                >
+                  {currentTrip.available_slots}/{currentTrip.total_slots}
+                </Text>
               </View>
             </View>
           </View>
@@ -441,30 +383,6 @@ export default function TripDetailsScreen() {
             </View>
           </View>
 
-          {/* Notes */}
-          {currentTrip.notes && (
-            <>
-              <View
-                style={[
-                  styles.divider,
-                  { backgroundColor: colors.border.light },
-                ]}
-              />
-              <View style={styles.notesSection}>
-                <Text
-                  style={[styles.notesTitle, { color: colors.text.primary }]}
-                >
-                  Additional Notes
-                </Text>
-                <Text
-                  style={[styles.notesText, { color: colors.text.secondary }]}
-                >
-                  {currentTrip.notes}
-                </Text>
-              </View>
-            </>
-          )}
-
           <View
             style={[styles.divider, { backgroundColor: colors.border.light }]}
           />
@@ -495,65 +413,33 @@ export default function TripDetailsScreen() {
           </View>
         </View>
 
-        {/* Action Buttons */}
-        {canPerformActions && (
-          <View style={styles.actionsContainer}>
-            <Pressable
-              style={[styles.actionButton, { backgroundColor: colors.success }]}
-              onPress={handleCompleteTrip}
-              disabled={actionLoading}
-            >
-              {actionLoading ? (
-                <ActivityIndicator color={colors.text.inverse} />
-              ) : (
-                <>
-                  <Ionicons
-                    name="checkmark-circle"
-                    size={20}
-                    color={colors.text.inverse}
-                  />
-                  <Text
-                    style={[
-                      styles.actionButtonText,
-                      { color: colors.text.inverse },
-                    ]}
-                  >
-                    Complete Trip
-                  </Text>
-                </>
-              )}
-            </Pressable>
-
-            <Pressable
-              style={[
-                styles.actionButton,
-                {
-                  backgroundColor: colors.background.secondary,
-                  borderColor: colors.error,
-                  borderWidth: 1.5,
-                },
-              ]}
-              onPress={handleCancelTrip}
-              disabled={actionLoading}
-            >
-              {actionLoading ? (
-                <ActivityIndicator color={colors.error} />
-              ) : (
-                <>
-                  <Ionicons
-                    name="close-circle"
-                    size={20}
-                    color={colors.error}
-                  />
-                  <Text
-                    style={[styles.actionButtonText, { color: colors.error }]}
-                  >
-                    Cancel Trip
-                  </Text>
-                </>
-              )}
-            </Pressable>
-          </View>
+        {/* REMOVED: Complete Trip button */}
+        {/* Action Buttons - Only Cancel */}
+        {canCancel && (
+          <Pressable
+            style={[
+              styles.cancelButton,
+              {
+                backgroundColor: colors.background.secondary,
+                borderColor: colors.error,
+              },
+            ]}
+            onPress={handleCancelTrip}
+            disabled={actionLoading}
+          >
+            {actionLoading ? (
+              <ActivityIndicator color={colors.error} />
+            ) : (
+              <>
+                <Ionicons name="close-circle" size={20} color={colors.error} />
+                <Text
+                  style={[styles.cancelButtonText, { color: colors.error }]}
+                >
+                  Cancel Trip
+                </Text>
+              </>
+            )}
+          </Pressable>
         )}
 
         <View style={{ height: Spacing.xxxl }} />
@@ -578,9 +464,10 @@ const styles = StyleSheet.create({
   header: {
     flexDirection: "row",
     alignItems: "center",
-    justifyContent: "space-between",
+    gap: Spacing.sm,
     paddingHorizontal: Spacing.lg,
     paddingVertical: Spacing.md,
+    borderBottomWidth: 1,
   },
   backButton: {
     width: 40,
@@ -589,12 +476,22 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
+  headerContent: {
+    flex: 1,
+    gap: 4,
+  },
   headerTitle: {
     fontSize: Typography.sizes.lg,
     fontWeight: Typography.weights.bold,
   },
-  headerSpacer: {
-    width: 40,
+  statusBadge: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+  },
+  statusBadgeText: {
+    fontSize: Typography.sizes.sm,
+    fontWeight: Typography.weights.semibold,
   },
   scrollView: {
     flex: 1,
@@ -602,23 +499,10 @@ const styles = StyleSheet.create({
   scrollContent: {
     padding: Spacing.lg,
   },
-  statusBadge: {
-    alignSelf: "flex-start",
-    flexDirection: "row",
-    alignItems: "center",
-    gap: Spacing.xs,
-    paddingHorizontal: Spacing.md,
-    paddingVertical: Spacing.sm,
-    borderRadius: BorderRadius.md,
-    marginBottom: Spacing.lg,
-  },
-  statusText: {
-    fontSize: Typography.sizes.sm,
-    fontWeight: Typography.weights.semibold,
-  },
   mainCard: {
     borderRadius: BorderRadius.xl,
     padding: Spacing.lg,
+    marginBottom: Spacing.lg,
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.05,
@@ -716,22 +600,6 @@ const styles = StyleSheet.create({
     fontSize: Typography.sizes.sm,
     fontWeight: Typography.weights.semibold,
   },
-  slotsInfo: {
-    gap: 4,
-  },
-  slotsRow: {
-    flexDirection: "row",
-    gap: 4,
-  },
-  slotDot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-  },
-  slotsCount: {
-    fontSize: Typography.sizes.xs,
-    fontWeight: Typography.weights.medium,
-  },
   pnrSection: {
     marginBottom: Spacing.md,
   },
@@ -768,18 +636,6 @@ const styles = StyleSheet.create({
     fontSize: Typography.sizes.xs,
     fontWeight: Typography.weights.semibold,
   },
-  notesSection: {
-    marginBottom: Spacing.md,
-  },
-  notesTitle: {
-    fontSize: Typography.sizes.sm,
-    fontWeight: Typography.weights.semibold,
-    marginBottom: Spacing.sm,
-  },
-  notesText: {
-    fontSize: Typography.sizes.sm,
-    lineHeight: Typography.sizes.sm * 1.5,
-  },
   ticketSection: {},
   ticketTitle: {
     fontSize: Typography.sizes.sm,
@@ -799,19 +655,16 @@ const styles = StyleSheet.create({
     fontSize: Typography.sizes.sm,
     fontWeight: Typography.weights.semibold,
   },
-  actionsContainer: {
-    gap: Spacing.sm,
-    marginTop: Spacing.lg,
-  },
-  actionButton: {
+  cancelButton: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
     gap: Spacing.sm,
     paddingVertical: Spacing.md,
     borderRadius: BorderRadius.xl,
+    borderWidth: 2,
   },
-  actionButtonText: {
+  cancelButtonText: {
     fontSize: Typography.sizes.md,
     fontWeight: Typography.weights.semibold,
   },
