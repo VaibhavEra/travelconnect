@@ -1,15 +1,10 @@
 import { z } from "zod";
 
-export const PARCEL_SIZES = ["small", "medium", "large"] as const;
+// REMOVED: PARCEL_SIZES - Size now comes from trip, not sender
 
-export type ParcelSize = (typeof PARCEL_SIZES)[number];
+// REMOVED: ParcelSize type
 
-// Size descriptions for UI
-export const SIZE_DESCRIPTIONS: Record<ParcelSize, string> = {
-  small: "Fits in pocket/small bag (< 1kg)",
-  medium: "Fits in backpack (1-3kg)",
-  large: "Requires dedicated luggage space (3-5kg)",
-};
+// REMOVED: SIZE_DESCRIPTIONS - No longer needed
 
 // Request form schema with delivery contact required
 export const requestSchema = z.object({
@@ -20,9 +15,7 @@ export const requestSchema = z.object({
 
   category: z.string().min(1, "Please select a category"),
 
-  size: z.enum(PARCEL_SIZES, {
-    message: "Please select a size",
-  }),
+  // REMOVED: size field - traveller defines capacity, sender doesn't select size
 
   // ============================================================================
   // UPDATED: Require exactly 2 photos (matches database constraint)
@@ -41,11 +34,7 @@ export const requestSchema = z.object({
     .string()
     .regex(/^[0-9]{10}$/, "Phone number must be 10 digits"),
 
-  sender_notes: z
-    .string()
-    .max(300, "Notes are too long")
-    .optional()
-    .or(z.literal("")),
+  // REMOVED: sender_notes field
 });
 
 export type RequestFormData = z.infer<typeof requestSchema>;
