@@ -47,7 +47,6 @@ export default function MyTripsScreen() {
   const [filter, setFilter] = useState<TripFilter>("all");
   const [refreshing, setRefreshing] = useState(false);
 
-  // Animated header for scroll
   const scrollY = useSharedValue(0);
   const headerOpacity = useAnimatedStyle(() => ({
     opacity: withTiming(scrollY.value > 50 ? 0 : 1),
@@ -134,8 +133,8 @@ export default function MyTripsScreen() {
       style={[styles.container, { backgroundColor: colors.background.primary }]}
       edges={["top"]}
     >
-      {/* Header */}
-      <View style={styles.header}>
+      {/* FIXED: Added border */}
+      <View style={[styles.header, { borderBottomColor: colors.border.light }]}>
         <View>
           <Text style={[styles.headerTitle, { color: colors.text.primary }]}>
             My Trips
@@ -164,7 +163,7 @@ export default function MyTripsScreen() {
           />
         }
       >
-        {/* Stats Cards - Hide on scroll */}
+        {/* Stats Cards */}
         {trips.length > 0 && (
           <Animated.View style={[styles.statsContainer, headerOpacity]}>
             <View
@@ -218,7 +217,7 @@ export default function MyTripsScreen() {
           </Animated.View>
         )}
 
-        {/* Filters - Sticky on scroll */}
+        {/* Filters */}
         <View style={styles.filtersWrapper}>
           <ScrollView
             horizontal
@@ -310,6 +309,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     paddingHorizontal: Spacing.lg,
     paddingVertical: Spacing.md,
+    borderBottomWidth: 1, // FIXED: Added border
   },
   headerTitle: {
     fontSize: Typography.sizes.xl,
