@@ -33,9 +33,10 @@ export default function TripCard({ trip }: TripCardProps) {
   const colors = useThemeColors();
   const scale = useSharedValue(1);
 
+  // FIXED: Use isFuture like before
   const isUpcoming =
     isFuture(trip.departure_date, trip.departure_time) &&
-    trip.status === "open";
+    trip.status === "upcoming";
 
   const renderSlots = () => {
     const slots = [];
@@ -108,6 +109,7 @@ export default function TripCard({ trip }: TripCardProps) {
           <Text style={[styles.statusText, { color: statusColor }]}>
             {statusConfig.label}
           </Text>
+          {/* FIXED: Only show "Upcoming" if trip is in future and not already showing upcoming status */}
           {isUpcoming && (
             <>
               <View
@@ -187,17 +189,18 @@ export default function TripCard({ trip }: TripCardProps) {
 
           {/* Info Row */}
           <View style={styles.infoRow}>
-            {/* Slots with Dots */}
+            {/* Slots with proper label */}
             <View style={styles.slotsContainer}>
               <View style={styles.slotsRow}>{renderSlots()}</View>
               <Text
                 style={[styles.slotsText, { color: colors.text.secondary }]}
               >
-                {trip.available_slots}/{trip.total_slots} slots
+                {trip.available_slots}/{trip.total_slots}{" "}
+                {trip.total_slots === 1 ? "slot" : "slots"}
               </Text>
             </View>
 
-            {/* Categories */}
+            {/* Categories with icons AND labels */}
             <View style={styles.categoriesContainer}>
               {trip.allowed_categories
                 .slice(0, UI.MAX_VISIBLE_CATEGORIES)
@@ -205,12 +208,21 @@ export default function TripCard({ trip }: TripCardProps) {
                   const config =
                     CATEGORY_CONFIG[category as keyof typeof CATEGORY_CONFIG];
                   return (
-                    <Ionicons
-                      key={category}
-                      name={config?.icon || "cube"}
-                      size={14}
-                      color={colors.text.tertiary}
-                    />
+                    <View key={category} style={styles.categoryItem}>
+                      <Ionicons
+                        name={config?.icon || "cube"}
+                        size={14}
+                        color={colors.text.tertiary}
+                      />
+                      <Text
+                        style={[
+                          styles.categoryLabel,
+                          { color: colors.text.tertiary },
+                        ]}
+                      >
+                        {config?.label || category}
+                      </Text>
+                    </View>
                   );
                 })}
               {trip.allowed_categories.length > UI.MAX_VISIBLE_CATEGORIES && (
@@ -335,6 +347,16 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     gap: Spacing.xs,
+    flexWrap: "wrap",
+  },
+  categoryItem: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+  },
+  categoryLabel: {
+    fontSize: Typography.sizes.xs,
+    fontWeight: Typography.weights.medium,
   },
   moreCategoriesText: {
     fontSize: Typography.sizes.xs,
