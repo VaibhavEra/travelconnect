@@ -1,9 +1,11 @@
-import { formatDateLong } from "@/lib/utils/dateTime";
+import { formatDateNoDay } from "@/lib/utils/dateTime";
 import { haptics } from "@/lib/utils/haptics";
 import { BorderRadius, Overlays, Spacing, Typography } from "@/styles";
 import { useThemeColors } from "@/styles/theme";
 import { Ionicons } from "@expo/vector-icons";
-import DateTimePicker from "@react-native-community/datetimepicker";
+import DateTimePicker, {
+  DateTimePickerEvent,
+} from "@react-native-community/datetimepicker";
 import { useState } from "react";
 import {
   Modal,
@@ -13,11 +15,12 @@ import {
   Text,
   View,
 } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 interface DatePickerInputProps {
-  label: string;
+  label?: string;
   value: Date | null;
-  onChange: (date: Date) => void;
+  onChange: (date: Date | null) => void;
   error?: string;
   minimumDate?: Date;
   maximumDate?: Date;
@@ -31,193 +34,189 @@ export default function DatePickerInput({
   error,
   minimumDate,
   maximumDate,
-  placeholder = "Select date",
+  placeholder = "Pick date",
 }: DatePickerInputProps) {
   const colors = useThemeColors();
-  const [show, setShow] = useState(false);
-  // FIXED: Use minimumDate or tomorrow as default for picker
-  const defaultPickerDate = minimumDate || new Date();
-  const pickerValue = value || defaultPickerDate;
+  const insets = useSafeAreaInsets();
+  const [showPicker, setShowPicker] = useState(false);
+  const [tempDate, setTempDate] = useState<Date | null>(null);
 
-  const handleChange = (event: any, selectedDate?: Date) => {
-    if (Platform.OS === "android") {
-      setShow(false);
-    }
-    if (selectedDate) {
-      haptics.selection();
-      onChange(selectedDate);
-    }
-  };
-
-  // NEW: Clear handler
-  const handleClear = () => {
-    haptics.light();
-    onChange(null as any); // Clear the value
-  };
-
-  // NEW: Done handler
-  const handleDone = () => {
-    haptics.light();
-    setShow(false);
-  };
-
-  const formatDisplayDate = (date: Date | null) => {
-    if (!date) {
+  const formatDateDisplay = (date: Date | null) => {
+    if (!date || isNaN(date.getTime())) {
       return placeholder;
     }
-
-    if (isNaN(date.getTime())) {
-      return placeholder;
-    }
-
     const isoString = date.toISOString().split("T")[0];
-    return formatDateLong(isoString);
+    return formatDateNoDay(isoString);
   };
+
+  const handleDateChange = (
+    event: DateTimePickerEvent,
+    selectedDate?: Date,
+  ) => {
+    if (Platform.OS === "android") {
+      setShowPicker(false);
+
+      if (event.type === "set" && selectedDate) {
+        onChange(selectedDate);
+        haptics.selection();
+      }
+    } else {
+      if (selectedDate) {
+        setTempDate(selectedDate);
+      }
+    }
+  };
+
+  const handleIOSDone = () => {
+    if (tempDate) {
+      onChange(tempDate);
+      haptics.selection();
+    }
+    setShowPicker(false);
+    setTempDate(null);
+  };
+
+  const handleIOSClear = () => {
+    onChange(null);
+    setTempDate(null);
+    setShowPicker(false);
+    haptics.light();
+  };
+
+  const handleIOSCancel = () => {
+    setShowPicker(false);
+    setTempDate(null);
+    haptics.light();
+  };
+
+  const handleOpenPicker = () => {
+    haptics.light();
+    if (Platform.OS === "ios") {
+      setTempDate(value || minimumDate || new Date());
+    }
+    setShowPicker(true);
+  };
+
+  const today = new Date();
+  const displayDate =
+    Platform.OS === "ios" && tempDate
+      ? tempDate
+      : value || minimumDate || today;
 
   const hasValue = value !== null;
 
   return (
     <View style={styles.container}>
-      {/* FIXED: Bigger label */}
-      <Text style={[styles.label, { color: colors.text.primary }]}>
-        {label}
-      </Text>
-
       <Pressable
         style={[
-          styles.input,
+          styles.selector,
           {
             backgroundColor: colors.background.secondary,
             borderColor: error ? colors.error : colors.border.default,
           },
         ]}
-        onPress={() => {
-          haptics.light();
-          setShow(true);
-        }}
+        onPress={handleOpenPicker}
       >
-        {/* FIXED: Better text size and spacing */}
-        <Text
-          style={[
-            styles.inputText,
-            {
-              color: hasValue ? colors.text.primary : colors.text.tertiary,
-            },
-          ]}
-        >
-          {formatDisplayDate(value)}
-        </Text>
-        {/* FIXED: Icon not displaced */}
-        <Ionicons
-          name="calendar-outline"
-          size={20}
-          color={colors.text.secondary}
-        />
+        <View style={styles.selectorContent}>
+          <Ionicons name="calendar-outline" size={20} color={colors.primary} />
+          <Text
+            style={[
+              styles.selectorText,
+              {
+                color: hasValue ? colors.text.primary : colors.text.placeholder,
+              },
+            ]}
+            numberOfLines={1}
+          >
+            {formatDateDisplay(value)}
+          </Text>
+        </View>
       </Pressable>
 
       {error && (
         <Text style={[styles.error, { color: colors.error }]}>{error}</Text>
       )}
 
-      {Platform.OS === "ios" ? (
+      {showPicker && Platform.OS === "ios" && (
         <Modal
-          visible={show}
           transparent
           animationType="slide"
-          onRequestClose={() => setShow(false)}
+          visible={showPicker}
+          onRequestClose={handleIOSCancel}
+          statusBarTranslucent
         >
-          <Pressable
-            style={[styles.modalOverlay, { backgroundColor: Overlays.light }]}
-            onPress={() => setShow(false)}
-          >
+          <View style={styles.modalOverlay}>
             <Pressable
+              style={[styles.backdrop, { backgroundColor: Overlays.light }]}
+              onPress={handleIOSCancel}
+            />
+
+            <View
               style={[
                 styles.modalContent,
-                { backgroundColor: colors.background.primary },
+                {
+                  backgroundColor: colors.background.primary,
+                  paddingBottom: insets.bottom || Spacing.lg,
+                },
               ]}
-              onPress={(e) => e.stopPropagation()}
             >
+              <View style={styles.handleBar}>
+                <View
+                  style={[
+                    styles.handle,
+                    { backgroundColor: colors.border.default },
+                  ]}
+                />
+              </View>
+
               <View
                 style={[
                   styles.modalHeader,
                   { borderBottomColor: colors.border.light },
                 ]}
               >
+                <Pressable onPress={handleIOSClear} hitSlop={10}>
+                  <Text style={[styles.clearText, { color: colors.error }]}>
+                    Clear
+                  </Text>
+                </Pressable>
                 <Text
                   style={[styles.modalTitle, { color: colors.text.primary }]}
                 >
-                  {label}
+                  {label || "Select Date"}
                 </Text>
-              </View>
-
-              <DateTimePicker
-                value={pickerValue}
-                mode="date"
-                display="spinner"
-                onChange={handleChange}
-                minimumDate={minimumDate}
-                maximumDate={maximumDate}
-                textColor={colors.text.primary}
-              />
-
-              {/* NEW: Action buttons with Clear and Done */}
-              <View style={styles.modalActions}>
-                {hasValue && (
-                  <Pressable
-                    style={[
-                      styles.actionButton,
-                      styles.clearButton,
-                      {
-                        backgroundColor: colors.background.secondary,
-                        borderColor: colors.border.default,
-                      },
-                    ]}
-                    onPress={handleClear}
-                  >
-                    <Text
-                      style={[
-                        styles.clearButtonText,
-                        { color: colors.text.secondary },
-                      ]}
-                    >
-                      Clear
-                    </Text>
-                  </Pressable>
-                )}
-
-                <Pressable
-                  style={[
-                    styles.actionButton,
-                    styles.doneButton,
-                    { backgroundColor: colors.primary },
-                    !hasValue && styles.fullWidthButton,
-                  ]}
-                  onPress={handleDone}
-                >
-                  <Text
-                    style={[
-                      styles.doneButtonText,
-                      { color: colors.text.inverse },
-                    ]}
-                  >
+                <Pressable onPress={handleIOSDone} hitSlop={10}>
+                  <Text style={[styles.doneText, { color: colors.primary }]}>
                     Done
                   </Text>
                 </Pressable>
               </View>
-            </Pressable>
-          </Pressable>
+
+              <View style={styles.pickerContainer}>
+                <DateTimePicker
+                  value={displayDate}
+                  mode="date"
+                  display="spinner"
+                  onChange={handleDateChange}
+                  minimumDate={minimumDate}
+                  maximumDate={maximumDate}
+                  textColor={colors.text.primary}
+                />
+              </View>
+            </View>
+          </View>
         </Modal>
-      ) : (
-        show && (
-          <DateTimePicker
-            value={pickerValue}
-            mode="date"
-            display="default"
-            onChange={handleChange}
-            minimumDate={minimumDate}
-            maximumDate={maximumDate}
-          />
-        )
+      )}
+
+      {showPicker && Platform.OS === "android" && (
+        <DateTimePicker
+          value={displayDate}
+          mode="date"
+          display="default"
+          onChange={handleDateChange}
+          minimumDate={minimumDate}
+          maximumDate={maximumDate}
+        />
       )}
     </View>
   );
@@ -225,24 +224,25 @@ export default function DatePickerInput({
 
 const styles = StyleSheet.create({
   container: {
-    marginBottom: Spacing.md,
+    flex: 1.2,
   },
-  label: {
-    fontSize: Typography.sizes.md, // FIXED: Bigger label
-    fontWeight: Typography.weights.semibold,
-    marginBottom: Spacing.sm,
-  },
-  input: {
+  selector: {
     flexDirection: "row",
     alignItems: "center",
-    justifyContent: "space-between",
-    borderRadius: BorderRadius.lg, // FIXED: Better radius
+    borderRadius: BorderRadius.lg,
     paddingHorizontal: Spacing.md,
-    paddingVertical: Spacing.md + 2, // FIXED: Better padding
-    borderWidth: 1.5,
+    height: 50,
+    borderWidth: 1,
   },
-  inputText: {
-    fontSize: Typography.sizes.md, // FIXED: Proper size
+  selectorContent: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: Spacing.xs, // Reduced gap for more text space
+    flex: 1,
+    minWidth: 0,
+  },
+  selectorText: {
+    fontSize: Typography.sizes.md,
     flex: 1,
   },
   error: {
@@ -251,47 +251,48 @@ const styles = StyleSheet.create({
   },
   modalOverlay: {
     flex: 1,
-    justifyContent: "flex-end",
+  },
+  backdrop: {
+    flex: 1,
   },
   modalContent: {
     borderTopLeftRadius: BorderRadius.xl,
     borderTopRightRadius: BorderRadius.xl,
-    paddingBottom: Spacing.lg,
+    paddingTop: Spacing.xs,
+  },
+  handleBar: {
+    alignItems: "center",
+    paddingVertical: Spacing.xs,
+  },
+  handle: {
+    width: 40,
+    height: 4,
+    borderRadius: 2,
   },
   modalHeader: {
-    padding: Spacing.lg,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingHorizontal: Spacing.lg,
+    paddingVertical: Spacing.md,
     borderBottomWidth: 1,
   },
   modalTitle: {
     fontSize: Typography.sizes.lg,
-    fontWeight: Typography.weights.bold,
-    textAlign: "center",
-  },
-  modalActions: {
-    flexDirection: "row",
-    gap: Spacing.sm,
-    paddingHorizontal: Spacing.lg,
-    paddingTop: Spacing.md,
-  },
-  actionButton: {
-    flex: 1,
-    paddingVertical: Spacing.md,
-    borderRadius: BorderRadius.lg,
-    alignItems: "center",
-  },
-  clearButton: {
-    borderWidth: 1.5,
-  },
-  clearButtonText: {
-    fontSize: Typography.sizes.md,
     fontWeight: Typography.weights.semibold,
   },
-  doneButton: {},
-  doneButtonText: {
+  clearText: {
     fontSize: Typography.sizes.md,
-    fontWeight: Typography.weights.bold,
+    fontWeight: Typography.weights.medium,
+    width: 60,
   },
-  fullWidthButton: {
-    flex: 1,
+  doneText: {
+    fontSize: Typography.sizes.md,
+    fontWeight: Typography.weights.semibold,
+    width: 60,
+    textAlign: "right",
+  },
+  pickerContainer: {
+    paddingVertical: Spacing.md,
   },
 });

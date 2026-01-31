@@ -226,3 +226,17 @@ export const dateToTimeString = (date: Date): string => {
   const minutes = date.getMinutes().toString().padStart(2, "0");
   return `${hours}:${minutes}`;
 };
+
+/**
+ * Formats a date string without weekday (Jan 31, 2026)
+ * @param dateString - ISO date string (YYYY-MM-DD)
+ * @returns Formatted date string without weekday
+ */
+export const formatDateNoDay = (dateString: string): string => {
+  const date = new Date(dateString);
+  return date.toLocaleDateString("en-US", {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+  });
+};
