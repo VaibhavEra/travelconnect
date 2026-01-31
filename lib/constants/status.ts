@@ -8,6 +8,8 @@ export const REQUEST_STATUSES = [
   "picked_up",
   "delivered",
   "cancelled",
+  "expired",
+  "failed",
 ] as const;
 
 export type RequestStatus = (typeof REQUEST_STATUSES)[number];
@@ -50,14 +52,26 @@ export const REQUEST_STATUS_CONFIG: Record<
     icon: "ban",
     colorKey: "error",
   },
+  expired: {
+    label: "Expired",
+    icon: "alert-circle",
+    colorKey: "error",
+  },
+  failed: {
+    label: "Failed",
+    icon: "close-circle",
+    colorKey: "error",
+  },
 };
 
 // Trip Statuses
 export const TRIP_STATUSES = [
-  "open",
+  "upcoming",
+  "locked",
   "in_progress",
   "completed",
   "cancelled",
+  "expired",
 ] as const;
 
 export type TripStatus = (typeof TRIP_STATUSES)[number];
@@ -67,18 +81,23 @@ export const TRIP_STATUS_CONFIG: Record<
   {
     label: string;
     icon: keyof typeof Ionicons.glyphMap;
-    colorKey: "success" | "warning" | "error";
+    colorKey: "success" | "warning" | "error" | "primary";
   }
 > = {
-  open: {
-    label: "Open",
-    icon: "checkmark-circle",
+  upcoming: {
+    label: "Upcoming",
+    icon: "calendar",
     colorKey: "success",
+  },
+  locked: {
+    label: "Locked",
+    icon: "lock-closed",
+    colorKey: "warning",
   },
   in_progress: {
     label: "In Progress",
     icon: "time",
-    colorKey: "warning",
+    colorKey: "primary",
   },
   completed: {
     label: "Completed",
@@ -88,6 +107,11 @@ export const TRIP_STATUS_CONFIG: Record<
   cancelled: {
     label: "Cancelled",
     icon: "close-circle",
+    colorKey: "error",
+  },
+  expired: {
+    label: "Expired",
+    icon: "alert-circle",
     colorKey: "error",
   },
 };
