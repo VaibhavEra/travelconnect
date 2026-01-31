@@ -1,7 +1,7 @@
 import { TRANSPORT_CONFIG, UI } from "@/lib/constants";
+import { CATEGORY_CONFIG } from "@/lib/constants/categories";
 import { formatDate, formatTime } from "@/lib/utils/dateTime";
 import { haptics } from "@/lib/utils/haptics";
-import { capitalize } from "@/lib/utils/string";
 import { Trip } from "@/stores/tripStore";
 import { BorderRadius, Spacing, Typography, withOpacity } from "@/styles";
 import { useThemeColors } from "@/styles/theme";
@@ -133,7 +133,7 @@ export default function AvailableTripCard({ trip }: AvailableTripCardProps) {
           style={[styles.divider, { backgroundColor: colors.border.light }]}
         />
 
-        {/* Allowed Items Section */}
+        {/* NEW: Allowed Items Section with Icons and Labels */}
         <View style={styles.section}>
           <Text style={[styles.sectionTitle, { color: colors.text.tertiary }]}>
             Allowed Items
@@ -141,21 +141,32 @@ export default function AvailableTripCard({ trip }: AvailableTripCardProps) {
           <View style={styles.categoriesRow}>
             {trip.allowed_categories
               .slice(0, UI.MAX_VISIBLE_CATEGORIES)
-              .map((cat) => (
-                <View
-                  key={cat}
-                  style={[
-                    styles.categoryChip,
-                    { backgroundColor: withOpacity(colors.primary, "subtle") },
-                  ]}
-                >
-                  <Text
-                    style={[styles.categoryText, { color: colors.primary }]}
+              .map((cat) => {
+                const categoryConfig =
+                  CATEGORY_CONFIG[cat as keyof typeof CATEGORY_CONFIG];
+                return (
+                  <View
+                    key={cat}
+                    style={[
+                      styles.categoryChip,
+                      {
+                        backgroundColor: withOpacity(colors.primary, "subtle"),
+                      },
+                    ]}
                   >
-                    {capitalize(cat)}
-                  </Text>
-                </View>
-              ))}
+                    <Ionicons
+                      name={categoryConfig?.icon || "cube-outline"}
+                      size={14}
+                      color={colors.primary}
+                    />
+                    <Text
+                      style={[styles.categoryText, { color: colors.primary }]}
+                    >
+                      {categoryConfig?.label || cat}
+                    </Text>
+                  </View>
+                );
+              })}
             {trip.allowed_categories.length > UI.MAX_VISIBLE_CATEGORIES && (
               <View
                 style={[
@@ -271,6 +282,9 @@ const styles = StyleSheet.create({
     gap: Spacing.xs,
   },
   categoryChip: {
+    flexDirection: "row", // NEW: Row for icon + text
+    alignItems: "center",
+    gap: 4, // NEW: Gap between icon and text
     paddingHorizontal: Spacing.sm,
     paddingVertical: Spacing.xs,
     borderRadius: BorderRadius.sm,
