@@ -67,14 +67,18 @@ export type Database = {
           category: string
           created_at: string | null
           delivered_at: string | null
+          delivery_blocked_until: string | null
           delivery_contact_name: string
           delivery_contact_phone: string
           delivery_otp: string | null
           delivery_otp_expiry: string | null
+          failed_delivery_attempts: number | null
+          failed_pickup_attempts: number | null
           id: string
           item_description: string
           parcel_photos: string[]
           picked_up_at: string | null
+          pickup_blocked_until: string | null
           pickup_otp: string | null
           pickup_otp_expiry: string | null
           rejected_at: string | null
@@ -93,14 +97,18 @@ export type Database = {
           category: string
           created_at?: string | null
           delivered_at?: string | null
+          delivery_blocked_until?: string | null
           delivery_contact_name: string
           delivery_contact_phone: string
           delivery_otp?: string | null
           delivery_otp_expiry?: string | null
+          failed_delivery_attempts?: number | null
+          failed_pickup_attempts?: number | null
           id?: string
           item_description: string
           parcel_photos?: string[]
           picked_up_at?: string | null
+          pickup_blocked_until?: string | null
           pickup_otp?: string | null
           pickup_otp_expiry?: string | null
           rejected_at?: string | null
@@ -119,14 +127,18 @@ export type Database = {
           category?: string
           created_at?: string | null
           delivered_at?: string | null
+          delivery_blocked_until?: string | null
           delivery_contact_name?: string
           delivery_contact_phone?: string
           delivery_otp?: string | null
           delivery_otp_expiry?: string | null
+          failed_delivery_attempts?: number | null
+          failed_pickup_attempts?: number | null
           id?: string
           item_description?: string
           parcel_photos?: string[]
           picked_up_at?: string | null
+          pickup_blocked_until?: string | null
           pickup_otp?: string | null
           pickup_otp_expiry?: string | null
           rejected_at?: string | null
@@ -272,6 +284,7 @@ export type Database = {
         Args: { p_request_id: string; p_traveller_notes?: string }
         Returns: Json
       }
+      can_edit_trip: { Args: { p_trip_id: string }; Returns: boolean }
       cancel_request_with_validation: {
         Args: {
           p_cancellation_reason?: string
@@ -320,13 +333,26 @@ export type Database = {
         }
         Returns: string
       }
+      expire_old_requests: {
+        Args: never
+        Returns: {
+          cleaned_attempts_count: number
+          expired_requests_count: number
+          expired_trips_count: number
+        }[]
+      }
       generate_otp: { Args: never; Returns: string }
       generate_pickup_otp: { Args: { request_id: string }; Returns: string }
       is_account_locked: { Args: { user_email: string }; Returns: boolean }
       is_trip_available: { Args: { p_trip_id: string }; Returns: boolean }
+      lock_trips_before_24h: { Args: never; Returns: number }
       record_failed_login: {
         Args: { user_email: string; user_ip?: string }
         Returns: undefined
+      }
+      validate_slot_reduction: {
+        Args: { p_new_total_slots: number; p_trip_id: string }
+        Returns: boolean
       }
       validate_trip_dates: {
         Args: {
@@ -337,15 +363,41 @@ export type Database = {
         }
         Returns: boolean
       }
-      verify_delivery_otp:
-        | { Args: { p_otp: string; p_request_id: string }; Returns: Json }
-        | { Args: { otp_code: string; request_id: string }; Returns: boolean }
-      verify_pickup_otp:
-        | { Args: { p_otp: string; p_request_id: string }; Returns: Json }
-        | { Args: { otp_code: string; request_id: string }; Returns: boolean }
+      verify_delivery_otp: {
+        Args: { p_otp: string; p_request_id: string }
+        Returns: Json
+      }
+      verify_pickup_otp: {
+        Args: { p_otp: string; p_request_id: string }
+        Returns: Json
+      }
     }
     Enums: {
-      [_ in never]: never
+      cancellation_source: "sender" | "traveller"
+      parcel_category:
+        | "documents"
+        | "clothing"
+        | "medicines"
+        | "books"
+        | "small_items"
+      parcel_size: "small" | "medium" | "large"
+      request_status:
+        | "pending"
+        | "accepted"
+        | "rejected"
+        | "picked_up"
+        | "delivered"
+        | "cancelled"
+        | "expired"
+        | "failed"
+      transport_mode: "flight" | "train" | "bus" | "car"
+      trip_status:
+        | "upcoming"
+        | "locked"
+        | "in_progress"
+        | "completed"
+        | "cancelled"
+        | "expired"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -475,6 +527,35 @@ export const Constants = {
     Enums: {},
   },
   public: {
-    Enums: {},
+    Enums: {
+      cancellation_source: ["sender", "traveller"],
+      parcel_category: [
+        "documents",
+        "clothing",
+        "medicines",
+        "books",
+        "small_items",
+      ],
+      parcel_size: ["small", "medium", "large"],
+      request_status: [
+        "pending",
+        "accepted",
+        "rejected",
+        "picked_up",
+        "delivered",
+        "cancelled",
+        "expired",
+        "failed",
+      ],
+      transport_mode: ["flight", "train", "bus", "car"],
+      trip_status: [
+        "upcoming",
+        "locked",
+        "in_progress",
+        "completed",
+        "cancelled",
+        "expired",
+      ],
+    },
   },
 } as const
