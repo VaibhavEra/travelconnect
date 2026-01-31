@@ -1,3 +1,4 @@
+import PhotoGallery from "@/components/request/PhotoGallery";
 import { CATEGORY_CONFIG, SIZE_CONFIG } from "@/lib/constants/categories";
 import { REQUEST_STATUS_CONFIG, RequestStatus } from "@/lib/constants/status";
 import { formatDate, formatTime } from "@/lib/utils/dateTime";
@@ -12,8 +13,9 @@ import { useEffect, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
-  Image,
+  Linking,
   Modal,
+  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -29,7 +31,7 @@ const TRANSPORT_ICONS: Record<string, keyof typeof Ionicons.glyphMap> = {
   bus: "bus",
 };
 
-// Cancel Request Modal Component
+// Cancel Request Modal Component - FIXED: Keyboard-aware
 function CancelRequestModal({
   visible,
   onClose,
@@ -75,12 +77,13 @@ function CancelRequestModal({
       animationType="fade"
       onRequestClose={handleClose}
     >
-      <View style={cancelModalStyles.overlay}>
-        <View
+      <Pressable style={cancelModalStyles.overlay} onPress={handleClose}>
+        <Pressable
           style={[
             cancelModalStyles.modal,
             { backgroundColor: colors.background.primary },
           ]}
+          onPress={(e) => e.stopPropagation()}
         >
           <View
             style={[
@@ -106,7 +109,12 @@ function CancelRequestModal({
             </Text>
           </View>
 
-          <View style={cancelModalStyles.content}>
+          {/* FIXED: ScrollView for keyboard visibility */}
+          <ScrollView
+            style={cancelModalStyles.content}
+            keyboardShouldPersistTaps="handled"
+            showsVerticalScrollIndicator={false}
+          >
             {isWithin24Hours ? (
               <View
                 style={[
@@ -168,7 +176,7 @@ function CancelRequestModal({
                 </Text>
               </>
             )}
-          </View>
+          </ScrollView>
 
           <View
             style={[
@@ -223,8 +231,8 @@ function CancelRequestModal({
               </Pressable>
             )}
           </View>
-        </View>
-      </View>
+        </Pressable>
+      </Pressable>
     </Modal>
   );
 }
@@ -235,7 +243,6 @@ export default function RequestDetailsScreen() {
   const { user } = useAuthStore();
   const { currentRequest, loading, getRequestById, cancelRequest } =
     useRequestStore();
-  const [selectedPhotoIndex, setSelectedPhotoIndex] = useState(0);
   const [showCancelModal, setShowCancelModal] = useState(false);
 
   useEffect(() => {
@@ -274,6 +281,13 @@ export default function RequestDetailsScreen() {
     }
   };
 
+  const handleOpenTicket = (url: string) => {
+    haptics.light();
+    Linking.openURL(url).catch(() => {
+      Alert.alert("Error", "Unable to open ticket file");
+    });
+  };
+
   if (loading || !currentRequest) {
     return (
       <SafeAreaView
@@ -299,12 +313,17 @@ export default function RequestDetailsScreen() {
   const sizeConfig =
     SIZE_CONFIG[currentRequest.size as keyof typeof SIZE_CONFIG];
 
+  const isAccepted =
+    currentRequest.status === "accepted" ||
+    currentRequest.status === "picked_up" ||
+    currentRequest.status === "delivered";
+
   return (
     <SafeAreaView
       style={[styles.container, { backgroundColor: colors.background.primary }]}
       edges={["top"]}
     >
-      {/* Header */}
+      {/* Header - FIXED: Left-aligned with status badge */}
       <View style={[styles.header, { borderBottomColor: colors.border.light }]}>
         <Pressable
           onPress={() => {
@@ -322,6 +341,12 @@ export default function RequestDetailsScreen() {
           <Text style={[styles.headerTitle, { color: colors.text.primary }]}>
             Request Details
           </Text>
+          <View style={styles.statusBadge}>
+            <Ionicons name={statusConfig.icon} size={14} color={statusColor} />
+            <Text style={[styles.statusBadgeText, { color: statusColor }]}>
+              {statusConfig.label}
+            </Text>
+          </View>
         </View>
       </View>
 
@@ -330,34 +355,6 @@ export default function RequestDetailsScreen() {
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
       >
-        {/* Status Card */}
-        <View
-          style={[
-            styles.statusCard,
-            {
-              backgroundColor: statusColor + "10",
-              borderColor: statusColor + "30",
-            },
-          ]}
-        >
-          <View
-            style={[
-              styles.statusIconContainer,
-              { backgroundColor: statusColor + "20" },
-            ]}
-          >
-            <Ionicons name={statusConfig.icon} size={24} color={statusColor} />
-          </View>
-          <View style={styles.statusContent}>
-            <Text style={[styles.statusLabel, { color: colors.text.tertiary }]}>
-              Status
-            </Text>
-            <Text style={[styles.statusText, { color: statusColor }]}>
-              {statusConfig.label}
-            </Text>
-          </View>
-        </View>
-
         {/* Trip Route Card */}
         {currentRequest.trip && (
           <View
@@ -434,7 +431,7 @@ export default function RequestDetailsScreen() {
                 </View>
               </View>
 
-              {/* Departure */}
+              {/* FIXED: Departure & Arrival both shown */}
               <View style={styles.timingContainer}>
                 <View style={styles.timingItem}>
                   <Ionicons
@@ -463,7 +460,6 @@ export default function RequestDetailsScreen() {
                   </View>
                 </View>
 
-                {/* Arrival (if available) */}
                 {(currentRequest.trip as any).arrival_date &&
                   (currentRequest.trip as any).arrival_time && (
                     <View style={styles.timingItem}>
@@ -503,7 +499,7 @@ export default function RequestDetailsScreen() {
           </View>
         )}
 
-        {/* Parcel Details Card */}
+        {/* Parcel Details Card - FIXED: Description → Size → Category → Photos */}
         <View
           style={[
             styles.card,
@@ -524,67 +520,27 @@ export default function RequestDetailsScreen() {
             </Text>
           </View>
 
-          {/* Photos */}
-          {currentRequest.parcel_photos &&
-            currentRequest.parcel_photos.length > 0 && (
-              <View style={styles.photosSection}>
-                <Image
-                  source={{
-                    uri: currentRequest.parcel_photos[selectedPhotoIndex],
-                  }}
-                  style={[
-                    styles.mainPhoto,
-                    { backgroundColor: colors.background.primary },
-                  ]}
-                />
-                {currentRequest.parcel_photos.length > 1 && (
-                  <ScrollView
-                    horizontal
-                    showsHorizontalScrollIndicator={false}
-                    contentContainerStyle={styles.photoThumbnails}
-                  >
-                    {currentRequest.parcel_photos.map((photo, index) => (
-                      <Pressable
-                        key={index}
-                        onPress={() => setSelectedPhotoIndex(index)}
-                      >
-                        <Image
-                          source={{ uri: photo }}
-                          style={[
-                            styles.thumbnail,
-                            {
-                              backgroundColor: colors.background.primary,
-                              borderColor:
-                                selectedPhotoIndex === index
-                                  ? colors.primary
-                                  : colors.border.default,
-                            },
-                          ]}
-                        />
-                      </Pressable>
-                    ))}
-                  </ScrollView>
-                )}
-              </View>
-            )}
-
-          {/* Description */}
+          {/* 1. Description - FIXED: Label different size */}
           <View style={styles.detailItem}>
             <Text style={[styles.detailLabel, { color: colors.text.tertiary }]}>
-              Description
+              DESCRIPTION
             </Text>
             <Text style={[styles.detailValue, { color: colors.text.primary }]}>
               {currentRequest.item_description}
             </Text>
           </View>
 
-          {/* Size & Category Row */}
+          <View
+            style={[styles.divider, { backgroundColor: colors.border.light }]}
+          />
+
+          {/* 2 & 3. Size & Category */}
           <View style={styles.detailGrid}>
             <View style={styles.detailGridItem}>
               <Text
                 style={[styles.detailLabel, { color: colors.text.tertiary }]}
               >
-                Size
+                SIZE
               </Text>
               <View
                 style={[
@@ -609,7 +565,7 @@ export default function RequestDetailsScreen() {
               <Text
                 style={[styles.detailLabel, { color: colors.text.tertiary }]}
               >
-                Category
+                CATEGORY
               </Text>
               <View
                 style={[
@@ -634,21 +590,33 @@ export default function RequestDetailsScreen() {
             </View>
           </View>
 
-          {/* Sender Notes */}
-          {currentRequest.sender_notes && (
-            <View style={styles.detailItem}>
-              <Text
-                style={[styles.detailLabel, { color: colors.text.tertiary }]}
-              >
-                Additional Notes
-              </Text>
-              <Text
-                style={[styles.detailValue, { color: colors.text.primary }]}
-              >
-                {currentRequest.sender_notes}
-              </Text>
-            </View>
-          )}
+          {/* 4. Photos - USING EXISTING PhotoGallery COMPONENT */}
+          {currentRequest.parcel_photos &&
+            currentRequest.parcel_photos.length > 0 && (
+              <>
+                <View
+                  style={[
+                    styles.divider,
+                    { backgroundColor: colors.border.light },
+                  ]}
+                />
+                <View style={styles.photosSection}>
+                  <Text
+                    style={[
+                      styles.detailLabel,
+                      { color: colors.text.tertiary },
+                    ]}
+                  >
+                    PHOTOS
+                  </Text>
+                  <PhotoGallery
+                    photos={currentRequest.parcel_photos}
+                    mode="thumbnail"
+                    thumbnailSize={80}
+                  />
+                </View>
+              </>
+            )}
         </View>
 
         {/* Receiver Details Card */}
@@ -677,7 +645,7 @@ export default function RequestDetailsScreen() {
               <Text
                 style={[styles.detailLabel, { color: colors.text.tertiary }]}
               >
-                Name
+                NAME
               </Text>
               <Text
                 style={[styles.detailValue, { color: colors.text.primary }]}
@@ -690,7 +658,7 @@ export default function RequestDetailsScreen() {
               <Text
                 style={[styles.detailLabel, { color: colors.text.tertiary }]}
               >
-                Phone
+                PHONE
               </Text>
               <Text
                 style={[styles.detailValue, { color: colors.text.primary }]}
@@ -701,7 +669,132 @@ export default function RequestDetailsScreen() {
           </View>
         </View>
 
-        {/* Pickup OTP Card */}
+        {/* NEW: Traveller Details Card - Only when accepted */}
+        {isAccepted && (currentRequest as any).traveller && (
+          <View
+            style={[
+              styles.card,
+              { backgroundColor: colors.background.secondary },
+            ]}
+          >
+            <View style={styles.cardHeader}>
+              <View
+                style={[
+                  styles.cardIconContainer,
+                  { backgroundColor: colors.primary + "15" },
+                ]}
+              >
+                <Ionicons
+                  name="person-circle"
+                  size={20}
+                  color={colors.primary}
+                />
+              </View>
+              <Text style={[styles.cardTitle, { color: colors.text.primary }]}>
+                Traveller Details
+              </Text>
+            </View>
+
+            <View style={styles.detailGrid}>
+              <View style={styles.detailGridItem}>
+                <Text
+                  style={[styles.detailLabel, { color: colors.text.tertiary }]}
+                >
+                  NAME
+                </Text>
+                <Text
+                  style={[styles.detailValue, { color: colors.text.primary }]}
+                >
+                  {(currentRequest as any).traveller.full_name || "N/A"}
+                </Text>
+              </View>
+
+              <View style={styles.detailGridItem}>
+                <Text
+                  style={[styles.detailLabel, { color: colors.text.tertiary }]}
+                >
+                  CONTACT
+                </Text>
+                <Text
+                  style={[styles.detailValue, { color: colors.text.primary }]}
+                >
+                  {(currentRequest as any).traveller.phone_number || "N/A"}
+                </Text>
+              </View>
+            </View>
+
+            {/* Ticket PNR */}
+            {(currentRequest.trip as any).ticket_pnr && (
+              <>
+                <View
+                  style={[
+                    styles.divider,
+                    { backgroundColor: colors.border.light },
+                  ]}
+                />
+                <View style={styles.detailItem}>
+                  <Text
+                    style={[
+                      styles.detailLabel,
+                      { color: colors.text.tertiary },
+                    ]}
+                  >
+                    TICKET PNR
+                  </Text>
+                  <Text
+                    style={[styles.detailValue, { color: colors.text.primary }]}
+                  >
+                    {(currentRequest.trip as any).ticket_pnr}
+                  </Text>
+                </View>
+              </>
+            )}
+
+            {/* Ticket File */}
+            {(currentRequest.trip as any).ticket_file_url && (
+              <>
+                <View
+                  style={[
+                    styles.divider,
+                    { backgroundColor: colors.border.light },
+                  ]}
+                />
+                <Pressable
+                  style={[
+                    styles.ticketButton,
+                    {
+                      backgroundColor: colors.primary + "10",
+                      borderColor: colors.primary,
+                    },
+                  ]}
+                  onPress={() =>
+                    handleOpenTicket(
+                      (currentRequest.trip as any).ticket_file_url,
+                    )
+                  }
+                >
+                  <Ionicons
+                    name="document-text"
+                    size={20}
+                    color={colors.primary}
+                  />
+                  <Text
+                    style={[styles.ticketButtonText, { color: colors.primary }]}
+                  >
+                    View Ticket File
+                  </Text>
+                  <Ionicons
+                    name="open-outline"
+                    size={16}
+                    color={colors.primary}
+                  />
+                </Pressable>
+              </>
+            )}
+          </View>
+        )}
+
+        {/* Pickup OTP Card - FIXED: Better placement and styling */}
         {currentRequest.status === "accepted" &&
           currentRequest.pickup_otp &&
           currentRequest.pickup_otp_expiry && (
@@ -714,46 +807,48 @@ export default function RequestDetailsScreen() {
                 },
               ]}
             >
-              <View
-                style={[
-                  styles.otpIconContainer,
-                  { backgroundColor: colors.primary + "20" },
-                ]}
-              >
-                <Ionicons name="key" size={32} color={colors.primary} />
-              </View>
-              <View style={styles.otpContent}>
-                <Text
-                  style={[styles.otpLabel, { color: colors.text.tertiary }]}
-                >
-                  Pickup OTP
-                </Text>
-                <Text
+              <View style={styles.otpHeader}>
+                <View
                   style={[
-                    styles.otpInstruction,
-                    { color: colors.text.secondary },
+                    styles.otpIconContainer,
+                    { backgroundColor: colors.primary + "20" },
                   ]}
                 >
-                  Share this code with the traveller at pickup
-                </Text>
-                <Text style={[styles.otpCode, { color: colors.primary }]}>
-                  {currentRequest.pickup_otp}
-                </Text>
-                <Text
-                  style={[styles.otpExpiry, { color: colors.text.tertiary }]}
-                >
-                  Valid until{" "}
-                  {new Date(currentRequest.pickup_otp_expiry).toLocaleString(
-                    "en-IN",
-                    {
-                      day: "numeric",
-                      month: "short",
-                      hour: "2-digit",
-                      minute: "2-digit",
-                    },
-                  )}
-                </Text>
+                  <Ionicons name="key" size={24} color={colors.primary} />
+                </View>
+                <View style={styles.otpHeaderText}>
+                  <Text
+                    style={[styles.otpLabel, { color: colors.text.primary }]}
+                  >
+                    Pickup OTP
+                  </Text>
+                  <Text
+                    style={[
+                      styles.otpInstruction,
+                      { color: colors.text.secondary },
+                    ]}
+                  >
+                    Share this with the traveller at pickup
+                  </Text>
+                </View>
               </View>
+
+              <Text style={[styles.otpCode, { color: colors.primary }]}>
+                {currentRequest.pickup_otp}
+              </Text>
+
+              <Text style={[styles.otpExpiry, { color: colors.text.tertiary }]}>
+                Valid until{" "}
+                {new Date(currentRequest.pickup_otp_expiry).toLocaleString(
+                  "en-IN",
+                  {
+                    day: "numeric",
+                    month: "short",
+                    hour: "2-digit",
+                    minute: "2-digit",
+                  },
+                )}
+              </Text>
             </View>
           )}
 
@@ -888,6 +983,7 @@ const cancelModalStyles = StyleSheet.create({
     borderRadius: BorderRadius.xl,
     width: "100%",
     maxWidth: 400,
+    maxHeight: "80%",
     overflow: "hidden",
   },
   header: {
@@ -907,6 +1003,7 @@ const cancelModalStyles = StyleSheet.create({
   },
   content: {
     padding: Spacing.lg,
+    maxHeight: 200,
   },
   warningBox: {
     flexDirection: "row",
@@ -988,10 +1085,20 @@ const styles = StyleSheet.create({
   },
   headerContent: {
     flex: 1,
+    gap: 4,
   },
   headerTitle: {
     fontSize: Typography.sizes.lg,
     fontWeight: Typography.weights.bold,
+  },
+  statusBadge: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+  },
+  statusBadgeText: {
+    fontSize: Typography.sizes.sm,
+    fontWeight: Typography.weights.semibold,
   },
   scrollView: {
     flex: 1,
@@ -999,37 +1106,15 @@ const styles = StyleSheet.create({
   scrollContent: {
     padding: Spacing.lg,
   },
-  statusCard: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: Spacing.md,
-    padding: Spacing.lg,
-    borderRadius: BorderRadius.xl,
-    borderWidth: 1.5,
-    marginBottom: Spacing.lg,
-  },
-  statusIconContainer: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  statusContent: {
-    flex: 1,
-  },
-  statusLabel: {
-    fontSize: Typography.sizes.xs,
-    marginBottom: 2,
-  },
-  statusText: {
-    fontSize: Typography.sizes.lg,
-    fontWeight: Typography.weights.bold,
-  },
   card: {
     borderRadius: BorderRadius.xl,
     padding: Spacing.lg,
-    marginBottom: Spacing.md,
+    marginBottom: Spacing.lg,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 8,
+    elevation: 2,
   },
   cardHeader: {
     flexDirection: "row",
@@ -1080,7 +1165,7 @@ const styles = StyleSheet.create({
     marginHorizontal: -8,
   },
   timingContainer: {
-    gap: Spacing.sm,
+    gap: Spacing.md,
   },
   timingItem: {
     flexDirection: "row",
@@ -1089,49 +1174,37 @@ const styles = StyleSheet.create({
   },
   timingDetails: {
     flex: 1,
+    gap: 2,
   },
   timingLabel: {
     fontSize: Typography.sizes.xs,
-    marginBottom: 2,
+    fontWeight: Typography.weights.medium,
   },
   timingValue: {
     fontSize: Typography.sizes.sm,
-    fontWeight: Typography.weights.medium,
-  },
-  photosSection: {
-    marginBottom: Spacing.md,
-  },
-  mainPhoto: {
-    width: "100%",
-    height: 250,
-    borderRadius: BorderRadius.lg,
-    marginBottom: Spacing.sm,
-  },
-  photoThumbnails: {
-    flexDirection: "row",
-    gap: Spacing.xs,
-  },
-  thumbnail: {
-    width: 60,
-    height: 60,
-    borderRadius: BorderRadius.md,
-    borderWidth: 2,
+    fontWeight: Typography.weights.semibold,
   },
   detailItem: {
     marginBottom: Spacing.md,
   },
   detailLabel: {
     fontSize: Typography.sizes.xs,
-    fontWeight: Typography.weights.medium,
+    fontWeight: Typography.weights.semibold,
+    textTransform: "uppercase",
+    letterSpacing: 0.5,
     marginBottom: Spacing.xs,
   },
   detailValue: {
-    fontSize: Typography.sizes.sm,
-    lineHeight: Typography.sizes.sm * 1.5,
+    fontSize: Typography.sizes.md,
+    lineHeight: Typography.sizes.md * 1.5,
+  },
+  divider: {
+    height: 1,
+    marginVertical: Spacing.md,
   },
   detailGrid: {
     flexDirection: "row",
-    gap: Spacing.md,
+    gap: Spacing.lg,
     marginBottom: Spacing.md,
   },
   detailGridItem: {
@@ -1150,37 +1223,61 @@ const styles = StyleSheet.create({
     fontSize: Typography.sizes.sm,
     fontWeight: Typography.weights.semibold,
   },
-  otpCard: {
+  photosSection: {
+    gap: Spacing.sm,
+  },
+  ticketButton: {
     flexDirection: "row",
-    gap: Spacing.md,
-    padding: Spacing.lg,
+    alignItems: "center",
+    justifyContent: "center",
+    gap: Spacing.sm,
+    padding: Spacing.md,
+    borderRadius: BorderRadius.lg,
+    borderWidth: 1,
+  },
+  ticketButtonText: {
+    fontSize: Typography.sizes.md,
+    fontWeight: Typography.weights.semibold,
+    flex: 1,
+    textAlign: "center",
+  },
+  otpCard: {
     borderRadius: BorderRadius.xl,
+    padding: Spacing.lg,
     borderWidth: 2,
-    marginBottom: Spacing.md,
+    marginBottom: Spacing.lg,
+    gap: Spacing.md,
+    alignItems: "center",
+  },
+  otpHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: Spacing.md,
+    width: "100%",
   },
   otpIconContainer: {
-    width: 56,
-    height: 56,
-    borderRadius: BorderRadius.lg,
+    width: 50,
+    height: 50,
+    borderRadius: 25,
     alignItems: "center",
     justifyContent: "center",
   },
-  otpContent: {
+  otpHeaderText: {
     flex: 1,
-    gap: Spacing.xs,
+    gap: 2,
   },
   otpLabel: {
-    fontSize: Typography.sizes.xs,
-    fontWeight: Typography.weights.medium,
+    fontSize: Typography.sizes.md,
+    fontWeight: Typography.weights.bold,
   },
   otpInstruction: {
-    fontSize: Typography.sizes.xs,
+    fontSize: Typography.sizes.sm,
   },
   otpCode: {
-    fontSize: Typography.sizes.xxxl,
+    fontSize: 48,
     fontWeight: Typography.weights.bold,
-    letterSpacing: 4,
-    marginTop: Spacing.xs,
+    letterSpacing: 8,
+    fontFamily: Platform.OS === "ios" ? "Courier" : "monospace",
   },
   otpExpiry: {
     fontSize: Typography.sizes.xs,
@@ -1191,7 +1288,7 @@ const styles = StyleSheet.create({
     padding: Spacing.md,
     borderRadius: BorderRadius.lg,
     borderWidth: 1.5,
-    marginBottom: Spacing.md,
+    marginBottom: Spacing.lg,
   },
   alertContent: {
     flex: 1,
@@ -1212,7 +1309,7 @@ const styles = StyleSheet.create({
     gap: Spacing.sm,
     paddingVertical: Spacing.md,
     borderRadius: BorderRadius.lg,
-    borderWidth: 1.5,
+    borderWidth: 2,
   },
   cancelButtonText: {
     fontSize: Typography.sizes.md,
