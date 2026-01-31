@@ -116,6 +116,7 @@ export default function CreateTripScreen() {
     formState: { errors, isValid },
     reset,
     watch,
+    setValue,
   } = useForm<TripFormData>({
     resolver: zodResolver(tripSchema),
     mode: "onChange",
@@ -141,6 +142,8 @@ export default function CreateTripScreen() {
   }
 
   const departureDate = watch("departure_date");
+  const source = watch("source");
+  const destination = watch("destination");
 
   const parseDate = (
     dateString: string | null,
@@ -158,6 +161,13 @@ export default function CreateTripScreen() {
 
     const date = new Date(dateString);
     return isNaN(date.getTime()) ? null : date;
+  };
+
+  const handleCitySwap = () => {
+    haptics.light();
+    const temp = source;
+    setValue("source", destination);
+    setValue("destination", temp);
   };
 
   const onSubmit = async (data: TripFormData) => {
@@ -207,7 +217,6 @@ export default function CreateTripScreen() {
       style={[styles.container, { backgroundColor: colors.background.primary }]}
       edges={["top"]}
     >
-      {/* Header */}
       <View style={[styles.header, { borderBottomColor: colors.border.light }]}>
         <View>
           <Text style={[styles.title, { color: colors.text.primary }]}>
@@ -230,25 +239,6 @@ export default function CreateTripScreen() {
           showsVerticalScrollIndicator={false}
           keyboardShouldPersistTaps="handled"
         >
-          {/* Info Banner */}
-          <View
-            style={[
-              styles.infoBanner,
-              { backgroundColor: colors.primary + "10" },
-            ]}
-          >
-            <Ionicons
-              name="information-circle"
-              size={20}
-              color={colors.primary}
-            />
-            <Text style={[styles.infoBannerText, { color: colors.primary }]}>
-              All trip details will be verified. Only travelers with valid
-              tickets can create trips.
-            </Text>
-          </View>
-
-          {/* Route & Transport */}
           <View
             style={[
               styles.card,
@@ -269,33 +259,58 @@ export default function CreateTripScreen() {
               </Text>
             </View>
 
-            <Controller
-              control={control}
-              name="source"
-              render={({ field: { onChange, value } }) => (
-                <CityDropdown
-                  label="Source City"
-                  value={value}
-                  onChange={onChange}
-                  placeholder="Select source city"
-                  error={errors.source?.message}
+            <View style={styles.citiesRow}>
+              <View style={styles.cityWrapper}>
+                <Controller
+                  control={control}
+                  name="source"
+                  render={({ field: { onChange, value } }) => (
+                    <CityDropdown
+                      label="Source City"
+                      value={value}
+                      onChange={onChange}
+                      placeholder="Select source city"
+                      error={errors.source?.message}
+                    />
+                  )}
                 />
-              )}
-            />
+              </View>
 
-            <Controller
-              control={control}
-              name="destination"
-              render={({ field: { onChange, value } }) => (
-                <CityDropdown
-                  label="Destination City"
-                  value={value}
-                  onChange={onChange}
-                  placeholder="Select destination city"
-                  error={errors.destination?.message}
+              <Pressable
+                style={[
+                  styles.swapButton,
+                  { backgroundColor: colors.background.primary },
+                ]}
+                onPress={handleCitySwap}
+                disabled={!source && !destination}
+              >
+                <Ionicons
+                  name="swap-vertical"
+                  size={20}
+                  color={
+                    source || destination
+                      ? colors.primary
+                      : colors.text.tertiary
+                  }
                 />
-              )}
-            />
+              </Pressable>
+
+              <View style={styles.cityWrapper}>
+                <Controller
+                  control={control}
+                  name="destination"
+                  render={({ field: { onChange, value } }) => (
+                    <CityDropdown
+                      label="Destination City"
+                      value={value}
+                      onChange={onChange}
+                      placeholder="Select destination city"
+                      error={errors.destination?.message}
+                    />
+                  )}
+                />
+              </View>
+            </View>
 
             <Controller
               control={control}
@@ -311,7 +326,6 @@ export default function CreateTripScreen() {
             />
           </View>
 
-          {/* Schedule */}
           <View
             style={[
               styles.card,
@@ -333,12 +347,12 @@ export default function CreateTripScreen() {
             </View>
 
             <Text
-              style={[styles.scheduleLabel, { color: colors.text.secondary }]}
+              style={[styles.scheduleLabel, { color: colors.text.primary }]}
             >
               Departure
             </Text>
-            <View style={styles.row}>
-              <View style={styles.halfWidth}>
+            <View style={styles.dateTimeRow}>
+              <View style={styles.dateTimeItem}>
                 <Controller
                   control={control}
                   name="departure_date"
@@ -349,12 +363,12 @@ export default function CreateTripScreen() {
                       onChange={(date) => onChange(dateToISO(date))}
                       error={errors.departure_date?.message}
                       minimumDate={new Date()}
-                      placeholder="Select departure date"
+                      placeholder="Select date"
                     />
                   )}
                 />
               </View>
-              <View style={styles.halfWidth}>
+              <View style={styles.dateTimeItem}>
                 <Controller
                   control={control}
                   name="departure_time"
@@ -368,7 +382,7 @@ export default function CreateTripScreen() {
                       }
                       onChange={(date) => onChange(dateToTimeString(date))}
                       error={errors.departure_time?.message}
-                      placeholder="Select departure time"
+                      placeholder="Select time"
                     />
                   )}
                 />
@@ -376,12 +390,12 @@ export default function CreateTripScreen() {
             </View>
 
             <Text
-              style={[styles.scheduleLabel, { color: colors.text.secondary }]}
+              style={[styles.scheduleLabel, { color: colors.text.primary }]}
             >
               Arrival
             </Text>
-            <View style={styles.row}>
-              <View style={styles.halfWidth}>
+            <View style={styles.dateTimeRow}>
+              <View style={styles.dateTimeItem}>
                 <Controller
                   control={control}
                   name="arrival_date"
@@ -392,12 +406,12 @@ export default function CreateTripScreen() {
                       onChange={(date) => onChange(dateToISO(date))}
                       error={errors.arrival_date?.message}
                       minimumDate={parseDate(departureDate) || undefined}
-                      placeholder="Select arrival date"
+                      placeholder="Select date"
                     />
                   )}
                 />
               </View>
-              <View style={styles.halfWidth}>
+              <View style={styles.dateTimeItem}>
                 <Controller
                   control={control}
                   name="arrival_time"
@@ -411,7 +425,7 @@ export default function CreateTripScreen() {
                       }
                       onChange={(date) => onChange(dateToTimeString(date))}
                       error={errors.arrival_time?.message}
-                      placeholder="Select arrival time"
+                      placeholder="Select time"
                     />
                   )}
                 />
@@ -419,7 +433,6 @@ export default function CreateTripScreen() {
             </View>
           </View>
 
-          {/* Capacity & Categories */}
           <View
             style={[
               styles.card,
@@ -526,58 +539,6 @@ export default function CreateTripScreen() {
             />
           </View>
 
-          {/* Additional Notes */}
-          <View
-            style={[
-              styles.card,
-              { backgroundColor: colors.background.secondary },
-            ]}
-          >
-            <View style={styles.cardHeader}>
-              <View
-                style={[
-                  styles.cardIconContainer,
-                  { backgroundColor: colors.text.tertiary + "15" },
-                ]}
-              >
-                <Ionicons
-                  name="document-text"
-                  size={20}
-                  color={colors.text.secondary}
-                />
-              </View>
-              <Text style={[styles.cardTitle, { color: colors.text.primary }]}>
-                Additional Notes
-                <Text
-                  style={[styles.optional, { color: colors.text.tertiary }]}
-                >
-                  {" "}
-                  (Optional)
-                </Text>
-              </Text>
-            </View>
-
-            <Controller
-              control={control}
-              name="notes"
-              render={({ field: { onChange, onBlur, value } }) => (
-                <TextInput
-                  label="Notes"
-                  placeholder="Any special instructions or requirements..."
-                  value={value || ""}
-                  onChangeText={onChange}
-                  onBlur={onBlur}
-                  error={errors.notes?.message}
-                  multiline
-                  numberOfLines={4}
-                  maxLength={500}
-                  style={{ minHeight: 100, textAlignVertical: "top" }}
-                />
-              )}
-            />
-          </View>
-
-          {/* Validation Errors Summary */}
           {hasErrors && (
             <View
               style={[
@@ -662,29 +623,21 @@ const styles = StyleSheet.create({
   scrollContent: {
     padding: Spacing.lg,
   },
-  infoBanner: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: Spacing.sm,
-    padding: Spacing.md,
-    borderRadius: BorderRadius.lg,
-    marginBottom: Spacing.lg,
-  },
-  infoBannerText: {
-    flex: 1,
-    fontSize: Typography.sizes.sm,
-    lineHeight: Typography.sizes.sm * 1.4,
-  },
   card: {
     borderRadius: BorderRadius.xl,
     padding: Spacing.lg,
-    marginBottom: Spacing.md,
+    marginBottom: Spacing.lg,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 8,
+    elevation: 2,
   },
   cardHeader: {
     flexDirection: "row",
     alignItems: "center",
     gap: Spacing.sm,
-    marginBottom: Spacing.md,
+    marginBottom: Spacing.lg,
   },
   cardIconContainer: {
     width: 36,
@@ -697,21 +650,35 @@ const styles = StyleSheet.create({
     fontSize: Typography.sizes.md,
     fontWeight: Typography.weights.bold,
   },
-  optional: {
-    fontSize: Typography.sizes.sm,
-    fontWeight: Typography.weights.normal,
+  citiesRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: Spacing.sm,
+    marginBottom: Spacing.md,
+  },
+  cityWrapper: {
+    flex: 1,
+  },
+  swapButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    alignItems: "center",
+    justifyContent: "center",
+    marginTop: 20,
   },
   scheduleLabel: {
-    fontSize: Typography.sizes.sm,
-    fontWeight: Typography.weights.semibold,
+    fontSize: Typography.sizes.md,
+    fontWeight: Typography.weights.bold,
     marginBottom: Spacing.sm,
-    marginTop: Spacing.sm,
+    marginTop: Spacing.md,
   },
-  row: {
+  dateTimeRow: {
     flexDirection: "row",
     gap: Spacing.md,
+    marginBottom: Spacing.sm,
   },
-  halfWidth: {
+  dateTimeItem: {
     flex: 1,
   },
   errorSummary: {
