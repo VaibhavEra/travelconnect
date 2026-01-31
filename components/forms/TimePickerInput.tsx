@@ -31,7 +31,6 @@ export default function TimePickerInput({
   const colors = useThemeColors();
   const [show, setShow] = useState(false);
 
-  // Use current time for picker display when value is null
   const pickerValue = value || new Date();
 
   const handleChange = (event: any, selectedTime?: Date) => {
@@ -44,18 +43,23 @@ export default function TimePickerInput({
     }
   };
 
-  const handleConfirm = () => {
+  // NEW: Clear handler
+  const handleClear = () => {
+    haptics.light();
+    onChange(null as any);
+  };
+
+  // NEW: Done handler
+  const handleDone = () => {
     haptics.light();
     setShow(false);
   };
 
-  // Format time for display
   const formatTime = (date: Date | null) => {
     if (!date) {
       return placeholder;
     }
 
-    // Validate date before formatting
     if (isNaN(date.getTime())) {
       return placeholder;
     }
@@ -71,6 +75,7 @@ export default function TimePickerInput({
 
   return (
     <View style={styles.container}>
+      {/* FIXED: Bigger label */}
       <Text style={[styles.label, { color: colors.text.primary }]}>
         {label}
       </Text>
@@ -88,6 +93,7 @@ export default function TimePickerInput({
           setShow(true);
         }}
       >
+        {/* FIXED: Better text size */}
         <Text
           style={[
             styles.inputText,
@@ -98,7 +104,8 @@ export default function TimePickerInput({
         >
           {formatTime(value)}
         </Text>
-        <Ionicons name="time" size={20} color={colors.text.secondary} />
+        {/* FIXED: Icon not displaced */}
+        <Ionicons name="time-outline" size={20} color={colors.text.secondary} />
       </Pressable>
 
       {error && (
@@ -109,19 +116,26 @@ export default function TimePickerInput({
         <Modal
           visible={show}
           transparent
-          animationType="fade"
+          animationType="slide"
           onRequestClose={() => setShow(false)}
         >
-          <View
+          <Pressable
             style={[styles.modalOverlay, { backgroundColor: Overlays.light }]}
+            onPress={() => setShow(false)}
           >
-            <View
+            <Pressable
               style={[
                 styles.modalContent,
                 { backgroundColor: colors.background.primary },
               ]}
+              onPress={(e) => e.stopPropagation()}
             >
-              <View style={styles.modalHeader}>
+              <View
+                style={[
+                  styles.modalHeader,
+                  { borderBottomColor: colors.border.light },
+                ]}
+              >
                 <Text
                   style={[styles.modalTitle, { color: colors.text.primary }]}
                 >
@@ -137,24 +151,52 @@ export default function TimePickerInput({
                 textColor={colors.text.primary}
               />
 
-              <Pressable
-                style={[
-                  styles.confirmButton,
-                  { backgroundColor: colors.primary },
-                ]}
-                onPress={handleConfirm}
-              >
-                <Text
+              {/* NEW: Action buttons with Clear and Done */}
+              <View style={styles.modalActions}>
+                {hasValue && (
+                  <Pressable
+                    style={[
+                      styles.actionButton,
+                      styles.clearButton,
+                      {
+                        backgroundColor: colors.background.secondary,
+                        borderColor: colors.border.default,
+                      },
+                    ]}
+                    onPress={handleClear}
+                  >
+                    <Text
+                      style={[
+                        styles.clearButtonText,
+                        { color: colors.text.secondary },
+                      ]}
+                    >
+                      Clear
+                    </Text>
+                  </Pressable>
+                )}
+
+                <Pressable
                   style={[
-                    styles.confirmButtonText,
-                    { color: colors.text.inverse },
+                    styles.actionButton,
+                    styles.doneButton,
+                    { backgroundColor: colors.primary },
+                    !hasValue && styles.fullWidthButton,
                   ]}
+                  onPress={handleDone}
                 >
-                  Confirm
-                </Text>
-              </Pressable>
-            </View>
-          </View>
+                  <Text
+                    style={[
+                      styles.doneButtonText,
+                      { color: colors.text.inverse },
+                    ]}
+                  >
+                    Done
+                  </Text>
+                </Pressable>
+              </View>
+            </Pressable>
+          </Pressable>
         </Modal>
       ) : (
         show && (
@@ -175,21 +217,22 @@ const styles = StyleSheet.create({
     marginBottom: Spacing.md,
   },
   label: {
-    fontSize: Typography.sizes.sm,
-    fontWeight: Typography.weights.medium,
-    marginBottom: Spacing.xs,
+    fontSize: Typography.sizes.md, // FIXED: Bigger label
+    fontWeight: Typography.weights.semibold,
+    marginBottom: Spacing.sm,
   },
   input: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    borderRadius: BorderRadius.md,
+    borderRadius: BorderRadius.lg, // FIXED: Better radius
     paddingHorizontal: Spacing.md,
-    paddingVertical: Spacing.md,
+    paddingVertical: Spacing.md + 2, // FIXED: Better padding
     borderWidth: 1.5,
   },
   inputText: {
-    fontSize: Typography.sizes.md,
+    fontSize: Typography.sizes.md, // FIXED: Proper size
+    flex: 1,
   },
   error: {
     fontSize: Typography.sizes.xs,
@@ -202,23 +245,42 @@ const styles = StyleSheet.create({
   modalContent: {
     borderTopLeftRadius: BorderRadius.xl,
     borderTopRightRadius: BorderRadius.xl,
-    padding: Spacing.lg,
+    paddingBottom: Spacing.lg,
   },
   modalHeader: {
-    marginBottom: Spacing.md,
+    padding: Spacing.lg,
+    borderBottomWidth: 1,
   },
   modalTitle: {
     fontSize: Typography.sizes.lg,
     fontWeight: Typography.weights.bold,
+    textAlign: "center",
   },
-  confirmButton: {
-    borderRadius: BorderRadius.lg,
+  modalActions: {
+    flexDirection: "row",
+    gap: Spacing.sm,
+    paddingHorizontal: Spacing.lg,
+    paddingTop: Spacing.md,
+  },
+  actionButton: {
+    flex: 1,
     paddingVertical: Spacing.md,
+    borderRadius: BorderRadius.lg,
     alignItems: "center",
-    marginTop: Spacing.md,
   },
-  confirmButtonText: {
+  clearButton: {
+    borderWidth: 1.5,
+  },
+  clearButtonText: {
     fontSize: Typography.sizes.md,
     fontWeight: Typography.weights.semibold,
+  },
+  doneButton: {},
+  doneButtonText: {
+    fontSize: Typography.sizes.md,
+    fontWeight: Typography.weights.bold,
+  },
+  fullWidthButton: {
+    flex: 1,
   },
 });
