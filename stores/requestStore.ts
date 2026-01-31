@@ -31,6 +31,7 @@ export interface ParcelRequest extends DbParcelRequest {
     arrival_date: string;
     arrival_time: string;
     transport_mode: string;
+    parcel_size_capacity: string; // NEW: Added for display
   } | null;
   sender?: {
     full_name: string;
@@ -38,16 +39,16 @@ export interface ParcelRequest extends DbParcelRequest {
   } | null;
 }
 
-// Form data for creating request
+// UPDATED: Form data for creating request (removed size and sender_notes)
 export interface CreateRequestData {
   trip_id: string;
   item_description: string;
   category: string;
-  size: "small" | "medium" | "large";
   parcel_photos: string[];
   delivery_contact_name: string;
   delivery_contact_phone: string;
-  sender_notes?: string;
+  // REMOVED: size (comes from trip now)
+  // REMOVED: sender_notes
 }
 
 interface RequestState {
@@ -65,8 +66,8 @@ interface RequestState {
   getIncomingRequests: (travellerId: string) => Promise<void>;
   getAcceptedRequests: (travellerId: string) => Promise<void>;
   getRequestById: (requestId: string) => Promise<ParcelRequest | null>;
-  acceptRequest: (requestId: string, travellerNotes?: string) => Promise<void>;
-  rejectRequest: (requestId: string, reason: string) => Promise<void>;
+  acceptRequest: (requestId: string) => Promise<void>; // UPDATED: Removed travellerNotes param
+  rejectRequest: (requestId: string, reason?: string) => Promise<void>; // UPDATED: Now uses proper rejection
   cancelRequest: (requestId: string, reason?: string) => Promise<void>;
   updateRequestStatus: (
     requestId: string,
@@ -79,11 +80,29 @@ interface RequestState {
   getPickupOtp: (requestId: string) => Promise<string | null>;
   getDeliveryOtp: (requestId: string) => Promise<string | null>;
 
-  // NEW: Update receiver details
+  // NEW: Regenerate OTP methods
+  regeneratePickupOtp: (requestId: string) => Promise<string>;
+  regenerateDeliveryOtp: (requestId: string) => Promise<string>;
+
+  // UPDATED: Update receiver details (now allowed until delivered)
   updateReceiverDetails: (
     requestId: string,
     delivery_contact_name: string,
     delivery_contact_phone: string,
+  ) => Promise<void>;
+
+  // NEW: Generate cancellation OTP for trip cancellation after pickup
+  generateCancellationOtp: (requestId: string) => Promise<string>;
+
+  // NEW: Check if request details can be edited
+  canEditRequestDetails: (requestId: string) => Promise<boolean>;
+
+  // NEW: Update request details (description, photos, category)
+  updateRequestDetails: (
+    requestId: string,
+    item_description: string,
+    category: string,
+    parcel_photos: string[],
   ) => Promise<void>;
 
   clearError: () => void;
@@ -105,21 +124,15 @@ export const useRequestStore = create<RequestState>((set, get) => ({
     try {
       set({ loading: true, error: null });
 
-      // Prepare RPC parameters (only include p_sender_notes if it has a value)
-      const rpcParams: any = {
+      // UPDATED: Removed p_size and p_sender_notes
+      const rpcParams = {
         p_trip_id: data.trip_id,
         p_item_description: data.item_description,
         p_category: data.category,
-        p_size: data.size,
         p_parcel_photos: data.parcel_photos,
         p_delivery_contact_name: data.delivery_contact_name,
         p_delivery_contact_phone: data.delivery_contact_phone,
       };
-
-      // Only add p_sender_notes if it exists
-      if (data.sender_notes) {
-        rpcParams.p_sender_notes = data.sender_notes;
-      }
 
       // Use RPC function for server-side validation and OTP generation
       const { data: requestId, error: rpcError } = await supabase.rpc(
@@ -129,13 +142,13 @@ export const useRequestStore = create<RequestState>((set, get) => ({
 
       if (rpcError) throw rpcError;
 
-      // Fetch the created request with trip details
+      // UPDATED: Fetch the created request with trip details (including parcel_size_capacity)
       const { data: request, error: fetchError } = await supabase
         .from("parcel_requests")
         .select(
           `
           *,
-          trip:trips(source, destination, departure_date, departure_time, arrival_date, arrival_time, transport_mode)
+          trip:trips(source, destination, departure_date, departure_time, arrival_date, arrival_time, transport_mode, parcel_size_capacity)
         `,
         )
         .eq("id", requestId)
@@ -162,12 +175,13 @@ export const useRequestStore = create<RequestState>((set, get) => ({
     try {
       set({ loading: true, error: null });
 
+      // UPDATED: Added parcel_size_capacity to trip selection
       const { data: requests, error } = await supabase
         .from("parcel_requests")
         .select(
           `
           *,
-          trip:trips(source, destination, departure_date, departure_time, arrival_date, arrival_time, transport_mode)
+          trip:trips(source, destination, departure_date, departure_time, arrival_date, arrival_time, transport_mode, parcel_size_capacity)
         `,
         )
         .eq("sender_id", senderId)
@@ -189,12 +203,13 @@ export const useRequestStore = create<RequestState>((set, get) => ({
     try {
       set({ loading: true, error: null });
 
+      // UPDATED: Added parcel_size_capacity to trip selection
       const { data: requests, error } = await supabase
         .from("parcel_requests")
         .select(
           `
           *,
-          trip:trips!inner(source, destination, departure_date, departure_time, arrival_date, arrival_time, transport_mode),
+          trip:trips!inner(source, destination, departure_date, departure_time, arrival_date, arrival_time, transport_mode, parcel_size_capacity),
           sender:profiles!parcel_requests_sender_id_fkey(full_name, phone)
         `,
         )
@@ -222,12 +237,13 @@ export const useRequestStore = create<RequestState>((set, get) => ({
     try {
       set({ loading: true, error: null });
 
+      // UPDATED: Added parcel_size_capacity to trip selection
       const { data: requests, error } = await supabase
         .from("parcel_requests")
         .select(
           `
           *,
-          trip:trips!inner(source, destination, departure_date, departure_time, arrival_date, arrival_time, transport_mode),
+          trip:trips!inner(source, destination, departure_date, departure_time, arrival_date, arrival_time, transport_mode, parcel_size_capacity),
           sender:profiles!parcel_requests_sender_id_fkey(full_name, phone)
         `,
         )
@@ -256,12 +272,13 @@ export const useRequestStore = create<RequestState>((set, get) => ({
     try {
       set({ loading: true, error: null });
 
+      // UPDATED: Added parcel_size_capacity to trip selection
       const { data: request, error } = await supabase
         .from("parcel_requests")
         .select(
           `
           *,
-          trip:trips(source, destination, departure_date, departure_time, arrival_date, arrival_time, transport_mode),
+          trip:trips(source, destination, departure_date, departure_time, arrival_date, arrival_time, transport_mode, parcel_size_capacity),
           sender:profiles!parcel_requests_sender_id_fkey(full_name, phone)
         `,
         )
@@ -285,18 +302,14 @@ export const useRequestStore = create<RequestState>((set, get) => ({
   // ============================================================================
   // UPDATED: Accept request with atomic slot decrement + trip refresh
   // ============================================================================
-  acceptRequest: async (requestId: string, travellerNotes?: string) => {
+  acceptRequest: async (requestId: string) => {
     try {
       set({ loading: true, error: null });
 
-      // Prepare RPC parameters
-      const rpcParams: any = {
+      // UPDATED: Removed travellerNotes parameter
+      const rpcParams = {
         p_request_id: requestId,
       };
-
-      if (travellerNotes) {
-        rpcParams.p_traveller_notes = travellerNotes;
-      }
 
       // Use atomic RPC to prevent race conditions
       const { data: result, error: rpcError } = await supabase.rpc(
@@ -311,7 +324,7 @@ export const useRequestStore = create<RequestState>((set, get) => ({
       // Refresh the request to get latest data
       const request = await get().getRequestById(requestId);
 
-      // NEW: Refresh the trip to get updated available_slots
+      // Refresh the trip to get updated status (should be 'locked' now)
       if (request?.trip_id) {
         const { useTripStore } = await import("./tripStore");
         await useTripStore.getState().getTripById(request.trip_id);
@@ -324,7 +337,6 @@ export const useRequestStore = create<RequestState>((set, get) => ({
             ? {
                 ...req,
                 status: "accepted" as const,
-                traveller_notes: travellerNotes || null,
               }
             : req,
         ),
@@ -341,40 +353,36 @@ export const useRequestStore = create<RequestState>((set, get) => ({
   },
 
   // ============================================================================
-  // UPDATED: Reject request with validation (uses cancel_request_with_validation)
+  // UPDATED: Reject request with proper rejection (not cancellation)
   // ============================================================================
-  rejectRequest: async (requestId: string, reason: string) => {
+  rejectRequest: async (requestId: string, reason?: string) => {
     try {
       set({ loading: true, error: null });
 
-      // Prepare RPC parameters
+      // UPDATED: Use new reject_request function instead of cancel_request_with_validation
       const rpcParams: any = {
         p_request_id: requestId,
-        p_cancelled_by: "traveller",
       };
 
-      // Only add p_cancellation_reason if it exists
       if (reason) {
-        rpcParams.p_cancellation_reason = reason;
+        rpcParams.p_rejection_reason = reason;
       }
 
-      // Use cancel_request_with_validation with traveller as cancelled_by
       const { data: result, error: rpcError } = await supabase.rpc(
-        "cancel_request_with_validation",
+        "reject_request",
         rpcParams,
       );
 
       if (rpcError) throw rpcError;
 
-      // Update local state
+      // Update local state (status is 'rejected', not 'cancelled')
       set((state) => ({
         incomingRequests: state.incomingRequests.map((req) =>
           req.id === requestId
             ? {
                 ...req,
-                status: "cancelled" as const,
-                cancelled_by: "traveller",
-                rejection_reason: reason,
+                status: "rejected" as const,
+                rejection_reason: reason || null,
               }
             : req,
         ),
@@ -391,7 +399,7 @@ export const useRequestStore = create<RequestState>((set, get) => ({
   },
 
   // ============================================================================
-  // UPDATED: Cancel request with 24h validation
+  // Cancel request with 24h validation (sender cancellation)
   // ============================================================================
   cancelRequest: async (requestId: string, reason?: string) => {
     try {
@@ -488,7 +496,7 @@ export const useRequestStore = create<RequestState>((set, get) => ({
   // ============================================================================
 
   // ============================================================================
-  // UPDATED: Verify pickup OTP (now returns JSON directly from DB)
+  // Verify pickup OTP (now returns JSON directly from DB)
   // ============================================================================
   verifyPickupOtp: async (requestId: string, otp: string) => {
     try {
@@ -540,7 +548,7 @@ export const useRequestStore = create<RequestState>((set, get) => ({
   },
 
   // ============================================================================
-  // UPDATED: Verify delivery OTP (now returns JSON directly from DB)
+  // Verify delivery OTP (now returns JSON directly from DB)
   // ============================================================================
   verifyDeliveryOtp: async (requestId: string, otp: string) => {
     try {
@@ -626,7 +634,65 @@ export const useRequestStore = create<RequestState>((set, get) => ({
   },
 
   // ============================================================================
-  // NEW: Update receiver details (only allowed before acceptance)
+  // NEW: Regenerate pickup OTP (when expired or failed)
+  // ============================================================================
+  regeneratePickupOtp: async (requestId: string) => {
+    try {
+      set({ loading: true, error: null });
+
+      const { data: newOtp, error } = await supabase.rpc(
+        "regenerate_pickup_otp",
+        { p_request_id: requestId },
+      );
+
+      if (error) throw error;
+
+      // Refresh request to get updated status (should be 'accepted' again if was 'failed')
+      await get().getRequestById(requestId);
+
+      set({ loading: false });
+      logger.info("Pickup OTP regenerated", { requestId });
+
+      return newOtp as string;
+    } catch (error: any) {
+      const errorMessage = parseSupabaseError(error);
+      logger.error("Regenerate pickup OTP failed", error);
+      set({ loading: false, error: errorMessage });
+      throw new Error(errorMessage);
+    }
+  },
+
+  // ============================================================================
+  // NEW: Regenerate delivery OTP (when expired or failed)
+  // ============================================================================
+  regenerateDeliveryOtp: async (requestId: string) => {
+    try {
+      set({ loading: true, error: null });
+
+      const { data: newOtp, error } = await supabase.rpc(
+        "regenerate_delivery_otp",
+        { p_request_id: requestId },
+      );
+
+      if (error) throw error;
+
+      // Refresh request to get updated status (should be 'picked_up' again if was 'failed')
+      await get().getRequestById(requestId);
+
+      set({ loading: false });
+      logger.info("Delivery OTP regenerated", { requestId });
+
+      return newOtp as string;
+    } catch (error: any) {
+      const errorMessage = parseSupabaseError(error);
+      logger.error("Regenerate delivery OTP failed", error);
+      set({ loading: false, error: errorMessage });
+      throw new Error(errorMessage);
+    }
+  },
+
+  // ============================================================================
+  // UPDATED: Update receiver details (now allowed until delivered)
   // ============================================================================
   updateReceiverDetails: async (
     requestId: string,
@@ -636,7 +702,7 @@ export const useRequestStore = create<RequestState>((set, get) => ({
     try {
       set({ loading: true, error: null });
 
-      // Check current status first
+      // UPDATED: Check current status - now allowed until delivered
       const { data: request, error: fetchError } = await supabase
         .from("parcel_requests")
         .select("status")
@@ -645,8 +711,9 @@ export const useRequestStore = create<RequestState>((set, get) => ({
 
       if (fetchError) throw fetchError;
 
-      if (request.status !== "pending") {
-        throw new Error("Can only edit receiver details before acceptance");
+      // UPDATED: Can edit until delivered (not just pending)
+      if (request.status === "delivered") {
+        throw new Error("Cannot edit receiver details after delivery");
       }
 
       const { error } = await supabase
@@ -674,6 +741,86 @@ export const useRequestStore = create<RequestState>((set, get) => ({
     } catch (error: any) {
       const errorMessage = parseSupabaseError(error);
       logger.error("Update receiver details failed", error);
+      set({ loading: false, error: errorMessage });
+      throw new Error(errorMessage);
+    }
+  },
+
+  // ============================================================================
+  // NEW: Generate cancellation OTP for trip cancellation after pickup
+  // ============================================================================
+  generateCancellationOtp: async (requestId: string) => {
+    try {
+      set({ loading: true, error: null });
+
+      const { data: cancellationOtp, error } = await supabase.rpc(
+        "generate_cancellation_otp",
+        { p_request_id: requestId },
+      );
+
+      if (error) throw error;
+
+      set({ loading: false });
+      logger.info("Cancellation OTP generated", { requestId });
+
+      return cancellationOtp as string;
+    } catch (error: any) {
+      const errorMessage = parseSupabaseError(error);
+      logger.error("Generate cancellation OTP failed", error);
+      set({ loading: false, error: errorMessage });
+      throw new Error(errorMessage);
+    }
+  },
+
+  // Add method to check if details can be edited
+  canEditRequestDetails: async (requestId: string): Promise<boolean> => {
+    try {
+      const { data, error } = await supabase.rpc("can_edit_request_details", {
+        p_request_id: requestId,
+      });
+
+      if (error) {
+        logger.error("Check edit permission failed", error);
+        return false;
+      }
+
+      return data ?? false;
+    } catch (error) {
+      logger.error("canEditRequestDetails error", error);
+      return false;
+    }
+  },
+
+  // Add method to update request details (description, photos, category)
+  updateRequestDetails: async (
+    requestId: string,
+    item_description: string,
+    category: string,
+    parcel_photos: string[],
+  ) => {
+    try {
+      set({ loading: true, error: null });
+
+      const { data: result, error } = await supabase.rpc(
+        "update_request_details",
+        {
+          p_request_id: requestId,
+          p_item_description: item_description,
+          p_category: category,
+          p_parcel_photos: parcel_photos,
+        },
+      );
+
+      if (error) throw error;
+
+      // Refresh request to get updated data
+      await get().getRequestById(requestId);
+
+      set({ loading: false });
+      logger.info("Request details updated", { requestId });
+    } catch (error: any) {
+      const errorMessage = parseSupabaseError(error);
+      logger.error("Update request details failed", error);
       set({ loading: false, error: errorMessage });
       throw new Error(errorMessage);
     }
