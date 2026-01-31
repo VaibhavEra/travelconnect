@@ -1,8 +1,11 @@
 import AcceptRequestModal from "@/components/modals/AcceptRequestModal";
 import RejectRequestModal from "@/components/modals/RejectRequestModal";
+import VerifyOtpModal from "@/components/modals/VerifyOtpModal";
+import PhotoGallery from "@/components/request/PhotoGallery";
 import { CATEGORY_CONFIG, SIZE_CONFIG } from "@/lib/constants/categories";
 import { REQUEST_STATUS_CONFIG, RequestStatus } from "@/lib/constants/status";
 import { TRANSPORT_ICONS, TransportMode } from "@/lib/constants/transport";
+import { formatDate, formatTime } from "@/lib/utils/dateTime";
 import { haptics } from "@/lib/utils/haptics";
 import { useRequestStore } from "@/stores/requestStore";
 import { BorderRadius, Spacing, Typography } from "@/styles";
@@ -13,7 +16,6 @@ import { useEffect, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
-  Image,
   Linking,
   Pressable,
   ScrollView,
@@ -39,10 +41,13 @@ export default function IncomingRequestDetailsScreen() {
     getRequestById,
     acceptRequest,
     rejectRequest,
+    verifyPickupOtp,
+    verifyDeliveryOtp,
   } = useRequestStore();
   const [acceptModalVisible, setAcceptModalVisible] = useState(false);
   const [rejectModalVisible, setRejectModalVisible] = useState(false);
-  const [selectedPhotoIndex, setSelectedPhotoIndex] = useState(0);
+  const [pickupOtpModalVisible, setPickupOtpModalVisible] = useState(false);
+  const [deliveryOtpModalVisible, setDeliveryOtpModalVisible] = useState(false);
 
   useEffect(() => {
     if (id) {
@@ -81,6 +86,46 @@ export default function IncomingRequestDetailsScreen() {
     }
   };
 
+  const handleMarkPickup = () => {
+    haptics.light();
+    setPickupOtpModalVisible(true);
+  };
+
+  const handleMarkDelivery = () => {
+    haptics.light();
+    setDeliveryOtpModalVisible(true);
+  };
+
+  const handleVerifyPickupOtp = async (otp: string) => {
+    try {
+      const isValid = await verifyPickupOtp(id, otp);
+      if (isValid) {
+        setPickupOtpModalVisible(false);
+        Alert.alert("Success", "Parcel marked as picked up!");
+        await getRequestById(id);
+      }
+      return isValid;
+    } catch (error) {
+      console.error("Verify pickup OTP failed:", error);
+      throw error;
+    }
+  };
+
+  const handleVerifyDeliveryOtp = async (otp: string) => {
+    try {
+      const isValid = await verifyDeliveryOtp(id, otp);
+      if (isValid) {
+        setDeliveryOtpModalVisible(false);
+        Alert.alert("Success", "Parcel marked as delivered!");
+        await getRequestById(id);
+      }
+      return isValid;
+    } catch (error) {
+      console.error("Verify delivery OTP failed:", error);
+      throw error;
+    }
+  };
+
   const handleBack = () => {
     haptics.light();
     router.back();
@@ -109,9 +154,10 @@ export default function IncomingRequestDetailsScreen() {
   const statusColor = colors[statusConfig.colorKey];
   const isPending = status === "pending";
   const isAccepted = status === "accepted";
+  const isPickedUp = status === "picked_up";
   const isCancelled = status === "cancelled";
   const isRejected = status === "rejected";
-  const canViewContacts = isAccepted || isCancelled || isRejected;
+  const canViewContacts = isAccepted || isPickedUp || isCancelled || isRejected;
 
   const categoryConfig =
     CATEGORY_CONFIG[request.category as keyof typeof CATEGORY_CONFIG];
@@ -122,8 +168,11 @@ export default function IncomingRequestDetailsScreen() {
       style={[styles.container, { backgroundColor: colors.background.primary }]}
       edges={["top"]}
     >
-      {/* Header */}
-      <Animated.View entering={FadeIn} style={styles.header}>
+      {/* FIXED: Header with status and left-aligned title */}
+      <Animated.View
+        entering={FadeIn}
+        style={[styles.header, { borderBottomColor: colors.border.light }]}
+      >
         <Pressable
           onPress={handleBack}
           hitSlop={10}
@@ -134,10 +183,18 @@ export default function IncomingRequestDetailsScreen() {
         >
           <Ionicons name="arrow-back" size={24} color={colors.text.primary} />
         </Pressable>
-        <Text style={[styles.headerTitle, { color: colors.text.primary }]}>
-          Request Details
-        </Text>
-        <View style={styles.headerSpacer} />
+        <View style={styles.headerContent}>
+          <Text style={[styles.headerTitle, { color: colors.text.primary }]}>
+            Request Details
+          </Text>
+          {/* Status in header */}
+          <View style={styles.statusBadge}>
+            <Ionicons name={statusConfig.icon} size={14} color={statusColor} />
+            <Text style={[styles.statusBadgeText, { color: statusColor }]}>
+              {statusConfig.label}
+            </Text>
+          </View>
+        </View>
       </Animated.View>
 
       <ScrollView
@@ -145,39 +202,10 @@ export default function IncomingRequestDetailsScreen() {
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
       >
-        {/* Status Banner */}
-        <Animated.View
-          entering={FadeInDown.delay(100)}
-          style={[
-            styles.statusBanner,
-            {
-              backgroundColor: statusColor + "15",
-              borderColor: statusColor + "30",
-            },
-          ]}
-        >
-          <View
-            style={[
-              styles.statusIconContainer,
-              { backgroundColor: statusColor + "20" },
-            ]}
-          >
-            <Ionicons name={statusConfig.icon} size={24} color={statusColor} />
-          </View>
-          <View style={styles.statusContent}>
-            <Text style={[styles.statusLabel, { color: colors.text.tertiary }]}>
-              Status
-            </Text>
-            <Text style={[styles.statusText, { color: statusColor }]}>
-              {statusConfig.label}
-            </Text>
-          </View>
-        </Animated.View>
-
         {/* Privacy Notice */}
         {isPending && (
           <Animated.View
-            entering={FadeInDown.delay(200)}
+            entering={FadeInDown.delay(100)}
             style={[
               styles.privacyNotice,
               {
@@ -200,74 +228,9 @@ export default function IncomingRequestDetailsScreen() {
           </Animated.View>
         )}
 
-        {/* Parcel Photos */}
-        {request.parcel_photos && request.parcel_photos.length > 0 && (
-          <Animated.View
-            entering={FadeInDown.delay(300)}
-            style={[
-              styles.card,
-              { backgroundColor: colors.background.secondary },
-            ]}
-          >
-            <View style={styles.cardHeader}>
-              <View
-                style={[
-                  styles.cardIconContainer,
-                  { backgroundColor: colors.primary + "15" },
-                ]}
-              >
-                <Ionicons name="images" size={20} color={colors.primary} />
-              </View>
-              <Text style={[styles.cardTitle, { color: colors.text.primary }]}>
-                Parcel Photos
-              </Text>
-              <View
-                style={[
-                  styles.photoCount,
-                  { backgroundColor: colors.primary + "10" },
-                ]}
-              >
-                <Text
-                  style={[styles.photoCountText, { color: colors.primary }]}
-                >
-                  {request.parcel_photos.length}
-                </Text>
-              </View>
-            </View>
-
-            <Image
-              source={{ uri: request.parcel_photos[selectedPhotoIndex] }}
-              style={[
-                styles.mainPhoto,
-                { backgroundColor: colors.background.primary },
-              ]}
-            />
-
-            {request.parcel_photos.length > 1 && (
-              <ScrollView
-                horizontal
-                showsHorizontalScrollIndicator={false}
-                contentContainerStyle={styles.photoThumbnails}
-              >
-                {request.parcel_photos.map((photo, index) => (
-                  <PhotoThumbnail
-                    key={index}
-                    uri={photo}
-                    isSelected={selectedPhotoIndex === index}
-                    onPress={() => {
-                      haptics.light();
-                      setSelectedPhotoIndex(index);
-                    }}
-                  />
-                ))}
-              </ScrollView>
-            )}
-          </Animated.View>
-        )}
-
-        {/* Parcel Details */}
+        {/* FIXED: Parcel Details BEFORE Photos */}
         <Animated.View
-          entering={FadeInDown.delay(400)}
+          entering={FadeInDown.delay(200)}
           style={[
             styles.card,
             { backgroundColor: colors.background.secondary },
@@ -357,36 +320,165 @@ export default function IncomingRequestDetailsScreen() {
               </View>
             </View>
           </View>
-
-          {/* Sender Notes */}
-          {request.sender_notes && (
-            <View
-              style={[
-                styles.notesBox,
-                {
-                  backgroundColor: colors.warning + "10",
-                  borderColor: colors.warning + "30",
-                },
-              ]}
-            >
-              <View style={styles.notesHeader}>
-                <Ionicons
-                  name="chatbox-ellipses"
-                  size={16}
-                  color={colors.warning}
-                />
-                <Text style={[styles.notesLabel, { color: colors.warning }]}>
-                  Sender's Note
-                </Text>
-              </View>
-              <Text style={[styles.notesText, { color: colors.text.primary }]}>
-                {request.sender_notes}
-              </Text>
-            </View>
-          )}
         </Animated.View>
 
-        {/* Contact Cards */}
+        {/* FIXED: Parcel Photos - Using PhotoGallery with thumbnail mode */}
+        {request.parcel_photos && request.parcel_photos.length > 0 && (
+          <Animated.View
+            entering={FadeInDown.delay(300)}
+            style={[
+              styles.card,
+              { backgroundColor: colors.background.secondary },
+            ]}
+          >
+            <View style={styles.cardHeader}>
+              <View
+                style={[
+                  styles.cardIconContainer,
+                  { backgroundColor: colors.primary + "15" },
+                ]}
+              >
+                <Ionicons name="images" size={20} color={colors.primary} />
+              </View>
+              <Text style={[styles.cardTitle, { color: colors.text.primary }]}>
+                Parcel Photos
+              </Text>
+              <View
+                style={[
+                  styles.photoCount,
+                  { backgroundColor: colors.primary + "10" },
+                ]}
+              >
+                <Text
+                  style={[styles.photoCountText, { color: colors.primary }]}
+                >
+                  {request.parcel_photos.length}
+                </Text>
+              </View>
+            </View>
+
+            <PhotoGallery
+              photos={request.parcel_photos}
+              mode="thumbnail"
+              thumbnailSize={80}
+            />
+          </Animated.View>
+        )}
+
+        {/* FIXED: Trip Info with Departure AND Arrival */}
+        {request.trip && (
+          <Animated.View
+            entering={FadeInDown.delay(400)}
+            style={[
+              styles.card,
+              { backgroundColor: colors.background.secondary },
+            ]}
+          >
+            <View style={styles.cardHeader}>
+              <View
+                style={[
+                  styles.cardIconContainer,
+                  { backgroundColor: colors.primary + "15" },
+                ]}
+              >
+                <Ionicons name="airplane" size={20} color={colors.primary} />
+              </View>
+              <Text style={[styles.cardTitle, { color: colors.text.primary }]}>
+                Your Trip
+              </Text>
+            </View>
+
+            {/* Route */}
+            <View style={styles.routeContainer}>
+              <View style={styles.routePoint}>
+                <View
+                  style={[styles.routeDot, { backgroundColor: colors.primary }]}
+                />
+                <View style={styles.routeInfo}>
+                  <Text
+                    style={[styles.routeLabel, { color: colors.text.tertiary }]}
+                  >
+                    Departure
+                  </Text>
+                  <Text
+                    style={[styles.routeCity, { color: colors.text.primary }]}
+                  >
+                    {request.trip.source}
+                  </Text>
+                  <Text
+                    style={[
+                      styles.routeDateTime,
+                      { color: colors.text.secondary },
+                    ]}
+                  >
+                    {formatDate(request.trip.departure_date)} •{" "}
+                    {formatTime(request.trip.departure_time)}
+                  </Text>
+                </View>
+              </View>
+
+              <View style={styles.routeLineContainer}>
+                <View
+                  style={[
+                    styles.routeLine,
+                    { backgroundColor: colors.border.default },
+                  ]}
+                />
+                <View
+                  style={[
+                    styles.transportBadge,
+                    { backgroundColor: colors.primary + "15" },
+                  ]}
+                >
+                  <Ionicons
+                    name={
+                      TRANSPORT_ICONS[
+                        request.trip.transport_mode as TransportMode
+                      ] || "car"
+                    }
+                    size={14}
+                    color={colors.primary}
+                  />
+                </View>
+                <View
+                  style={[
+                    styles.routeLine,
+                    { backgroundColor: colors.border.default },
+                  ]}
+                />
+              </View>
+
+              <View style={styles.routePoint}>
+                <View
+                  style={[styles.routeDot, { backgroundColor: colors.success }]}
+                />
+                <View style={styles.routeInfo}>
+                  <Text
+                    style={[styles.routeLabel, { color: colors.text.tertiary }]}
+                  >
+                    Arrival
+                  </Text>
+                  <Text
+                    style={[styles.routeCity, { color: colors.text.primary }]}
+                  >
+                    {request.trip.destination}
+                  </Text>
+                  <Text
+                    style={[
+                      styles.routeDateTime,
+                      { color: colors.text.secondary },
+                    ]}
+                  >
+                    {formatDate(request.trip.arrival_date)} •{" "}
+                    {formatTime(request.trip.arrival_time)}
+                  </Text>
+                </View>
+              </View>
+            </View>
+          </Animated.View>
+        )}
+
+        {/* FIXED: Contact Cards - Only visible after accept */}
         {canViewContacts && (
           <>
             {/* Sender Info */}
@@ -457,128 +549,10 @@ export default function IncomingRequestDetailsScreen() {
           </>
         )}
 
-        {/* Trip Info */}
-        {request.trip && (
-          <Animated.View
-            entering={FadeInDown.delay(700)}
-            style={[
-              styles.card,
-              { backgroundColor: colors.background.secondary },
-            ]}
-          >
-            <View style={styles.cardHeader}>
-              <View
-                style={[
-                  styles.cardIconContainer,
-                  { backgroundColor: colors.primary + "15" },
-                ]}
-              >
-                <Ionicons name="airplane" size={20} color={colors.primary} />
-              </View>
-              <Text style={[styles.cardTitle, { color: colors.text.primary }]}>
-                Your Trip
-              </Text>
-            </View>
-
-            {/* Route */}
-            <View style={styles.routeContainer}>
-              <View style={styles.routePoint}>
-                <View
-                  style={[styles.routeDot, { backgroundColor: colors.primary }]}
-                />
-                <Text
-                  style={[styles.routeCity, { color: colors.text.primary }]}
-                >
-                  {request.trip.source}
-                </Text>
-              </View>
-
-              <View style={styles.routeLineContainer}>
-                <View
-                  style={[
-                    styles.routeLine,
-                    { backgroundColor: colors.border.default },
-                  ]}
-                />
-                <View
-                  style={[
-                    styles.transportBadge,
-                    { backgroundColor: colors.primary + "15" },
-                  ]}
-                >
-                  <Ionicons
-                    name={
-                      TRANSPORT_ICONS[
-                        request.trip.transport_mode as TransportMode
-                      ] || "car"
-                    }
-                    size={14}
-                    color={colors.primary}
-                  />
-                </View>
-                <View
-                  style={[
-                    styles.routeLine,
-                    { backgroundColor: colors.border.default },
-                  ]}
-                />
-              </View>
-
-              <View style={styles.routePoint}>
-                <View
-                  style={[styles.routeDot, { backgroundColor: colors.success }]}
-                />
-                <Text
-                  style={[styles.routeCity, { color: colors.text.primary }]}
-                >
-                  {request.trip.destination}
-                </Text>
-              </View>
-            </View>
-
-            {/* Date & Time */}
-            <View
-              style={[
-                styles.tripInfoBox,
-                { backgroundColor: colors.background.primary },
-              ]}
-            >
-              <View style={styles.tripInfoRow}>
-                <Ionicons
-                  name="calendar"
-                  size={18}
-                  color={colors.text.secondary}
-                />
-                <Text
-                  style={[styles.tripInfoText, { color: colors.text.primary }]}
-                >
-                  {new Date(request.trip.departure_date).toLocaleDateString(
-                    "en-IN",
-                    {
-                      weekday: "short",
-                      day: "numeric",
-                      month: "short",
-                      year: "numeric",
-                    },
-                  )}
-                </Text>
-              </View>
-              <View style={styles.tripInfoRow}>
-                <Ionicons name="time" size={18} color={colors.text.secondary} />
-                <Text
-                  style={[styles.tripInfoText, { color: colors.text.primary }]}
-                >
-                  {request.trip.departure_time}
-                </Text>
-              </View>
-            </View>
-          </Animated.View>
-        )}
-
         {/* Alert Cards */}
         {(isCancelled || isRejected) && request.rejection_reason && (
           <Animated.View
-            entering={FadeInDown.delay(800)}
+            entering={FadeInDown.delay(700)}
             style={[
               styles.alertCard,
               {
@@ -608,9 +582,9 @@ export default function IncomingRequestDetailsScreen() {
           </Animated.View>
         )}
 
-        {isAccepted && request.traveller_notes && (
+        {(isAccepted || isPickedUp) && request.traveller_notes && (
           <Animated.View
-            entering={FadeInDown.delay(800)}
+            entering={FadeInDown.delay(700)}
             style={[
               styles.alertCard,
               {
@@ -645,10 +619,10 @@ export default function IncomingRequestDetailsScreen() {
         <View style={{ height: Spacing.xxxl * 2 }} />
       </ScrollView>
 
-      {/* Action Buttons */}
+      {/* FIXED: Action Buttons */}
       {isPending && (
         <Animated.View
-          entering={FadeIn.delay(900)}
+          entering={FadeIn.delay(800)}
           style={[
             styles.footer,
             {
@@ -701,6 +675,70 @@ export default function IncomingRequestDetailsScreen() {
         </Animated.View>
       )}
 
+      {/* FIXED: Mark as Picked Up button in details page */}
+      {isAccepted && (
+        <Animated.View
+          entering={FadeIn.delay(800)}
+          style={[
+            styles.footer,
+            {
+              backgroundColor: colors.background.primary,
+              borderTopColor: colors.border.light,
+            },
+          ]}
+        >
+          <Pressable
+            style={[
+              styles.actionButton,
+              styles.fullWidthButton,
+              { backgroundColor: colors.primary },
+            ]}
+            onPress={handleMarkPickup}
+          >
+            <Ionicons name="cube" size={22} color={colors.text.inverse} />
+            <Text
+              style={[styles.actionButtonText, { color: colors.text.inverse }]}
+            >
+              Mark as Picked Up
+            </Text>
+          </Pressable>
+        </Animated.View>
+      )}
+
+      {/* FIXED: Mark as Delivered button in details page */}
+      {isPickedUp && (
+        <Animated.View
+          entering={FadeIn.delay(800)}
+          style={[
+            styles.footer,
+            {
+              backgroundColor: colors.background.primary,
+              borderTopColor: colors.border.light,
+            },
+          ]}
+        >
+          <Pressable
+            style={[
+              styles.actionButton,
+              styles.fullWidthButton,
+              { backgroundColor: colors.success },
+            ]}
+            onPress={handleMarkDelivery}
+          >
+            <Ionicons
+              name="checkmark-done"
+              size={22}
+              color={colors.text.inverse}
+            />
+            <Text
+              style={[styles.actionButtonText, { color: colors.text.inverse }]}
+            >
+              Mark as Delivered
+            </Text>
+          </Pressable>
+        </Animated.View>
+      )}
+
       {/* Modals */}
       <AcceptRequestModal
         visible={acceptModalVisible}
@@ -715,58 +753,29 @@ export default function IncomingRequestDetailsScreen() {
         onReject={handleReject}
         senderName={request.sender?.full_name || "Sender"}
       />
+
+      <VerifyOtpModal
+        visible={pickupOtpModalVisible}
+        onClose={() => setPickupOtpModalVisible(false)}
+        onVerify={handleVerifyPickupOtp}
+        type="pickup"
+        userName={request.sender?.full_name || "Sender"}
+        otpExpiry={request.pickup_otp_expiry || ""}
+      />
+
+      <VerifyOtpModal
+        visible={deliveryOtpModalVisible}
+        onClose={() => setDeliveryOtpModalVisible(false)}
+        onVerify={handleVerifyDeliveryOtp}
+        type="delivery"
+        userName={request.delivery_contact_name}
+        otpExpiry={request.delivery_otp_expiry || ""}
+      />
     </SafeAreaView>
   );
 }
 
-// Helper Components (kept inline due to specific requirements)
-function PhotoThumbnail({
-  uri,
-  isSelected,
-  onPress,
-}: {
-  uri: string;
-  isSelected: boolean;
-  onPress: () => void;
-}) {
-  const colors = useThemeColors();
-  const scale = useSharedValue(1);
-
-  const animatedStyle = useAnimatedStyle(() => ({
-    transform: [{ scale: scale.value }],
-  }));
-
-  const handlePressIn = () => {
-    scale.value = withSpring(0.95);
-  };
-
-  const handlePressOut = () => {
-    scale.value = withSpring(1);
-  };
-
-  return (
-    <Animated.View style={animatedStyle}>
-      <Pressable
-        onPress={onPress}
-        onPressIn={handlePressIn}
-        onPressOut={handlePressOut}
-      >
-        <Image
-          source={{ uri }}
-          style={[
-            styles.thumbnail,
-            {
-              backgroundColor: colors.background.primary,
-              borderColor: isSelected ? colors.primary : colors.border.default,
-              borderWidth: isSelected ? 2.5 : 1.5,
-            },
-          ]}
-        />
-      </Pressable>
-    </Animated.View>
-  );
-}
-
+// Helper Component
 function ContactCard({
   name,
   phone,
@@ -830,56 +839,40 @@ const styles = StyleSheet.create({
   header: {
     flexDirection: "row",
     alignItems: "center",
-    justifyContent: "space-between",
+    gap: Spacing.sm,
     paddingHorizontal: Spacing.lg,
     paddingVertical: Spacing.md,
+    borderBottomWidth: 1,
   },
   backButton: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
+    width: 40,
+    height: 40,
+    borderRadius: 20,
     alignItems: "center",
     justifyContent: "center",
+  },
+  headerContent: {
+    flex: 1,
+    gap: 4,
   },
   headerTitle: {
     fontSize: Typography.sizes.lg,
     fontWeight: Typography.weights.bold,
   },
-  headerSpacer: {
-    width: 44,
+  statusBadge: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+  },
+  statusBadgeText: {
+    fontSize: Typography.sizes.sm,
+    fontWeight: Typography.weights.semibold,
   },
   scrollView: {
     flex: 1,
   },
   scrollContent: {
     padding: Spacing.lg,
-  },
-  statusBanner: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: Spacing.md,
-    padding: Spacing.md,
-    borderRadius: BorderRadius.xl,
-    borderWidth: 1,
-    marginBottom: Spacing.lg,
-  },
-  statusIconContainer: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  statusContent: {
-    flex: 1,
-  },
-  statusLabel: {
-    fontSize: Typography.sizes.xs,
-    marginBottom: 2,
-  },
-  statusText: {
-    fontSize: Typography.sizes.md,
-    fontWeight: Typography.weights.bold,
   },
   privacyNotice: {
     flexDirection: "row",
@@ -940,22 +933,6 @@ const styles = StyleSheet.create({
     fontSize: Typography.sizes.xs,
     fontWeight: Typography.weights.bold,
   },
-  mainPhoto: {
-    width: "100%",
-    height: 280,
-    borderRadius: BorderRadius.lg,
-    marginBottom: Spacing.sm,
-  },
-  photoThumbnails: {
-    flexDirection: "row",
-    gap: Spacing.xs,
-    paddingTop: Spacing.xs,
-  },
-  thumbnail: {
-    width: 64,
-    height: 64,
-    borderRadius: BorderRadius.md,
-  },
   infoBox: {
     padding: Spacing.md,
     borderRadius: BorderRadius.lg,
@@ -973,7 +950,6 @@ const styles = StyleSheet.create({
   detailRow: {
     flexDirection: "row",
     gap: Spacing.md,
-    marginBottom: Spacing.md,
   },
   detailItem: {
     flex: 1,
@@ -995,25 +971,6 @@ const styles = StyleSheet.create({
   detailChipText: {
     fontSize: Typography.sizes.xs,
     fontWeight: Typography.weights.bold,
-  },
-  notesBox: {
-    padding: Spacing.md,
-    borderRadius: BorderRadius.lg,
-    borderWidth: 1,
-  },
-  notesHeader: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: Spacing.xs,
-    marginBottom: Spacing.xs,
-  },
-  notesLabel: {
-    fontSize: Typography.sizes.xs,
-    fontWeight: Typography.weights.bold,
-  },
-  notesText: {
-    fontSize: Typography.sizes.sm,
-    lineHeight: Typography.sizes.sm * 1.5,
   },
   contactCard: {
     flexDirection: "row",
@@ -1041,21 +998,33 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   routeContainer: {
-    marginBottom: Spacing.md,
+    gap: Spacing.xs,
   },
   routePoint: {
     flexDirection: "row",
-    alignItems: "center",
+    alignItems: "flex-start",
     gap: Spacing.sm,
   },
   routeDot: {
     width: 12,
     height: 12,
     borderRadius: 6,
+    marginTop: 4,
+  },
+  routeInfo: {
+    flex: 1,
+  },
+  routeLabel: {
+    fontSize: Typography.sizes.xs,
+    marginBottom: 2,
   },
   routeCity: {
     fontSize: Typography.sizes.md,
     fontWeight: Typography.weights.bold,
+    marginBottom: 2,
+  },
+  routeDateTime: {
+    fontSize: Typography.sizes.sm,
   },
   routeLineContainer: {
     flexDirection: "row",
@@ -1072,22 +1041,6 @@ const styles = StyleSheet.create({
     paddingVertical: 4,
     borderRadius: BorderRadius.sm,
     marginHorizontal: Spacing.xs,
-  },
-  tripInfoBox: {
-    flexDirection: "row",
-    gap: Spacing.lg,
-    padding: Spacing.md,
-    borderRadius: BorderRadius.lg,
-  },
-  tripInfoRow: {
-    flex: 1,
-    flexDirection: "row",
-    alignItems: "center",
-    gap: Spacing.xs,
-  },
-  tripInfoText: {
-    fontSize: Typography.sizes.sm,
-    fontWeight: Typography.weights.medium,
   },
   alertCard: {
     flexDirection: "row",
@@ -1140,6 +1093,9 @@ const styles = StyleSheet.create({
   },
   acceptButton: {
     flex: 1.5,
+  },
+  fullWidthButton: {
+    flex: 1,
   },
   actionButtonText: {
     fontSize: Typography.sizes.md,
