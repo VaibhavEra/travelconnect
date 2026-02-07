@@ -1,17 +1,17 @@
 import FilterChip from "@/components/shared/FilterChip";
 import ModeSwitcher from "@/components/shared/ModeSwitcher";
 import TripCard from "@/components/trip/TripCard";
-import { isFuture } from "@/lib/utils/dateTime";
 import { haptics } from "@/lib/utils/haptics";
 import { useAuthStore } from "@/stores/authStore";
 import { useTripStore } from "@/stores/tripStore";
 import { BorderRadius, Spacing, Typography } from "@/styles";
 import { useThemeColors } from "@/styles/theme";
 import { Ionicons } from "@expo/vector-icons";
-import { useFocusEffect } from "expo-router";
+import { router, useFocusEffect } from "expo-router";
 import { useCallback, useState } from "react";
 import {
   ActivityIndicator,
+  Pressable,
   RefreshControl,
   ScrollView,
   StyleSheet,
@@ -27,7 +27,13 @@ import Animated, {
 } from "react-native-reanimated";
 import { SafeAreaView } from "react-native-safe-area-context";
 
-type TripFilter = "all" | "upcoming" | "completed" | "cancelled";
+type TripFilter =
+  | "all"
+  | "upcoming"
+  | "locked"
+  | "in_progress"
+  | "completed"
+  | "cancelled";
 
 const FILTER_CONFIG: Array<{
   key: TripFilter;
@@ -36,6 +42,8 @@ const FILTER_CONFIG: Array<{
 }> = [
   { key: "all", label: "All", icon: "apps" },
   { key: "upcoming", label: "Upcoming", icon: "time" },
+  { key: "locked", label: "Locked", icon: "lock-closed" },
+  { key: "in_progress", label: "In Progress", icon: "bicycle" },
   { key: "completed", label: "Completed", icon: "checkmark-done" },
   { key: "cancelled", label: "Cancelled", icon: "close-circle" },
 ];
@@ -73,42 +81,24 @@ export default function MyTripsScreen() {
     scrollY.value = event.nativeEvent.contentOffset.y;
   };
 
-  const isTripUpcoming = (trip: any) => {
-    return (
-      isFuture(trip.departure_date, trip.departure_time) &&
-      trip.status === "open"
-    );
+  const handleCreateTrip = () => {
+    haptics.light();
+    router.push("/(tabs)/create-trip");
   };
 
   const getFilteredTrips = () => {
-    switch (filter) {
-      case "upcoming":
-        return trips.filter(isTripUpcoming);
-      case "completed":
-        return trips.filter((trip) => trip.status === "completed");
-      case "cancelled":
-        return trips.filter((trip) => trip.status === "cancelled");
-      default:
-        return trips;
-    }
+    if (filter === "all") return trips;
+    return trips.filter((trip) => trip.status === filter);
   };
 
   const getFilterCount = (filterType: TripFilter) => {
     if (filterType === "all") return trips.length;
-    if (filterType === "upcoming") {
-      return trips.filter(isTripUpcoming).length;
-    }
-    if (filterType === "completed") {
-      return trips.filter((trip) => trip.status === "completed").length;
-    }
-    if (filterType === "cancelled") {
-      return trips.filter((trip) => trip.status === "cancelled").length;
-    }
-    return 0;
+    return trips.filter((trip) => trip.status === filterType).length;
   };
 
   const filteredTrips = getFilteredTrips();
   const upcomingCount = getFilterCount("upcoming");
+  const inProgressCount = getFilterCount("in_progress");
   const completedCount = getFilterCount("completed");
 
   if (loading && !refreshing) {
@@ -133,7 +123,7 @@ export default function MyTripsScreen() {
       style={[styles.container, { backgroundColor: colors.background.primary }]}
       edges={["top"]}
     >
-      {/* FIXED: Added border */}
+      {/* Header */}
       <View style={[styles.header, { borderBottomColor: colors.border.light }]}>
         <View>
           <Text style={[styles.headerTitle, { color: colors.text.primary }]}>
@@ -184,34 +174,27 @@ export default function MyTripsScreen() {
             <View
               style={[
                 styles.statCard,
-                { backgroundColor: colors.warning + "15" },
+                { backgroundColor: colors.success + "15" },
               ]}
             >
-              <Ionicons name="time" size={20} color={colors.warning} />
-              <Text style={[styles.statNumber, { color: colors.warning }]}>
+              <Ionicons name="time" size={20} color={colors.success} />
+              <Text style={[styles.statNumber, { color: colors.success }]}>
                 {upcomingCount}
               </Text>
-              <Text style={[styles.statLabel, { color: colors.warning }]}>
+              <Text style={[styles.statLabel, { color: colors.success }]}>
                 Upcoming
               </Text>
             </View>
 
             <View
-              style={[
-                styles.statCard,
-                { backgroundColor: colors.success + "15" },
-              ]}
+              style={[styles.statCard, { backgroundColor: colors.info + "15" }]}
             >
-              <Ionicons
-                name="checkmark-done"
-                size={20}
-                color={colors.success}
-              />
-              <Text style={[styles.statNumber, { color: colors.success }]}>
-                {completedCount}
+              <Ionicons name="bicycle" size={20} color={colors.info} />
+              <Text style={[styles.statNumber, { color: colors.info }]}>
+                {inProgressCount}
               </Text>
-              <Text style={[styles.statLabel, { color: colors.success }]}>
-                Completed
+              <Text style={[styles.statLabel, { color: colors.info }]}>
+                In Progress
               </Text>
             </View>
           </Animated.View>
@@ -268,6 +251,25 @@ export default function MyTripsScreen() {
                 ? "Create your first trip to start helping senders"
                 : `You don't have any ${filter} trips at the moment`}
             </Text>
+            {filter === "all" && (
+              <Pressable
+                style={[
+                  styles.emptyButton,
+                  { backgroundColor: colors.primary },
+                ]}
+                onPress={handleCreateTrip}
+              >
+                <Ionicons name="add" size={20} color={colors.text.inverse} />
+                <Text
+                  style={[
+                    styles.emptyButtonText,
+                    { color: colors.text.inverse },
+                  ]}
+                >
+                  Create Trip
+                </Text>
+              </Pressable>
+            )}
           </Animated.View>
         ) : (
           /* Trips List */
@@ -286,6 +288,14 @@ export default function MyTripsScreen() {
 
         <View style={{ height: Spacing.xxxl }} />
       </ScrollView>
+
+      {/* Floating Action Button */}
+      <Pressable
+        style={[styles.fab, { backgroundColor: colors.primary }]}
+        onPress={handleCreateTrip}
+      >
+        <Ionicons name="add" size={28} color={colors.text.inverse} />
+      </Pressable>
     </SafeAreaView>
   );
 }
@@ -309,7 +319,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     paddingHorizontal: Spacing.lg,
     paddingVertical: Spacing.md,
-    borderBottomWidth: 1, // FIXED: Added border
+    borderBottomWidth: 1,
   },
   headerTitle: {
     fontSize: Typography.sizes.xl,
@@ -378,7 +388,35 @@ const styles = StyleSheet.create({
     lineHeight: Typography.sizes.md * 1.5,
     paddingHorizontal: Spacing.xl,
   },
+  emptyButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: Spacing.xs,
+    paddingHorizontal: Spacing.lg,
+    paddingVertical: Spacing.sm,
+    borderRadius: BorderRadius.md,
+    marginTop: Spacing.sm,
+  },
+  emptyButtonText: {
+    fontSize: Typography.sizes.md,
+    fontWeight: Typography.weights.semibold,
+  },
   tripsList: {
     gap: Spacing.md,
+  },
+  fab: {
+    position: "absolute",
+    bottom: Spacing.xl,
+    right: Spacing.xl,
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    alignItems: "center",
+    justifyContent: "center",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 8,
   },
 });
