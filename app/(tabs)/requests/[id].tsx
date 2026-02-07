@@ -1,8 +1,13 @@
+// app/(tabs)/requests/[id].tsx
 import AcceptRequestModal from "@/components/modals/AcceptRequestModal";
 import RejectRequestModal from "@/components/modals/RejectRequestModal";
 import VerifyOtpModal from "@/components/modals/VerifyOtpModal";
 import PhotoGallery from "@/components/request/PhotoGallery";
-import { CATEGORY_CONFIG, SIZE_CONFIG } from "@/lib/constants/categories";
+import { CATEGORY_CONFIG } from "@/lib/constants/categories";
+import {
+  getSizeCapacityIcon,
+  getSizeCapacityLabel,
+} from "@/lib/constants/parcel";
 import { REQUEST_STATUS_CONFIG, RequestStatus } from "@/lib/constants/status";
 import { TRANSPORT_ICONS, TransportMode } from "@/lib/constants/transport";
 import { formatDate, formatTime } from "@/lib/utils/dateTime";
@@ -44,6 +49,7 @@ export default function IncomingRequestDetailsScreen() {
     verifyPickupOtp,
     verifyDeliveryOtp,
   } = useRequestStore();
+
   const [acceptModalVisible, setAcceptModalVisible] = useState(false);
   const [rejectModalVisible, setRejectModalVisible] = useState(false);
   const [pickupOtpModalVisible, setPickupOtpModalVisible] = useState(false);
@@ -60,11 +66,12 @@ export default function IncomingRequestDetailsScreen() {
     Linking.openURL(`tel:${phone}`);
   };
 
-  const handleAccept = async (notes?: string) => {
+  // UPDATED: No notes parameter
+  const handleAccept = async () => {
     try {
-      await acceptRequest(id, notes);
+      await acceptRequest(id);
       haptics.success();
-      Alert.alert("Request Accepted! 🎉", "The sender has been notified.", [
+      Alert.alert("Request Accepted!", "The sender has been notified.", [
         { text: "OK", onPress: () => router.back() },
       ]);
     } catch (error: any) {
@@ -96,7 +103,7 @@ export default function IncomingRequestDetailsScreen() {
     setDeliveryOtpModalVisible(true);
   };
 
-  const handleVerifyPickupOtp = async (otp: string) => {
+  const handleVerifyPickupOtp = async (otp: string): Promise<boolean> => {
     try {
       const isValid = await verifyPickupOtp(id, otp);
       if (isValid) {
@@ -111,7 +118,7 @@ export default function IncomingRequestDetailsScreen() {
     }
   };
 
-  const handleVerifyDeliveryOtp = async (otp: string) => {
+  const handleVerifyDeliveryOtp = async (otp: string): Promise<boolean> => {
     try {
       const isValid = await verifyDeliveryOtp(id, otp);
       if (isValid) {
@@ -152,23 +159,29 @@ export default function IncomingRequestDetailsScreen() {
   const status = request.status as RequestStatus;
   const statusConfig = REQUEST_STATUS_CONFIG[status];
   const statusColor = colors[statusConfig.colorKey];
+
   const isPending = status === "pending";
   const isAccepted = status === "accepted";
   const isPickedUp = status === "picked_up";
   const isCancelled = status === "cancelled";
   const isRejected = status === "rejected";
+
   const canViewContacts = isAccepted || isPickedUp || isCancelled || isRejected;
 
   const categoryConfig =
     CATEGORY_CONFIG[request.category as keyof typeof CATEGORY_CONFIG];
-  const sizeConfig = SIZE_CONFIG[request.size as keyof typeof SIZE_CONFIG];
+
+  // UPDATED: Get trip capacity instead of request size
+  const capacityLabel = request.trip?.parcel_size_capacity
+    ? getSizeCapacityLabel(request.trip.parcel_size_capacity)
+    : "Unknown";
 
   return (
     <SafeAreaView
       style={[styles.container, { backgroundColor: colors.background.primary }]}
       edges={["top"]}
     >
-      {/* FIXED: Header with status and left-aligned title */}
+      {/* Header */}
       <Animated.View
         entering={FadeIn}
         style={[styles.header, { borderBottomColor: colors.border.light }]}
@@ -228,7 +241,7 @@ export default function IncomingRequestDetailsScreen() {
           </Animated.View>
         )}
 
-        {/* FIXED: Parcel Details BEFORE Photos */}
+        {/* Parcel Details */}
         <Animated.View
           entering={FadeInDown.delay(200)}
           style={[
@@ -265,8 +278,9 @@ export default function IncomingRequestDetailsScreen() {
             </Text>
           </View>
 
-          {/* Category & Size */}
+          {/* Category & Trip Capacity */}
           <View style={styles.detailRow}>
+            {/* Category */}
             <View style={styles.detailItem}>
               <Text
                 style={[styles.detailLabel, { color: colors.text.tertiary }]}
@@ -292,11 +306,12 @@ export default function IncomingRequestDetailsScreen() {
               </View>
             </View>
 
+            {/* UPDATED: Show Trip Capacity instead of Size */}
             <View style={styles.detailItem}>
               <Text
                 style={[styles.detailLabel, { color: colors.text.tertiary }]}
               >
-                Size
+                Trip Capacity
               </Text>
               <View
                 style={[
@@ -305,7 +320,9 @@ export default function IncomingRequestDetailsScreen() {
                 ]}
               >
                 <Ionicons
-                  name={sizeConfig.icon}
+                  name={getSizeCapacityIcon(
+                    request.trip?.parcel_size_capacity || "small",
+                  )}
                   size={16}
                   color={colors.text.secondary}
                 />
@@ -315,14 +332,14 @@ export default function IncomingRequestDetailsScreen() {
                     { color: colors.text.secondary },
                   ]}
                 >
-                  {sizeConfig.label}
+                  {capacityLabel}
                 </Text>
               </View>
             </View>
           </View>
         </Animated.View>
 
-        {/* FIXED: Parcel Photos - Using PhotoGallery with thumbnail mode */}
+        {/* Parcel Photos */}
         {request.parcel_photos && request.parcel_photos.length > 0 && (
           <Animated.View
             entering={FadeInDown.delay(300)}
@@ -356,7 +373,6 @@ export default function IncomingRequestDetailsScreen() {
                 </Text>
               </View>
             </View>
-
             <PhotoGallery
               photos={request.parcel_photos}
               mode="thumbnail"
@@ -365,7 +381,7 @@ export default function IncomingRequestDetailsScreen() {
           </Animated.View>
         )}
 
-        {/* FIXED: Trip Info with Departure AND Arrival */}
+        {/* Trip Info */}
         {request.trip && (
           <Animated.View
             entering={FadeInDown.delay(400)}
@@ -411,7 +427,7 @@ export default function IncomingRequestDetailsScreen() {
                       { color: colors.text.secondary },
                     ]}
                   >
-                    {formatDate(request.trip.departure_date)} •{" "}
+                    {formatDate(request.trip.departure_date)},{" "}
                     {formatTime(request.trip.departure_time)}
                   </Text>
                 </View>
@@ -469,7 +485,7 @@ export default function IncomingRequestDetailsScreen() {
                       { color: colors.text.secondary },
                     ]}
                   >
-                    {formatDate(request.trip.arrival_date)} •{" "}
+                    {formatDate(request.trip.arrival_date)},{" "}
                     {formatTime(request.trip.arrival_time)}
                   </Text>
                 </View>
@@ -478,7 +494,7 @@ export default function IncomingRequestDetailsScreen() {
           </Animated.View>
         )}
 
-        {/* FIXED: Contact Cards - Only visible after accept */}
+        {/* Contact Cards - Only visible after accept */}
         {canViewContacts && (
           <>
             {/* Sender Info */}
@@ -505,7 +521,6 @@ export default function IncomingRequestDetailsScreen() {
                     Sender
                   </Text>
                 </View>
-
                 <ContactCard
                   name={request.sender.full_name}
                   phone={request.sender.phone}
@@ -538,7 +553,6 @@ export default function IncomingRequestDetailsScreen() {
                   Receiver
                 </Text>
               </View>
-
               <ContactCard
                 name={request.delivery_contact_name}
                 phone={request.delivery_contact_phone}
@@ -550,7 +564,7 @@ export default function IncomingRequestDetailsScreen() {
         )}
 
         {/* Alert Cards */}
-        {(isCancelled || isRejected) && request.rejection_reason && (
+        {(isCancelled || (isRejected && request.rejection_reason)) && (
           <Animated.View
             entering={FadeInDown.delay(700)}
             style={[
@@ -582,44 +596,12 @@ export default function IncomingRequestDetailsScreen() {
           </Animated.View>
         )}
 
-        {(isAccepted || isPickedUp) && request.traveller_notes && (
-          <Animated.View
-            entering={FadeInDown.delay(700)}
-            style={[
-              styles.alertCard,
-              {
-                backgroundColor: colors.primary + "10",
-                borderColor: colors.primary + "30",
-              },
-            ]}
-          >
-            <View
-              style={[
-                styles.alertIconContainer,
-                { backgroundColor: colors.primary + "20" },
-              ]}
-            >
-              <Ionicons
-                name="information-circle"
-                size={20}
-                color={colors.primary}
-              />
-            </View>
-            <View style={styles.alertContent}>
-              <Text style={[styles.alertTitle, { color: colors.primary }]}>
-                Your Notes
-              </Text>
-              <Text style={[styles.alertText, { color: colors.text.primary }]}>
-                {request.traveller_notes}
-              </Text>
-            </View>
-          </Animated.View>
-        )}
+        {/* REMOVED: traveller_notes display - No longer exists in capacity-based system */}
 
         <View style={{ height: Spacing.xxxl * 2 }} />
       </ScrollView>
 
-      {/* FIXED: Action Buttons */}
+      {/* Action Buttons */}
       {isPending && (
         <Animated.View
           entering={FadeIn.delay(800)}
@@ -675,7 +657,7 @@ export default function IncomingRequestDetailsScreen() {
         </Animated.View>
       )}
 
-      {/* FIXED: Mark as Picked Up button in details page */}
+      {/* Mark as Picked Up button */}
       {isAccepted && (
         <Animated.View
           entering={FadeIn.delay(800)}
@@ -705,7 +687,7 @@ export default function IncomingRequestDetailsScreen() {
         </Animated.View>
       )}
 
-      {/* FIXED: Mark as Delivered button in details page */}
+      {/* Mark as Delivered button */}
       {isPickedUp && (
         <Animated.View
           entering={FadeIn.delay(800)}
@@ -745,31 +727,30 @@ export default function IncomingRequestDetailsScreen() {
         onClose={() => setAcceptModalVisible(false)}
         onAccept={handleAccept}
         senderName={request.sender?.full_name || "Sender"}
+        category={request.category}
+        tripCapacity={request.trip?.parcel_size_capacity || "small"}
       />
-
       <RejectRequestModal
         visible={rejectModalVisible}
         onClose={() => setRejectModalVisible(false)}
         onReject={handleReject}
         senderName={request.sender?.full_name || "Sender"}
       />
-
       <VerifyOtpModal
         visible={pickupOtpModalVisible}
         onClose={() => setPickupOtpModalVisible(false)}
         onVerify={handleVerifyPickupOtp}
         type="pickup"
         userName={request.sender?.full_name || "Sender"}
-        otpExpiry={request.pickup_otp_expiry || ""}
+        otpExpiry={request.pickup_otp_expiry ?? undefined}
       />
-
       <VerifyOtpModal
         visible={deliveryOtpModalVisible}
         onClose={() => setDeliveryOtpModalVisible(false)}
         onVerify={handleVerifyDeliveryOtp}
         type="delivery"
         userName={request.delivery_contact_name}
-        otpExpiry={request.delivery_otp_expiry || ""}
+        otpExpiry={request.delivery_otp_expiry ?? undefined}
       />
     </SafeAreaView>
   );
@@ -813,8 +794,12 @@ function ContactCard({
         <Pressable
           style={[styles.callButton, { backgroundColor: iconColor + "15" }]}
           onPress={onCall}
-          onPressIn={() => (scale.value = withSpring(0.9))}
-          onPressOut={() => (scale.value = withSpring(1))}
+          onPressIn={() => {
+            scale.value = withSpring(0.9);
+          }}
+          onPressOut={() => {
+            scale.value = withSpring(1);
+          }}
         >
           <Ionicons name="call" size={20} color={iconColor} />
         </Pressable>
