@@ -1,11 +1,11 @@
-import {
-  TRANSPORT_CONFIG,
-  TRIP_STATUS_CONFIG,
-  TripStatus,
-  UI,
-} from "@/lib/constants";
 import { CATEGORY_CONFIG } from "@/lib/constants/categories";
-import { formatDate, formatTime, isFuture } from "@/lib/utils/dateTime";
+import {
+  getSizeCapacityIcon,
+  getSizeCapacityLabel,
+} from "@/lib/constants/parcel";
+import { TRIP_STATUS_CONFIG, TripStatus } from "@/lib/constants/status";
+import { TRANSPORT_CONFIG } from "@/lib/constants/transport";
+import { formatDate, formatTime } from "@/lib/utils/dateTime";
 import { haptics } from "@/lib/utils/haptics";
 import { Trip } from "@/stores/tripStore";
 import {
@@ -32,34 +32,6 @@ interface TripCardProps {
 export default function TripCard({ trip }: TripCardProps) {
   const colors = useThemeColors();
   const scale = useSharedValue(1);
-
-  // FIXED: Use isFuture like before
-  const isUpcoming =
-    isFuture(trip.departure_date, trip.departure_time) &&
-    trip.status === "upcoming";
-
-  const renderSlots = () => {
-    const slots = [];
-    const maxSlots = Math.min(trip.total_slots, UI.MAX_VISIBLE_SLOTS);
-
-    for (let i = 0; i < maxSlots; i++) {
-      const isAvailable = i < trip.available_slots;
-      slots.push(
-        <View
-          key={i}
-          style={[
-            styles.slotDot,
-            {
-              backgroundColor: isAvailable
-                ? colors.success
-                : withOpacity(colors.text.tertiary, "strong"),
-            },
-          ]}
-        />,
-      );
-    }
-    return slots;
-  };
 
   const handlePress = () => {
     haptics.light();
@@ -109,24 +81,9 @@ export default function TripCard({ trip }: TripCardProps) {
           <Text style={[styles.statusText, { color: statusColor }]}>
             {statusConfig.label}
           </Text>
-          {/* FIXED: Only show "Upcoming" if trip is in future and not already showing upcoming status */}
-          {isUpcoming && (
-            <>
-              <View
-                style={[
-                  styles.separator,
-                  { backgroundColor: withOpacity(statusColor, "medium") },
-                ]}
-              />
-              <Ionicons name="time" size={14} color={statusColor} />
-              <Text style={[styles.statusText, { color: statusColor }]}>
-                Upcoming
-              </Text>
-            </>
-          )}
         </View>
 
-        {/* Route Section */}
+        {/* Content */}
         <View style={styles.content}>
           {/* Cities Row */}
           <View style={styles.citiesRow}>
@@ -187,52 +144,49 @@ export default function TripCard({ trip }: TripCardProps) {
             style={[styles.divider, { backgroundColor: colors.border.light }]}
           />
 
-          {/* Info Row */}
+          {/* Info Row - Parcel Size + Categories */}
           <View style={styles.infoRow}>
-            {/* Slots with proper label */}
-            <View style={styles.slotsContainer}>
-              <View style={styles.slotsRow}>{renderSlots()}</View>
-              <Text
-                style={[styles.slotsText, { color: colors.text.secondary }]}
+            {/* Parcel Size */}
+            <View style={styles.sizeContainer}>
+              <View
+                style={[
+                  styles.sizeChip,
+                  { backgroundColor: withOpacity(colors.success, "light") },
+                ]}
               >
-                {trip.available_slots}/{trip.total_slots}{" "}
-                {trip.total_slots === 1 ? "slot" : "slots"}
-              </Text>
+                <Ionicons
+                  name={getSizeCapacityIcon(trip.parcel_size_capacity)}
+                  size={14}
+                  color={colors.success}
+                />
+                <Text style={[styles.sizeText, { color: colors.success }]}>
+                  {getSizeCapacityLabel(trip.parcel_size_capacity)}
+                </Text>
+              </View>
             </View>
 
-            {/* Categories with icons AND labels */}
+            {/* Categories */}
             <View style={styles.categoriesContainer}>
-              {trip.allowed_categories
-                .slice(0, UI.MAX_VISIBLE_CATEGORIES)
-                .map((category) => {
-                  const config =
-                    CATEGORY_CONFIG[category as keyof typeof CATEGORY_CONFIG];
-                  return (
-                    <View key={category} style={styles.categoryItem}>
-                      <Ionicons
-                        name={config?.icon || "cube"}
-                        size={14}
-                        color={colors.text.tertiary}
-                      />
-                      <Text
-                        style={[
-                          styles.categoryLabel,
-                          { color: colors.text.tertiary },
-                        ]}
-                      >
-                        {config?.label || category}
-                      </Text>
-                    </View>
-                  );
-                })}
-              {trip.allowed_categories.length > UI.MAX_VISIBLE_CATEGORIES && (
+              {trip.allowed_categories.slice(0, 2).map((category) => {
+                const config =
+                  CATEGORY_CONFIG[category as keyof typeof CATEGORY_CONFIG];
+                return (
+                  <Ionicons
+                    key={category}
+                    name={config?.icon || "cube"}
+                    size={16}
+                    color={colors.text.tertiary}
+                  />
+                );
+              })}
+              {trip.allowed_categories.length > 2 && (
                 <Text
                   style={[
                     styles.moreCategoriesText,
                     { color: colors.text.tertiary },
                   ]}
                 >
-                  +{trip.allowed_categories.length - UI.MAX_VISIBLE_CATEGORIES}
+                  +{trip.allowed_categories.length - 2}
                 </Text>
               )}
             </View>
@@ -276,11 +230,6 @@ const styles = StyleSheet.create({
   statusText: {
     fontSize: Typography.sizes.sm,
     fontWeight: Typography.weights.semibold,
-  },
-  separator: {
-    width: 1,
-    height: 14,
-    marginHorizontal: Spacing.xs,
   },
   content: {
     padding: Spacing.lg,
@@ -328,35 +277,23 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     alignItems: "center",
   },
-  slotsContainer: {
-    gap: 4,
-  },
-  slotsRow: {
+  sizeContainer: {},
+  sizeChip: {
     flexDirection: "row",
+    alignItems: "center",
     gap: 4,
+    paddingHorizontal: Spacing.sm,
+    paddingVertical: 4,
+    borderRadius: BorderRadius.sm,
   },
-  slotDot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-  },
-  slotsText: {
+  sizeText: {
     fontSize: Typography.sizes.xs,
+    fontWeight: Typography.weights.semibold,
   },
   categoriesContainer: {
     flexDirection: "row",
     alignItems: "center",
     gap: Spacing.xs,
-    flexWrap: "wrap",
-  },
-  categoryItem: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 4,
-  },
-  categoryLabel: {
-    fontSize: Typography.sizes.xs,
-    fontWeight: Typography.weights.medium,
   },
   moreCategoriesText: {
     fontSize: Typography.sizes.xs,
@@ -366,12 +303,12 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
-    gap: 4,
+    gap: Spacing.xs,
     paddingVertical: Spacing.sm,
     borderTopWidth: 1,
   },
   footerText: {
-    fontSize: Typography.sizes.xs,
+    fontSize: Typography.sizes.sm,
     fontWeight: Typography.weights.medium,
   },
 });
