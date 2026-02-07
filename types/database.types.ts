@@ -310,41 +310,23 @@ export type Database = {
         }
         Returns: string
       }
-      create_trip_with_validation:
-        | {
-            Args: {
-              p_allowed_categories: string[]
-              p_arrival_date: string
-              p_arrival_time: string
-              p_departure_date: string
-              p_departure_time: string
-              p_destination: string
-              p_notes?: string
-              p_parcel_size_capacity: string
-              p_pnr_number: string
-              p_source: string
-              p_ticket_file_url: string
-              p_transport_mode: string
-            }
-            Returns: string
-          }
-        | {
-            Args: {
-              p_allowed_categories: string[]
-              p_arrival_date: string
-              p_arrival_time: string
-              p_departure_date: string
-              p_departure_time: string
-              p_destination: string
-              p_notes?: string
-              p_pnr_number: string
-              p_source: string
-              p_ticket_file_url: string
-              p_total_slots: number
-              p_transport_mode: string
-            }
-            Returns: string
-          }
+      create_trip_with_validation: {
+        Args: {
+          p_allowed_categories: string[]
+          p_arrival_date: string
+          p_arrival_time: string
+          p_departure_date: string
+          p_departure_time: string
+          p_destination: string
+          p_notes?: string
+          p_parcel_size_capacity: string
+          p_pnr_number: string
+          p_source: string
+          p_ticket_file_url: string
+          p_transport_mode: string
+        }
+        Returns: string
+      }
       expire_old_requests: {
         Args: never
         Returns: {
