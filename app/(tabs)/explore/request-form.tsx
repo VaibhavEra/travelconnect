@@ -1,13 +1,10 @@
 import ImagePicker from "@/components/forms/ImagePicker";
 import TextInput from "@/components/forms/TextInput";
-import { CATEGORY_CONFIG, SIZE_CONFIG } from "@/lib/constants/categories";
+import { CATEGORY_CONFIG } from "@/lib/constants/categories";
+import { getSizeCapacityLabel } from "@/lib/constants/parcel";
 import { formatDate } from "@/lib/utils/dateTime";
 import { haptics } from "@/lib/utils/haptics";
-import {
-  PARCEL_SIZES,
-  RequestFormData,
-  requestSchema,
-} from "@/lib/validations/request";
+import { RequestFormData, requestSchema } from "@/lib/validations/request";
 import { useAuthStore } from "@/stores/authStore";
 import { useRequestStore } from "@/stores/requestStore";
 import { useTripStore } from "@/stores/tripStore";
@@ -50,11 +47,9 @@ export default function RequestFormScreen() {
     defaultValues: {
       item_description: "",
       category: "",
-      size: "medium",
       parcel_photos: [],
       delivery_contact_name: "",
       delivery_contact_phone: "",
-      sender_notes: "",
     },
   });
 
@@ -184,7 +179,7 @@ export default function RequestFormScreen() {
           showsVerticalScrollIndicator={false}
           keyboardShouldPersistTaps="handled"
         >
-          {/* Info Alert - Pickup Coordination */}
+          {/* Info Alert - Trip Capacity */}
           <View
             style={[
               styles.alertBox,
@@ -200,8 +195,8 @@ export default function RequestFormScreen() {
               color={colors.primary}
             />
             <Text style={[styles.alertText, { color: colors.primary }]}>
-              Pickup details will be coordinated after the traveller accepts
-              your request
+              This trip accepts{" "}
+              {getSizeCapacityLabel(currentTrip.parcel_size_capacity)} parcels
             </Text>
           </View>
 
@@ -312,78 +307,6 @@ export default function RequestFormScreen() {
                   {errors.category.message}
                 </Text>
               )}
-            </View>
-
-            <View
-              style={[styles.divider, { backgroundColor: colors.border.light }]}
-            />
-
-            {/* Size Selection with Icons */}
-            <View style={styles.inputGroup}>
-              <Text style={[styles.label, { color: colors.text.primary }]}>
-                Parcel Size *
-              </Text>
-              <View style={styles.sizesContainer}>
-                {PARCEL_SIZES.map((size) => {
-                  const sizeConfig =
-                    SIZE_CONFIG[size as keyof typeof SIZE_CONFIG];
-                  const isSelected = watch("size") === size;
-                  return (
-                    <Pressable
-                      key={size}
-                      style={[
-                        styles.sizeButton,
-                        {
-                          backgroundColor: colors.background.primary,
-                          borderColor: colors.border.default,
-                        },
-                        isSelected && {
-                          backgroundColor: colors.primary + "10",
-                          borderColor: colors.primary,
-                        },
-                      ]}
-                      onPress={() => {
-                        haptics.light();
-                        setValue("size", size, { shouldValidate: true });
-                      }}
-                    >
-                      <View style={styles.sizeButtonContent}>
-                        <Ionicons
-                          name={sizeConfig?.icon || "cube-outline"}
-                          size={24}
-                          color={
-                            isSelected ? colors.primary : colors.text.secondary
-                          }
-                        />
-                        <View style={styles.sizeButtonText}>
-                          <Text
-                            style={[
-                              styles.sizeButtonTitle,
-                              { color: colors.text.primary },
-                              isSelected && {
-                                color: colors.primary,
-                              },
-                            ]}
-                          >
-                            {sizeConfig?.label || size}
-                          </Text>
-                          <Text
-                            style={[
-                              styles.sizeButtonDesc,
-                              { color: colors.text.secondary },
-                              isSelected && {
-                                color: colors.primary,
-                              },
-                            ]}
-                          >
-                            {sizeConfig?.description || ""}
-                          </Text>
-                        </View>
-                      </View>
-                    </Pressable>
-                  );
-                })}
-              </View>
             </View>
           </View>
 
@@ -546,7 +469,7 @@ export default function RequestFormScreen() {
             </View>
           </View>
 
-          {/* Submit Button - AT BOTTOM OF SCROLLABLE CONTENT (NOT STICKY) */}
+          {/* Submit Button */}
           <Pressable
             style={[
               styles.submitButton,
@@ -714,30 +637,6 @@ const styles = StyleSheet.create({
     fontSize: Typography.sizes.sm,
     fontWeight: Typography.weights.medium,
   },
-  sizesContainer: {
-    gap: Spacing.sm,
-  },
-  sizeButton: {
-    padding: Spacing.md,
-    borderRadius: BorderRadius.lg,
-    borderWidth: 1.5,
-  },
-  sizeButtonContent: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: Spacing.sm,
-  },
-  sizeButtonText: {
-    flex: 1,
-  },
-  sizeButtonTitle: {
-    fontSize: Typography.sizes.md,
-    fontWeight: Typography.weights.bold,
-    marginBottom: 2,
-  },
-  sizeButtonDesc: {
-    fontSize: Typography.sizes.xs,
-  },
   phoneSection: {
     gap: Spacing.sm,
   },
@@ -766,7 +665,6 @@ const styles = StyleSheet.create({
     fontSize: Typography.sizes.xs,
     marginTop: Spacing.xs,
   },
-  // NEW: Submit button at bottom of scroll content (NOT sticky footer)
   submitButton: {
     flexDirection: "row",
     alignItems: "center",
