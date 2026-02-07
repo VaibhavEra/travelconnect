@@ -30,7 +30,7 @@ type StatusFilter =
   | "all"
   | "pending"
   | "accepted"
-  | "rejected"
+  | "in_transit"
   | "completed"
   | "cancelled";
 
@@ -42,6 +42,7 @@ const FILTER_CONFIG: Array<{
   { key: "all", label: "All", icon: "apps" },
   { key: "pending", label: "Pending", icon: "time" },
   { key: "accepted", label: "Accepted", icon: "checkmark-circle" },
+  { key: "in_transit", label: "In Transit", icon: "location" },
   { key: "completed", label: "Completed", icon: "checkmark-done" },
   { key: "cancelled", label: "Cancelled", icon: "close-circle" },
 ];
@@ -53,7 +54,6 @@ export default function MyRequestsScreen() {
   const [filter, setFilter] = useState<StatusFilter>("all");
   const [refreshing, setRefreshing] = useState(false);
 
-  // Animated header for scroll
   const scrollY = useSharedValue(0);
   const headerOpacity = useAnimatedStyle(() => ({
     opacity: withTiming(scrollY.value > 50 ? 0 : 1),
@@ -81,23 +81,36 @@ export default function MyRequestsScreen() {
 
   const filteredRequests = myRequests.filter((request) => {
     if (filter === "all") return true;
+    if (filter === "in_transit") {
+      return request.status === "picked_up";
+    }
     if (filter === "completed") {
       return request.status === "delivered";
     }
     if (filter === "cancelled") {
-      return request.status === "cancelled" || request.status === "rejected";
+      return (
+        request.status === "cancelled" ||
+        request.status === "rejected" ||
+        request.status === "failed"
+      );
     }
     return request.status === filter;
   });
 
   const getFilterCount = (filterType: StatusFilter) => {
     if (filterType === "all") return myRequests.length;
+    if (filterType === "in_transit") {
+      return myRequests.filter((r) => r.status === "picked_up").length;
+    }
     if (filterType === "completed") {
       return myRequests.filter((r) => r.status === "delivered").length;
     }
     if (filterType === "cancelled") {
       return myRequests.filter(
-        (r) => r.status === "cancelled" || r.status === "rejected",
+        (r) =>
+          r.status === "cancelled" ||
+          r.status === "rejected" ||
+          r.status === "failed",
       ).length;
     }
     return myRequests.filter((r) => r.status === filterType).length;
@@ -125,7 +138,6 @@ export default function MyRequestsScreen() {
       style={[styles.container, { backgroundColor: colors.background.primary }]}
       edges={["top"]}
     >
-      {/* Header - Matching Explore Style */}
       <View style={styles.header}>
         <View>
           <Text style={[styles.headerTitle, { color: colors.text.primary }]}>
@@ -156,7 +168,6 @@ export default function MyRequestsScreen() {
           />
         }
       >
-        {/* Stats Cards - Hide on scroll */}
         {myRequests.length > 0 && (
           <Animated.View style={[styles.statsContainer, headerOpacity]}>
             <View
@@ -170,7 +181,7 @@ export default function MyRequestsScreen() {
                 {myRequests.length}
               </Text>
               <Text style={[styles.statLabel, { color: colors.primary }]}>
-                Total Requests
+                Total
               </Text>
             </View>
 
@@ -210,7 +221,6 @@ export default function MyRequestsScreen() {
           </Animated.View>
         )}
 
-        {/* Filters - Sticky on scroll */}
         <View style={styles.filtersWrapper}>
           <ScrollView
             horizontal
@@ -238,7 +248,6 @@ export default function MyRequestsScreen() {
           </ScrollView>
         </View>
 
-        {/* Empty State */}
         {filteredRequests.length === 0 ? (
           <Animated.View entering={FadeInDown} style={styles.emptyState}>
             <View
@@ -263,7 +272,6 @@ export default function MyRequestsScreen() {
             </Text>
           </Animated.View>
         ) : (
-          /* Requests List */
           <Animated.View
             layout={Layout.springify()}
             style={styles.requestsList}
