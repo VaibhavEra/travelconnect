@@ -1,5 +1,6 @@
 import { TRANSPORT_CONFIG, UI } from "@/lib/constants";
 import { CATEGORY_CONFIG } from "@/lib/constants/categories";
+import { getSizeCapacityLabel } from "@/lib/constants/parcel";
 import { formatDate, formatTime } from "@/lib/utils/dateTime";
 import { haptics } from "@/lib/utils/haptics";
 import { Trip } from "@/stores/tripStore";
@@ -22,30 +23,6 @@ export default function AvailableTripCard({ trip }: AvailableTripCardProps) {
       pathname: "/(tabs)/explore/trip-preview",
       params: { id: trip.id },
     });
-  };
-
-  // Render slot dots (max 5)
-  const renderSlots = () => {
-    const slots = [];
-    const maxSlots = Math.min(trip.total_slots, UI.MAX_VISIBLE_SLOTS);
-
-    for (let i = 0; i < maxSlots; i++) {
-      const isAvailable = i < trip.available_slots;
-      slots.push(
-        <View
-          key={i}
-          style={[
-            styles.slotDot,
-            {
-              backgroundColor: isAvailable
-                ? colors.success
-                : withOpacity(colors.text.tertiary, "strong"),
-            },
-          ]}
-        />,
-      );
-    }
-    return slots;
   };
 
   return (
@@ -115,15 +92,15 @@ export default function AvailableTripCard({ trip }: AvailableTripCardProps) {
           style={[styles.divider, { backgroundColor: colors.border.light }]}
         />
 
-        {/* Slots Section */}
+        {/* Parcel Size Section */}
         <View style={styles.section}>
           <Text style={[styles.sectionTitle, { color: colors.text.tertiary }]}>
-            Available Slots
+            Parcel Size Accepted
           </Text>
-          <View style={styles.slotsContainer}>
-            <View style={styles.slotsRow}>{renderSlots()}</View>
-            <Text style={[styles.slotsCount, { color: colors.text.primary }]}>
-              {trip.available_slots} of {trip.total_slots} slots
+          <View style={styles.sizeRow}>
+            <Ionicons name="cube" size={18} color={colors.success} />
+            <Text style={[styles.sizeText, { color: colors.text.primary }]}>
+              {getSizeCapacityLabel(trip.parcel_size_capacity)}
             </Text>
           </View>
         </View>
@@ -133,7 +110,7 @@ export default function AvailableTripCard({ trip }: AvailableTripCardProps) {
           style={[styles.divider, { backgroundColor: colors.border.light }]}
         />
 
-        {/* NEW: Allowed Items Section with Icons and Labels */}
+        {/* Allowed Items Section with Icons and Labels */}
         <View style={styles.section}>
           <Text style={[styles.sectionTitle, { color: colors.text.tertiary }]}>
             Allowed Items
@@ -258,21 +235,12 @@ const styles = StyleSheet.create({
   divider: {
     height: 1,
   },
-  slotsContainer: {
+  sizeRow: {
     flexDirection: "row",
     alignItems: "center",
-    gap: Spacing.sm,
-  },
-  slotsRow: {
-    flexDirection: "row",
     gap: Spacing.xs,
   },
-  slotDot: {
-    width: 12,
-    height: 12,
-    borderRadius: 6,
-  },
-  slotsCount: {
+  sizeText: {
     fontSize: Typography.sizes.md,
     fontWeight: Typography.weights.semibold,
   },
@@ -282,9 +250,9 @@ const styles = StyleSheet.create({
     gap: Spacing.xs,
   },
   categoryChip: {
-    flexDirection: "row", // NEW: Row for icon + text
+    flexDirection: "row",
     alignItems: "center",
-    gap: 4, // NEW: Gap between icon and text
+    gap: 4,
     paddingHorizontal: Spacing.sm,
     paddingVertical: Spacing.xs,
     borderRadius: BorderRadius.sm,
