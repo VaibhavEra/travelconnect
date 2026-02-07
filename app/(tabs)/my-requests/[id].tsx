@@ -1,6 +1,10 @@
+import EditReceiverDetailsModal from "@/components/request/EditReceiverDetailsModal";
+import EditRequestDetailsModal from "@/components/request/EditRequestDetailsModal";
 import PhotoGallery from "@/components/request/PhotoGallery";
-import { CATEGORY_CONFIG, SIZE_CONFIG } from "@/lib/constants/categories";
+import { CATEGORY_CONFIG } from "@/lib/constants/categories";
+import { getSizeCapacityLabel } from "@/lib/constants/parcel";
 import { REQUEST_STATUS_CONFIG, RequestStatus } from "@/lib/constants/status";
+import { TRANSPORT_ICONS } from "@/lib/constants/transport";
 import { formatDate, formatTime } from "@/lib/utils/dateTime";
 import { haptics } from "@/lib/utils/haptics";
 import { useAuthStore } from "@/stores/authStore";
@@ -15,7 +19,6 @@ import {
   Alert,
   Linking,
   Modal,
-  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -25,13 +28,7 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
-const TRANSPORT_ICONS: Record<string, keyof typeof Ionicons.glyphMap> = {
-  flight: "airplane",
-  train: "train",
-  bus: "bus",
-};
-
-// Cancel Request Modal Component - FIXED: Keyboard-aware
+// Cancel Request Modal Component
 function CancelRequestModal({
   visible,
   onClose,
@@ -109,7 +106,6 @@ function CancelRequestModal({
             </Text>
           </View>
 
-          {/* FIXED: ScrollView for keyboard visibility */}
           <ScrollView
             style={cancelModalStyles.content}
             keyboardShouldPersistTaps="handled"
@@ -237,6 +233,94 @@ function CancelRequestModal({
   );
 }
 
+const cancelModalStyles = StyleSheet.create({
+  overlay: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.5)",
+    justifyContent: "center",
+    alignItems: "center",
+    padding: Spacing.lg,
+  },
+  modal: {
+    width: "100%",
+    maxWidth: 400,
+    borderRadius: BorderRadius.xl,
+    overflow: "hidden",
+    maxHeight: "80%",
+  },
+  header: {
+    alignItems: "center",
+    padding: Spacing.lg,
+    gap: Spacing.sm,
+    borderBottomWidth: 1,
+  },
+  title: {
+    fontSize: Typography.sizes.xl,
+    fontWeight: Typography.weights.bold,
+  },
+  subtitle: {
+    fontSize: Typography.sizes.sm,
+    textAlign: "center",
+  },
+  content: {
+    padding: Spacing.lg,
+    maxHeight: 300,
+  },
+  warningBox: {
+    flexDirection: "row",
+    gap: Spacing.sm,
+    padding: Spacing.md,
+    borderRadius: BorderRadius.md,
+    borderWidth: 1,
+  },
+  warningText: {
+    flex: 1,
+    fontSize: Typography.sizes.sm,
+    lineHeight: Typography.sizes.sm * 1.5,
+  },
+  label: {
+    fontSize: Typography.sizes.sm,
+    fontWeight: Typography.weights.semibold,
+    marginBottom: Spacing.sm,
+  },
+  input: {
+    borderWidth: 1,
+    borderRadius: BorderRadius.md,
+    padding: Spacing.md,
+    fontSize: Typography.sizes.md,
+    minHeight: 80,
+    marginBottom: Spacing.sm,
+  },
+  hint: {
+    fontSize: Typography.sizes.xs,
+  },
+  actions: {
+    flexDirection: "row",
+    gap: Spacing.sm,
+    padding: Spacing.lg,
+    borderTopWidth: 1,
+  },
+  button: {
+    flex: 1,
+    paddingVertical: Spacing.md,
+    borderRadius: BorderRadius.md,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  backButton: {
+    borderWidth: 1,
+  },
+  backButtonText: {
+    fontSize: Typography.sizes.md,
+    fontWeight: Typography.weights.semibold,
+  },
+  cancelButton: {},
+  cancelButtonText: {
+    fontSize: Typography.sizes.md,
+    fontWeight: Typography.weights.semibold,
+  },
+});
+
 export default function RequestDetailsScreen() {
   const colors = useThemeColors();
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -244,6 +328,8 @@ export default function RequestDetailsScreen() {
   const { currentRequest, loading, getRequestById, cancelRequest } =
     useRequestStore();
   const [showCancelModal, setShowCancelModal] = useState(false);
+  const [showEditDetailsModal, setShowEditDetailsModal] = useState(false);
+  const [showEditReceiverModal, setShowEditReceiverModal] = useState(false);
 
   useEffect(() => {
     if (id) {
@@ -288,6 +374,16 @@ export default function RequestDetailsScreen() {
     });
   };
 
+  const handleEditDetailsSuccess = async () => {
+    await getRequestById(id);
+    setShowEditDetailsModal(false);
+  };
+
+  const handleEditReceiverSuccess = async () => {
+    await getRequestById(id);
+    setShowEditReceiverModal(false);
+  };
+
   if (loading || !currentRequest) {
     return (
       <SafeAreaView
@@ -306,24 +402,38 @@ export default function RequestDetailsScreen() {
   const statusConfig =
     REQUEST_STATUS_CONFIG[status] || REQUEST_STATUS_CONFIG.pending;
   const statusColor = colors[statusConfig.colorKey];
+
   const canCancel = currentRequest.status === "pending";
+  const canEditDetails = currentRequest.status === "pending";
+  const canEditReceiver = currentRequest.status !== "delivered";
 
   const categoryConfig =
     CATEGORY_CONFIG[currentRequest.category as keyof typeof CATEGORY_CONFIG];
-  const sizeConfig =
-    SIZE_CONFIG[currentRequest.size as keyof typeof SIZE_CONFIG];
 
   const isAccepted =
     currentRequest.status === "accepted" ||
     currentRequest.status === "picked_up" ||
     currentRequest.status === "delivered";
 
+  // Get traveller info - need to fetch from trip's traveller relationship
+  const tripData = currentRequest.trip as any;
+  const travellerInfo = tripData?.traveller || null;
+
+  // Get allowed categories for edit modal
+  const allowedCategories = tripData?.allowed_categories || [];
+
+  // Get transport icon safely
+  const transportMode = currentRequest.trip?.transport_mode || "";
+  const transportIcon =
+    TRANSPORT_ICONS[transportMode as keyof typeof TRANSPORT_ICONS] ||
+    "arrow-forward";
+
   return (
     <SafeAreaView
       style={[styles.container, { backgroundColor: colors.background.primary }]}
       edges={["top"]}
     >
-      {/* Header - FIXED: Left-aligned with status badge */}
+      {/* Header */}
       <View style={[styles.header, { borderBottomColor: colors.border.light }]}>
         <Pressable
           onPress={() => {
@@ -395,23 +505,18 @@ export default function RequestDetailsScreen() {
                       { backgroundColor: colors.border.default },
                     ]}
                   />
-                  {currentRequest.trip.transport_mode && (
-                    <View
-                      style={[
-                        styles.transportIcon,
-                        { backgroundColor: colors.primary + "15" },
-                      ]}
-                    >
-                      <Ionicons
-                        name={
-                          TRANSPORT_ICONS[currentRequest.trip.transport_mode] ||
-                          "arrow-forward"
-                        }
-                        size={16}
-                        color={colors.primary}
-                      />
-                    </View>
-                  )}
+                  <View
+                    style={[
+                      styles.transportIcon,
+                      { backgroundColor: colors.primary + "15" },
+                    ]}
+                  >
+                    <Ionicons
+                      name={transportIcon}
+                      size={16}
+                      color={colors.primary}
+                    />
+                  </View>
                   <View
                     style={[
                       styles.routeLine,
@@ -431,7 +536,7 @@ export default function RequestDetailsScreen() {
                 </View>
               </View>
 
-              {/* FIXED: Departure & Arrival both shown */}
+              {/* Departure & Arrival */}
               <View style={styles.timingContainer}>
                 <View style={styles.timingItem}>
                   <Ionicons
@@ -460,8 +565,8 @@ export default function RequestDetailsScreen() {
                   </View>
                 </View>
 
-                {(currentRequest.trip as any).arrival_date &&
-                  (currentRequest.trip as any).arrival_time && (
+                {currentRequest.trip.arrival_date &&
+                  currentRequest.trip.arrival_time && (
                     <View style={styles.timingItem}>
                       <Ionicons
                         name="log-in-outline"
@@ -483,23 +588,51 @@ export default function RequestDetailsScreen() {
                             { color: colors.text.primary },
                           ]}
                         >
-                          {formatDate(
-                            (currentRequest.trip as any).arrival_date,
-                          )}{" "}
-                          •{" "}
-                          {formatTime(
-                            (currentRequest.trip as any).arrival_time,
-                          )}
+                          {formatDate(currentRequest.trip.arrival_date)} •{" "}
+                          {formatTime(currentRequest.trip.arrival_time)}
                         </Text>
                       </View>
                     </View>
                   )}
               </View>
+
+              {/* Parcel Size Capacity */}
+              {currentRequest.trip.parcel_size_capacity && (
+                <>
+                  <View
+                    style={[
+                      styles.divider,
+                      { backgroundColor: colors.border.light },
+                    ]}
+                  />
+                  <View style={styles.detailItem}>
+                    <Text
+                      style={[
+                        styles.detailLabel,
+                        { color: colors.text.tertiary },
+                      ]}
+                    >
+                      TRIP ACCEPTS
+                    </Text>
+                    <Text
+                      style={[
+                        styles.detailValue,
+                        { color: colors.text.primary },
+                      ]}
+                    >
+                      {getSizeCapacityLabel(
+                        currentRequest.trip.parcel_size_capacity,
+                      )}{" "}
+                      parcels
+                    </Text>
+                  </View>
+                </>
+              )}
             </View>
           </View>
         )}
 
-        {/* Parcel Details Card - FIXED: Description → Size → Category → Photos */}
+        {/* Parcel Details Card */}
         <View
           style={[
             styles.card,
@@ -518,9 +651,33 @@ export default function RequestDetailsScreen() {
             <Text style={[styles.cardTitle, { color: colors.text.primary }]}>
               Parcel Details
             </Text>
+            {canEditDetails && (
+              <Pressable
+                onPress={() => {
+                  haptics.light();
+                  setShowEditDetailsModal(true);
+                }}
+                hitSlop={10}
+                style={[
+                  styles.editButton,
+                  { backgroundColor: colors.primary + "10" },
+                ]}
+              >
+                <Ionicons
+                  name="create-outline"
+                  size={18}
+                  color={colors.primary}
+                />
+                <Text
+                  style={[styles.editButtonText, { color: colors.primary }]}
+                >
+                  Edit
+                </Text>
+              </Pressable>
+            )}
           </View>
 
-          {/* 1. Description - FIXED: Label different size */}
+          {/* Description */}
           <View style={styles.detailItem}>
             <Text style={[styles.detailLabel, { color: colors.text.tertiary }]}>
               DESCRIPTION
@@ -534,63 +691,29 @@ export default function RequestDetailsScreen() {
             style={[styles.divider, { backgroundColor: colors.border.light }]}
           />
 
-          {/* 2 & 3. Size & Category */}
-          <View style={styles.detailGrid}>
-            <View style={styles.detailGridItem}>
-              <Text
-                style={[styles.detailLabel, { color: colors.text.tertiary }]}
-              >
-                SIZE
+          {/* Category */}
+          <View style={styles.detailItem}>
+            <Text style={[styles.detailLabel, { color: colors.text.tertiary }]}>
+              CATEGORY
+            </Text>
+            <View
+              style={[
+                styles.detailChip,
+                { backgroundColor: colors.primary + "10" },
+              ]}
+            >
+              <Ionicons
+                name={categoryConfig.icon}
+                size={16}
+                color={colors.primary}
+              />
+              <Text style={[styles.detailChipText, { color: colors.primary }]}>
+                {categoryConfig.label}
               </Text>
-              <View
-                style={[
-                  styles.detailChip,
-                  { backgroundColor: colors.primary + "10" },
-                ]}
-              >
-                <Ionicons
-                  name={sizeConfig.icon}
-                  size={16}
-                  color={colors.primary}
-                />
-                <Text
-                  style={[styles.detailChipText, { color: colors.primary }]}
-                >
-                  {sizeConfig.label}
-                </Text>
-              </View>
-            </View>
-
-            <View style={styles.detailGridItem}>
-              <Text
-                style={[styles.detailLabel, { color: colors.text.tertiary }]}
-              >
-                CATEGORY
-              </Text>
-              <View
-                style={[
-                  styles.detailChip,
-                  { backgroundColor: colors.background.primary },
-                ]}
-              >
-                <Ionicons
-                  name={categoryConfig.icon}
-                  size={16}
-                  color={colors.text.secondary}
-                />
-                <Text
-                  style={[
-                    styles.detailChipText,
-                    { color: colors.text.secondary },
-                  ]}
-                >
-                  {categoryConfig.label}
-                </Text>
-              </View>
             </View>
           </View>
 
-          {/* 4. Photos - USING EXISTING PhotoGallery COMPONENT */}
+          {/* Photos */}
           {currentRequest.parcel_photos &&
             currentRequest.parcel_photos.length > 0 && (
               <>
@@ -638,6 +761,30 @@ export default function RequestDetailsScreen() {
             <Text style={[styles.cardTitle, { color: colors.text.primary }]}>
               Receiver Details
             </Text>
+            {canEditReceiver && (
+              <Pressable
+                onPress={() => {
+                  haptics.light();
+                  setShowEditReceiverModal(true);
+                }}
+                hitSlop={10}
+                style={[
+                  styles.editButton,
+                  { backgroundColor: colors.success + "10" },
+                ]}
+              >
+                <Ionicons
+                  name="create-outline"
+                  size={18}
+                  color={colors.success}
+                />
+                <Text
+                  style={[styles.editButtonText, { color: colors.success }]}
+                >
+                  Edit
+                </Text>
+              </Pressable>
+            )}
           </View>
 
           <View style={styles.detailGrid}>
@@ -669,8 +816,8 @@ export default function RequestDetailsScreen() {
           </View>
         </View>
 
-        {/* NEW: Traveller Details Card - Only when accepted */}
-        {isAccepted && (currentRequest as any).traveller && (
+        {/* Traveller Details Card - Only when accepted */}
+        {isAccepted && travellerInfo && (
           <View
             style={[
               styles.card,
@@ -705,7 +852,7 @@ export default function RequestDetailsScreen() {
                 <Text
                   style={[styles.detailValue, { color: colors.text.primary }]}
                 >
-                  {(currentRequest as any).traveller.full_name || "N/A"}
+                  {travellerInfo.full_name || "N/A"}
                 </Text>
               </View>
 
@@ -718,13 +865,13 @@ export default function RequestDetailsScreen() {
                 <Text
                   style={[styles.detailValue, { color: colors.text.primary }]}
                 >
-                  {(currentRequest as any).traveller.phone_number || "N/A"}
+                  {travellerInfo.phone || "N/A"}
                 </Text>
               </View>
             </View>
 
             {/* Ticket PNR */}
-            {(currentRequest.trip as any).ticket_pnr && (
+            {tripData?.ticket_pnr && (
               <>
                 <View
                   style={[
@@ -744,14 +891,14 @@ export default function RequestDetailsScreen() {
                   <Text
                     style={[styles.detailValue, { color: colors.text.primary }]}
                   >
-                    {(currentRequest.trip as any).ticket_pnr}
+                    {tripData.ticket_pnr}
                   </Text>
                 </View>
               </>
             )}
 
             {/* Ticket File */}
-            {(currentRequest.trip as any).ticket_file_url && (
+            {tripData?.ticket_file_url && (
               <>
                 <View
                   style={[
@@ -767,11 +914,7 @@ export default function RequestDetailsScreen() {
                       borderColor: colors.primary,
                     },
                   ]}
-                  onPress={() =>
-                    handleOpenTicket(
-                      (currentRequest.trip as any).ticket_file_url,
-                    )
-                  }
+                  onPress={() => handleOpenTicket(tripData.ticket_file_url)}
                 >
                   <Ionicons
                     name="document-text"
@@ -794,7 +937,7 @@ export default function RequestDetailsScreen() {
           </View>
         )}
 
-        {/* Pickup OTP Card - FIXED: Better placement and styling */}
+        {/* Pickup OTP Card */}
         {currentRequest.status === "accepted" &&
           currentRequest.pickup_otp &&
           currentRequest.pickup_otp_expiry && (
@@ -906,38 +1049,20 @@ export default function RequestDetailsScreen() {
             </View>
           )}
 
-        {/* Traveller's Notes */}
-        {currentRequest.status === "accepted" &&
-          currentRequest.traveller_notes && (
-            <View
-              style={[
-                styles.alertCard,
-                {
-                  backgroundColor: colors.primary + "10",
-                  borderColor: colors.primary + "30",
-                },
-              ]}
-            >
-              <Ionicons
-                name="information-circle"
-                size={20}
-                color={colors.primary}
-              />
-              <View style={styles.alertContent}>
-                <Text style={[styles.alertTitle, { color: colors.primary }]}>
-                  Traveller's Notes
-                </Text>
-                <Text
-                  style={[styles.alertText, { color: colors.text.primary }]}
-                >
-                  {currentRequest.traveller_notes}
-                </Text>
-              </View>
-            </View>
-          )}
+        <View style={{ height: Spacing.xxxl }} />
+      </ScrollView>
 
-        {/* Cancel Button */}
-        {canCancel && (
+      {/* Footer - Cancel Button */}
+      {canCancel && (
+        <View
+          style={[
+            styles.footer,
+            {
+              backgroundColor: colors.background.primary,
+              borderTopColor: colors.border.light,
+            },
+          ]}
+        >
           <Pressable
             style={[
               styles.cancelButton,
@@ -956,108 +1081,38 @@ export default function RequestDetailsScreen() {
               Cancel Request
             </Text>
           </Pressable>
-        )}
+        </View>
+      )}
 
-        <View style={{ height: Spacing.xxxl }} />
-      </ScrollView>
-
+      {/* Modals */}
       <CancelRequestModal
         visible={showCancelModal}
         onClose={() => setShowCancelModal(false)}
         onCancel={handleCancel}
         tripDepartureDate={currentRequest.trip?.departure_date || ""}
       />
+
+      {allowedCategories.length > 0 && (
+        <>
+          <EditRequestDetailsModal
+            visible={showEditDetailsModal}
+            request={currentRequest}
+            allowedCategories={allowedCategories}
+            onClose={() => setShowEditDetailsModal(false)}
+            onSuccess={handleEditDetailsSuccess}
+          />
+
+          <EditReceiverDetailsModal
+            visible={showEditReceiverModal}
+            request={currentRequest}
+            onClose={() => setShowEditReceiverModal(false)}
+            onSuccess={handleEditReceiverSuccess}
+          />
+        </>
+      )}
     </SafeAreaView>
   );
 }
-
-const cancelModalStyles = StyleSheet.create({
-  overlay: {
-    flex: 1,
-    backgroundColor: "rgba(0, 0, 0, 0.5)",
-    justifyContent: "center",
-    alignItems: "center",
-    padding: Spacing.lg,
-  },
-  modal: {
-    borderRadius: BorderRadius.xl,
-    width: "100%",
-    maxWidth: 400,
-    maxHeight: "80%",
-    overflow: "hidden",
-  },
-  header: {
-    alignItems: "center",
-    padding: Spacing.lg,
-    borderBottomWidth: 1,
-  },
-  title: {
-    fontSize: Typography.sizes.xl,
-    fontWeight: Typography.weights.bold,
-    marginTop: Spacing.sm,
-  },
-  subtitle: {
-    fontSize: Typography.sizes.sm,
-    textAlign: "center",
-    marginTop: Spacing.xs,
-  },
-  content: {
-    padding: Spacing.lg,
-    maxHeight: 200,
-  },
-  warningBox: {
-    flexDirection: "row",
-    gap: Spacing.sm,
-    padding: Spacing.md,
-    borderRadius: BorderRadius.md,
-    borderWidth: 1,
-  },
-  warningText: {
-    flex: 1,
-    fontSize: Typography.sizes.sm,
-    lineHeight: Typography.sizes.sm * 1.5,
-  },
-  label: {
-    fontSize: Typography.sizes.sm,
-    fontWeight: Typography.weights.medium,
-    marginBottom: Spacing.xs,
-  },
-  input: {
-    borderRadius: BorderRadius.md,
-    borderWidth: 1,
-    padding: Spacing.md,
-    fontSize: Typography.sizes.md,
-    minHeight: 80,
-  },
-  hint: {
-    fontSize: Typography.sizes.xs,
-    marginTop: Spacing.xs,
-  },
-  actions: {
-    flexDirection: "row",
-    gap: Spacing.sm,
-    padding: Spacing.lg,
-    borderTopWidth: 1,
-  },
-  button: {
-    flex: 1,
-    paddingVertical: Spacing.md,
-    borderRadius: BorderRadius.lg,
-    alignItems: "center",
-  },
-  backButton: {
-    borderWidth: 1,
-  },
-  backButtonText: {
-    fontSize: Typography.sizes.md,
-    fontWeight: Typography.weights.semibold,
-  },
-  cancelButton: {},
-  cancelButtonText: {
-    fontSize: Typography.sizes.md,
-    fontWeight: Typography.weights.semibold,
-  },
-});
 
 const styles = StyleSheet.create({
   container: {
@@ -1085,7 +1140,6 @@ const styles = StyleSheet.create({
   },
   headerContent: {
     flex: 1,
-    gap: 4,
   },
   headerTitle: {
     fontSize: Typography.sizes.lg,
@@ -1094,10 +1148,11 @@ const styles = StyleSheet.create({
   statusBadge: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 6,
+    gap: 4,
+    marginTop: 4,
   },
   statusBadgeText: {
-    fontSize: Typography.sizes.sm,
+    fontSize: Typography.sizes.xs,
     fontWeight: Typography.weights.semibold,
   },
   scrollView: {
@@ -1105,11 +1160,11 @@ const styles = StyleSheet.create({
   },
   scrollContent: {
     padding: Spacing.lg,
+    gap: Spacing.lg,
   },
   card: {
     borderRadius: BorderRadius.xl,
     padding: Spacing.lg,
-    marginBottom: Spacing.lg,
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.05,
@@ -1130,8 +1185,21 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   cardTitle: {
+    flex: 1,
     fontSize: Typography.sizes.md,
     fontWeight: Typography.weights.bold,
+  },
+  editButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    paddingHorizontal: Spacing.sm,
+    paddingVertical: 6,
+    borderRadius: BorderRadius.sm,
+  },
+  editButtonText: {
+    fontSize: Typography.sizes.xs,
+    fontWeight: Typography.weights.semibold,
   },
   routeContainer: {
     gap: Spacing.md,
@@ -1144,7 +1212,7 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   cityName: {
-    fontSize: Typography.sizes.lg,
+    fontSize: Typography.sizes.md,
     fontWeight: Typography.weights.bold,
   },
   routeMiddle: {
@@ -1153,71 +1221,68 @@ const styles = StyleSheet.create({
     paddingHorizontal: Spacing.sm,
   },
   routeLine: {
-    width: 24,
+    flex: 1,
     height: 2,
   },
   transportIcon: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
+    width: 28,
+    height: 28,
+    borderRadius: 14,
     alignItems: "center",
     justifyContent: "center",
-    marginHorizontal: -8,
+    marginHorizontal: Spacing.xs,
   },
   timingContainer: {
-    gap: Spacing.md,
+    gap: Spacing.sm,
   },
   timingItem: {
     flexDirection: "row",
-    alignItems: "flex-start",
+    alignItems: "center",
     gap: Spacing.sm,
   },
   timingDetails: {
     flex: 1,
-    gap: 2,
   },
   timingLabel: {
     fontSize: Typography.sizes.xs,
-    fontWeight: Typography.weights.medium,
+    marginBottom: 2,
   },
   timingValue: {
     fontSize: Typography.sizes.sm,
-    fontWeight: Typography.weights.semibold,
+    fontWeight: Typography.weights.medium,
+  },
+  divider: {
+    height: 1,
   },
   detailItem: {
-    marginBottom: Spacing.md,
+    gap: Spacing.xs,
   },
   detailLabel: {
     fontSize: Typography.sizes.xs,
     fontWeight: Typography.weights.semibold,
     textTransform: "uppercase",
     letterSpacing: 0.5,
-    marginBottom: Spacing.xs,
   },
   detailValue: {
     fontSize: Typography.sizes.md,
     lineHeight: Typography.sizes.md * 1.5,
   },
-  divider: {
-    height: 1,
-    marginVertical: Spacing.md,
-  },
   detailGrid: {
     flexDirection: "row",
-    gap: Spacing.lg,
-    marginBottom: Spacing.md,
+    gap: Spacing.md,
   },
   detailGridItem: {
     flex: 1,
+    gap: Spacing.xs,
   },
   detailChip: {
     flexDirection: "row",
     alignItems: "center",
-    gap: Spacing.xs,
-    paddingHorizontal: Spacing.sm,
-    paddingVertical: Spacing.xs,
-    borderRadius: BorderRadius.md,
+    gap: 6,
     alignSelf: "flex-start",
+    paddingHorizontal: Spacing.sm,
+    paddingVertical: 6,
+    borderRadius: BorderRadius.sm,
   },
   detailChipText: {
     fontSize: Typography.sizes.sm,
@@ -1231,68 +1296,64 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     gap: Spacing.sm,
-    padding: Spacing.md,
-    borderRadius: BorderRadius.lg,
+    paddingVertical: Spacing.sm,
+    borderRadius: BorderRadius.md,
     borderWidth: 1,
   },
   ticketButtonText: {
-    fontSize: Typography.sizes.md,
+    fontSize: Typography.sizes.sm,
     fontWeight: Typography.weights.semibold,
-    flex: 1,
-    textAlign: "center",
   },
   otpCard: {
     borderRadius: BorderRadius.xl,
     padding: Spacing.lg,
-    borderWidth: 2,
-    marginBottom: Spacing.lg,
-    gap: Spacing.md,
-    alignItems: "center",
+    borderWidth: 1,
   },
   otpHeader: {
     flexDirection: "row",
     alignItems: "center",
-    gap: Spacing.md,
-    width: "100%",
+    gap: Spacing.sm,
+    marginBottom: Spacing.md,
   },
   otpIconContainer: {
-    width: 50,
-    height: 50,
-    borderRadius: 25,
+    width: 48,
+    height: 48,
+    borderRadius: 24,
     alignItems: "center",
     justifyContent: "center",
   },
   otpHeaderText: {
     flex: 1,
-    gap: 2,
   },
   otpLabel: {
     fontSize: Typography.sizes.md,
     fontWeight: Typography.weights.bold,
   },
   otpInstruction: {
-    fontSize: Typography.sizes.sm,
+    fontSize: Typography.sizes.xs,
+    marginTop: 2,
   },
   otpCode: {
-    fontSize: 48,
+    fontSize: 40,
     fontWeight: Typography.weights.bold,
+    textAlign: "center",
     letterSpacing: 8,
-    fontFamily: Platform.OS === "ios" ? "Courier" : "monospace",
+    marginVertical: Spacing.md,
   },
   otpExpiry: {
     fontSize: Typography.sizes.xs,
+    textAlign: "center",
   },
   alertCard: {
     flexDirection: "row",
     gap: Spacing.sm,
     padding: Spacing.md,
     borderRadius: BorderRadius.lg,
-    borderWidth: 1.5,
-    marginBottom: Spacing.lg,
+    borderWidth: 1,
   },
   alertContent: {
     flex: 1,
-    gap: Spacing.xs,
+    gap: 4,
   },
   alertTitle: {
     fontSize: Typography.sizes.sm,
@@ -1300,14 +1361,18 @@ const styles = StyleSheet.create({
   },
   alertText: {
     fontSize: Typography.sizes.sm,
-    lineHeight: Typography.sizes.sm * 1.5,
+    lineHeight: Typography.sizes.sm * 1.4,
+  },
+  footer: {
+    padding: Spacing.lg,
+    borderTopWidth: 1,
   },
   cancelButton: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
     gap: Spacing.sm,
-    paddingVertical: Spacing.md,
+    paddingVertical: Spacing.md + 2,
     borderRadius: BorderRadius.lg,
     borderWidth: 2,
   },
