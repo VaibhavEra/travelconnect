@@ -16,12 +16,12 @@ export const PACKAGE_CATEGORIES = [
 
 export type PackageCategory = (typeof PACKAGE_CATEGORIES)[number];
 
-// NEW: Parcel size capacity enum
+// Parcel size capacity enum
 export const PARCEL_SIZE_CAPACITY = ["small", "medium", "large"] as const;
 
 export type ParcelSizeCapacity = (typeof PARCEL_SIZE_CAPACITY)[number];
 
-// NEW: Size descriptions for UI (what traveller can carry)
+// Size descriptions for UI (what traveller can carry)
 export const SIZE_CAPACITY_DESCRIPTIONS: Record<ParcelSizeCapacity, string> = {
   small: "Less than 1 kg",
   medium: "1-3 kg",
@@ -50,16 +50,14 @@ export const tripSchema = z
     departure_date: z.string().min(1, "Departure date is required"),
     departure_time: z.string().min(1, "Departure time is required"),
 
-    // Arrival is optional (can be null or empty string)
-    arrival_date: z.string().nullable(),
-    arrival_time: z.string().nullable(),
+    // Arrival is required
+    arrival_date: z.string().min(1, "Arrival date is required"),
+    arrival_time: z.string().min(1, "Arrival time is required"),
 
-    // NEW: Parcel size capacity (replaces total_slots)
+    // Parcel size capacity (replaces total_slots)
     parcel_size_capacity: z.enum(PARCEL_SIZE_CAPACITY, {
       message: "Please select parcel size capacity",
     }),
-
-    // REMOVED: total_slots
 
     // Categories
     allowed_categories: z
@@ -90,7 +88,7 @@ export const tripSchema = z
       path: ["destination"],
     },
   )
-  // Replace the departure validation refine:
+  // Departure validation
   .refine(
     (data) => {
       // Skip validation if date or time is empty
@@ -138,7 +136,7 @@ export const tripSchema = z
 
 export type TripFormData = z.infer<typeof tripSchema>;
 
-// Helper to convert form data to database format (UPDATED)
+// Helper to convert form data to database format
 export const formatTripForDatabase = (
   data: TripFormData,
   travellerId: string,
@@ -150,14 +148,13 @@ export const formatTripForDatabase = (
     transport_mode: data.transport_mode,
     departure_date: data.departure_date,
     departure_time: data.departure_time,
-    arrival_date: data.arrival_date || null,
-    arrival_time: data.arrival_time || null,
-    parcel_size_capacity: data.parcel_size_capacity, // NEW
+    arrival_date: data.arrival_date || data.departure_date, // Changed
+    arrival_time: data.arrival_time || data.departure_time, // Changed
+    parcel_size_capacity: data.parcel_size_capacity,
     allowed_categories: data.allowed_categories,
     pnr_number: data.pnr_number.trim(),
     ticket_file_url: data.ticket_file_url,
     notes: data.notes || null,
     status: "upcoming" as const,
-    // REMOVED: total_slots, available_slots
   };
 };
