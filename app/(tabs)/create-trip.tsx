@@ -2,7 +2,7 @@ import CategoryCheckboxes from "@/components/forms/CategoryCheckboxes";
 import CityDropdown from "@/components/forms/CityDropdown";
 import DatePickerInput from "@/components/forms/DatePickerInput";
 import FileUploadButton from "@/components/forms/FileUploadButton";
-import SlotsStepper from "@/components/forms/SlotsStepper";
+import ParcelSizeSelector from "@/components/forms/ParcelSizeSelector";
 import TextInput from "@/components/forms/TextInput";
 import TimePickerInput from "@/components/forms/TimePickerInput";
 import TransportModeSelector from "@/components/forms/TransportModeSelector";
@@ -11,6 +11,7 @@ import { dateToISO, dateToTimeString } from "@/lib/utils/dateTime";
 import { haptics } from "@/lib/utils/haptics";
 import {
   PackageCategory,
+  ParcelSizeCapacity,
   TransportMode,
   TripFormData,
   tripSchema,
@@ -119,9 +120,9 @@ export default function CreateTripScreen() {
       transport_mode: "train",
       departure_date: "",
       departure_time: "",
-      arrival_date: null,
-      arrival_time: null,
-      total_slots: 3,
+      arrival_date: "",
+      arrival_time: "",
+      parcel_size_capacity: "medium",
       allowed_categories: [],
       pnr_number: "",
       ticket_file_url: "",
@@ -175,9 +176,9 @@ export default function CreateTripScreen() {
         transport_mode: "train",
         departure_date: "",
         departure_time: "",
-        arrival_date: null,
-        arrival_time: null,
-        total_slots: 3,
+        arrival_date: "",
+        arrival_time: "",
+        parcel_size_capacity: "medium",
         allowed_categories: [],
         pnr_number: "",
         ticket_file_url: "",
@@ -189,7 +190,7 @@ export default function CreateTripScreen() {
 
       setTimeout(() => {
         Alert.alert(
-          "Trip Created! 🎉",
+          "Trip Created!",
           "Your trip has been created successfully. You can now receive parcel requests from senders.",
           [{ text: "OK", style: "default" }],
         );
@@ -459,15 +460,13 @@ export default function CreateTripScreen() {
 
             <Controller
               control={control}
-              name="total_slots"
+              name="parcel_size_capacity"
               render={({ field: { onChange, value } }) => (
-                <SlotsStepper
-                  label="Available Slots"
-                  value={value}
+                <ParcelSizeSelector
+                  label="Parcel Size Capacity"
+                  value={value as ParcelSizeCapacity}
                   onChange={onChange}
-                  min={1}
-                  max={5}
-                  error={errors.total_slots?.message}
+                  error={errors.parcel_size_capacity?.message}
                 />
               )}
             />
