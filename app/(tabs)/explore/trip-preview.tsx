@@ -1,4 +1,8 @@
 import { CATEGORY_CONFIG } from "@/lib/constants/categories";
+import {
+  getSizeCapacityIcon,
+  getSizeCapacityLabel,
+} from "@/lib/constants/parcel";
 import { TRANSPORT_ICONS } from "@/lib/constants/transport";
 import { formatDate, formatTime } from "@/lib/utils/dateTime";
 import { haptics } from "@/lib/utils/haptics";
@@ -58,38 +62,14 @@ export default function TripPreviewScreen() {
     );
   }
 
-  // Render slot dots
-  const renderSlots = () => {
-    const slots = [];
-    const maxSlots = Math.min(currentTrip.total_slots, 5);
-
-    for (let i = 0; i < maxSlots; i++) {
-      const isAvailable = i < currentTrip.available_slots;
-      slots.push(
-        <View
-          key={i}
-          style={[
-            styles.slotDot,
-            {
-              backgroundColor: isAvailable
-                ? colors.success
-                : colors.text.tertiary + "40",
-            },
-          ]}
-        />,
-      );
-    }
-    return slots;
-  };
-
-  const isFull = currentTrip.available_slots === 0;
+  const isNotAvailable = currentTrip.status !== "upcoming";
 
   return (
     <SafeAreaView
       style={[styles.container, { backgroundColor: colors.background.primary }]}
       edges={["top"]}
     >
-      {/* Header - LEFT ALIGNED */}
+      {/* Header */}
       <View style={styles.header}>
         <Pressable
           onPress={handleBack}
@@ -292,22 +272,23 @@ export default function TripPreviewScreen() {
                   { backgroundColor: colors.success + "10" },
                 ]}
               >
-                <Ionicons name="cube" size={18} color={colors.success} />
+                <Ionicons
+                  name={getSizeCapacityIcon(currentTrip.parcel_size_capacity)}
+                  size={18}
+                  color={colors.success}
+                />
               </View>
               <View>
                 <Text
                   style={[styles.infoLabel, { color: colors.text.tertiary }]}
                 >
-                  Available Slots
+                  Parcel Size
                 </Text>
-                <View style={styles.slotsInfo}>
-                  <View style={styles.slotsRow}>{renderSlots()}</View>
-                  <Text
-                    style={[styles.slotsCount, { color: colors.text.primary }]}
-                  >
-                    {currentTrip.available_slots}/{currentTrip.total_slots}
-                  </Text>
-                </View>
+                <Text
+                  style={[styles.infoValue, { color: colors.text.primary }]}
+                >
+                  {getSizeCapacityLabel(currentTrip.parcel_size_capacity)}
+                </Text>
               </View>
             </View>
           </View>
@@ -316,7 +297,7 @@ export default function TripPreviewScreen() {
             style={[styles.divider, { backgroundColor: colors.border.light }]}
           />
 
-          {/* Categories WITH ICONS AND LABELS */}
+          {/* Categories */}
           <View style={styles.categoriesSection}>
             <Text
               style={[styles.categoriesTitle, { color: colors.text.primary }]}
@@ -367,17 +348,17 @@ export default function TripPreviewScreen() {
           style={({ pressed }) => [
             styles.requestButton,
             { backgroundColor: colors.primary },
-            isFull && styles.requestButtonDisabled,
-            pressed && !isFull && styles.requestButtonPressed,
+            isNotAvailable && styles.requestButtonDisabled,
+            pressed && !isNotAvailable && styles.requestButtonPressed,
           ]}
           onPress={handleRequestParcel}
-          disabled={isFull}
+          disabled={isNotAvailable}
         >
           <Ionicons name="add-circle" size={20} color={colors.text.inverse} />
           <Text
             style={[styles.requestButtonText, { color: colors.text.inverse }]}
           >
-            {isFull ? "No Slots Available" : "Request Parcel Delivery"}
+            {isNotAvailable ? "Trip Not Available" : "Request Parcel Delivery"}
           </Text>
         </Pressable>
       </View>
@@ -522,22 +503,6 @@ const styles = StyleSheet.create({
     fontSize: Typography.sizes.sm,
     fontWeight: Typography.weights.semibold,
   },
-  slotsInfo: {
-    gap: 4,
-  },
-  slotsRow: {
-    flexDirection: "row",
-    gap: 4,
-  },
-  slotDot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-  },
-  slotsCount: {
-    fontSize: Typography.sizes.xs,
-    fontWeight: Typography.weights.medium,
-  },
   categoriesSection: {
     marginBottom: Spacing.md,
   },
@@ -552,9 +517,9 @@ const styles = StyleSheet.create({
     gap: Spacing.xs,
   },
   categoryChip: {
-    flexDirection: "row", // NEW: Row layout
+    flexDirection: "row",
     alignItems: "center",
-    gap: 6, // NEW: Gap between icon and text
+    gap: 6,
     paddingHorizontal: Spacing.sm,
     paddingVertical: 6,
     borderRadius: BorderRadius.sm,
