@@ -71,7 +71,7 @@ export const useSearchStore = create<SearchState>((set, get) => ({
     }));
   },
 
-  // UPDATED: Search trips with current filters
+  // Search trips with current filters
   searchTrips: async () => {
     try {
       set({ loading: true, error: null });
@@ -83,26 +83,28 @@ export const useSearchStore = create<SearchState>((set, get) => ({
         data: { user },
       } = await supabase.auth.getUser();
 
-      // UPDATED: Start with base query - only upcoming trips (not locked)
-      // Slot system removed - trips are visible if status = 'upcoming'
+      // Base query - ONLY show upcoming trips that can accept requests
       let query = supabase
         .from("trips")
         .select("*")
-        .eq("status", "upcoming") // Only upcoming, not locked
-        .gte("departure_date", new Date().toISOString().split("T")[0]) // Future trips only
-        .neq("traveller_id", user?.id || "") // Filter out own trips
+        .eq("status", "upcoming")
+        .gte("departure_date", new Date().toISOString().split("T")[0])
         .order("departure_date", { ascending: true })
         .order("departure_time", { ascending: true });
-      // REMOVED: .gt("available_slots", 0) - slot system removed
 
-      // Apply source filter (required)
-      if (filters.source) {
-        query = query.eq("source", filters.source);
+      // Filter out own trips
+      if (user?.id) {
+        query = query.neq("traveller_id", user.id);
       }
 
-      // Apply destination filter (required)
-      if (filters.destination) {
-        query = query.eq("destination", filters.destination);
+      // Apply source filter (partial match)
+      if (filters.source && filters.source.trim()) {
+        query = query.ilike("source", `%${filters.source.trim()}%`);
+      }
+
+      // Apply destination filter (partial match)
+      if (filters.destination && filters.destination.trim()) {
+        query = query.ilike("destination", `%${filters.destination.trim()}%`);
       }
 
       // Apply departure date filter (optional)
@@ -117,7 +119,10 @@ export const useSearchStore = create<SearchState>((set, get) => ({
 
       const { data: trips, error } = await query;
 
-      if (error) throw error;
+      if (error) {
+        logger.error("Search query error", error);
+        throw error;
+      }
 
       const normalizedTrips = (trips || []).map(normalizeTrip);
 
