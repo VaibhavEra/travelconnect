@@ -1,4 +1,6 @@
-import { CATEGORY_CONFIG, SIZE_CONFIG } from "@/lib/constants/categories";
+// components/request/IncomingRequestCard.tsx
+import { CATEGORY_CONFIG } from "@/lib/constants/categories";
+import { getSizeCapacityLabel } from "@/lib/constants/parcel";
 import { REQUEST_STATUS_CONFIG, RequestStatus } from "@/lib/constants/status";
 import { haptics } from "@/lib/utils/haptics";
 import { ParcelRequest } from "@/stores/requestStore";
@@ -52,7 +54,11 @@ export default function IncomingRequestCard({
 
   const categoryConfig =
     CATEGORY_CONFIG[request.category as keyof typeof CATEGORY_CONFIG];
-  const sizeConfig = SIZE_CONFIG[request.size as keyof typeof SIZE_CONFIG];
+
+  // UPDATED: Show trip capacity instead of request size
+  const capacityLabel = request.trip?.parcel_size_capacity
+    ? getSizeCapacityLabel(request.trip.parcel_size_capacity)
+    : "Unknown";
 
   return (
     <Animated.View style={animatedStyle}>
@@ -91,7 +97,7 @@ export default function IncomingRequestCard({
             {request.item_description}
           </Text>
 
-          {/* Category & Weight */}
+          {/* Category & Trip Capacity */}
           <View style={styles.metaRow}>
             <View style={styles.metaItem}>
               <Ionicons
@@ -104,14 +110,11 @@ export default function IncomingRequestCard({
               </Text>
             </View>
 
+            {/* UPDATED: Show trip capacity instead of size */}
             <View style={styles.metaItem}>
-              <Ionicons
-                name={sizeConfig.icon}
-                size={14}
-                color={colors.text.tertiary}
-              />
+              <Ionicons name="cube" size={14} color={colors.text.tertiary} />
               <Text style={[styles.metaText, { color: colors.text.tertiary }]}>
-                {sizeConfig.label}
+                Trip: {capacityLabel}
               </Text>
             </View>
           </View>
