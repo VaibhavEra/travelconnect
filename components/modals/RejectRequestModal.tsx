@@ -1,9 +1,10 @@
+// components/modals/RejectRequestModal.tsx
 import { BaseModal, ModalButton } from "@/components/shared";
-import { Spacing, Typography } from "@/styles";
+import { BorderRadius, Spacing, Typography } from "@/styles";
 import { useThemeColors } from "@/styles/theme";
 import { Ionicons } from "@expo/vector-icons";
 import { useState } from "react";
-import { StyleSheet, Text, TextInput, View } from "react-native";
+import { Pressable, StyleSheet, Text, TextInput, View } from "react-native";
 
 interface RejectRequestModalProps {
   visible: boolean;
@@ -11,6 +12,14 @@ interface RejectRequestModalProps {
   onReject: (reason: string) => Promise<void>;
   senderName: string;
 }
+
+// UPDATED: Add common rejection reasons as per checklist
+const REJECTION_REASONS = [
+  "Size exceeds capacity",
+  "Category doesn't match description",
+  "Photos unclear",
+  "Other",
+];
 
 export default function RejectRequestModal({
   visible,
@@ -20,8 +29,22 @@ export default function RejectRequestModal({
 }: RejectRequestModalProps) {
   const colors = useThemeColors();
   const [reason, setReason] = useState("");
+  const [selectedQuickReason, setSelectedQuickReason] = useState<string | null>(
+    null,
+  );
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+
+  const handleQuickReasonSelect = (quickReason: string) => {
+    if (quickReason === "Other") {
+      setSelectedQuickReason(quickReason);
+      setReason("");
+    } else {
+      setSelectedQuickReason(quickReason);
+      setReason(quickReason);
+    }
+    setError("");
+  };
 
   const handleReject = async () => {
     if (!reason.trim()) {
@@ -34,6 +57,7 @@ export default function RejectRequestModal({
       setError("");
       await onReject(reason.trim());
       setReason("");
+      setSelectedQuickReason(null);
       onClose();
     } catch (error) {
       console.error("Reject request failed:", error);
@@ -46,6 +70,7 @@ export default function RejectRequestModal({
   const handleClose = () => {
     if (!loading) {
       setReason("");
+      setSelectedQuickReason(null);
       setError("");
       onClose();
     }
@@ -75,38 +100,95 @@ export default function RejectRequestModal({
       }
     >
       <View>
+        {/* NEW: Quick Rejection Reasons */}
         <Text style={[styles.label, { color: colors.text.primary }]}>
-          Reason for Rejection{" "}
-          <Text style={[styles.required, { color: colors.error }]}>*</Text>
+          Quick Reasons
         </Text>
-        <TextInput
-          style={[
-            styles.input,
-            {
-              backgroundColor: colors.background.secondary,
-              borderColor: error ? colors.error : colors.border.default,
-              color: colors.text.primary,
-            },
-          ]}
-          placeholder="Explain why you're rejecting this request..."
-          placeholderTextColor={colors.text.tertiary}
-          value={reason}
-          onChangeText={(text) => {
-            setReason(text);
-            setError("");
-          }}
-          multiline
-          numberOfLines={4}
-          textAlignVertical="top"
-          editable={!loading}
-        />
+        <View style={styles.quickReasonsContainer}>
+          {REJECTION_REASONS.map((quickReason) => (
+            <Pressable
+              key={quickReason}
+              style={[
+                styles.quickReasonChip,
+                {
+                  backgroundColor:
+                    selectedQuickReason === quickReason
+                      ? colors.error + "20"
+                      : colors.background.secondary,
+                  borderColor:
+                    selectedQuickReason === quickReason
+                      ? colors.error
+                      : colors.border.default,
+                },
+              ]}
+              onPress={() => handleQuickReasonSelect(quickReason)}
+            >
+              <Text
+                style={[
+                  styles.quickReasonText,
+                  {
+                    color:
+                      selectedQuickReason === quickReason
+                        ? colors.error
+                        : colors.text.secondary,
+                    fontWeight:
+                      selectedQuickReason === quickReason
+                        ? Typography.weights.bold
+                        : Typography.weights.medium,
+                  },
+                ]}
+              >
+                {quickReason}
+              </Text>
+            </Pressable>
+          ))}
+        </View>
+
+        {/* Custom Reason Input */}
+        {(selectedQuickReason === "Other" || selectedQuickReason === null) && (
+          <>
+            <Text
+              style={[
+                styles.label,
+                { color: colors.text.primary, marginTop: Spacing.md },
+              ]}
+            >
+              {selectedQuickReason === "Other"
+                ? "Custom Reason"
+                : "Or Provide Custom Reason"}{" "}
+              <Text style={[styles.required, { color: colors.error }]}>*</Text>
+            </Text>
+            <TextInput
+              style={[
+                styles.input,
+                {
+                  backgroundColor: colors.background.secondary,
+                  borderColor: error ? colors.error : colors.border.default,
+                  color: colors.text.primary,
+                },
+              ]}
+              placeholder="Explain why you're rejecting this request..."
+              placeholderTextColor={colors.text.tertiary}
+              value={reason}
+              onChangeText={(text) => {
+                setReason(text);
+                setError("");
+              }}
+              multiline
+              numberOfLines={4}
+              textAlignVertical="top"
+              editable={!loading}
+            />
+          </>
+        )}
+
         {error ? (
           <Text style={[styles.errorText, { color: colors.error }]}>
             {error}
           </Text>
         ) : (
           <Text style={[styles.hint, { color: colors.text.tertiary }]}>
-            e.g., "Item too large", "Category not allowed", etc.
+            The sender will be notified and can request from other travelers
           </Text>
         )}
       </View>
@@ -121,6 +203,21 @@ const styles = StyleSheet.create({
     marginBottom: Spacing.xs,
   },
   required: {},
+  quickReasonsContainer: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: Spacing.xs,
+    marginBottom: Spacing.sm,
+  },
+  quickReasonChip: {
+    paddingHorizontal: Spacing.md,
+    paddingVertical: Spacing.sm,
+    borderRadius: BorderRadius.full,
+    borderWidth: 1.5,
+  },
+  quickReasonText: {
+    fontSize: Typography.sizes.sm,
+  },
   input: {
     borderRadius: 8,
     borderWidth: 1,
