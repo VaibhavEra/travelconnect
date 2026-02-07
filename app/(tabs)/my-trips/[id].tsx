@@ -1,8 +1,18 @@
+// app/(tabs)/my-trips/[id].tsx
+import CancellationOtpModal from "@/components/modals/CancellationOtpModal";
+import EditTripDatesModal from "@/components/trip/EditTripDatesModal";
+import EditTripDetailsModal from "@/components/trip/EditTripDetailsModal";
 import { CATEGORY_CONFIG } from "@/lib/constants/categories";
+import {
+  getSizeCapacityIcon,
+  getSizeCapacityLabel,
+} from "@/lib/constants/parcel";
 import { TRIP_STATUS_CONFIG, TripStatus } from "@/lib/constants/status";
-import { TRANSPORT_ICONS } from "@/lib/constants/transport";
+import { TRANSPORT_CONFIG } from "@/lib/constants/transport";
 import { formatDate, formatTime } from "@/lib/utils/dateTime";
 import { haptics } from "@/lib/utils/haptics";
+import { useAuthStore } from "@/stores/authStore";
+import { useRequestStore } from "@/stores/requestStore";
 import { useTripStore } from "@/stores/tripStore";
 import { BorderRadius, Spacing, Typography } from "@/styles";
 import { useThemeColors } from "@/styles/theme";
@@ -24,8 +34,27 @@ import { SafeAreaView } from "react-native-safe-area-context";
 export default function TripDetailsScreen() {
   const colors = useThemeColors();
   const { id } = useLocalSearchParams<{ id: string }>();
+  const user = useAuthStore((state) => state.user);
   const { currentTrip, loading, getTripById, deleteTrip } = useTripStore();
+  const {
+    acceptedRequests,
+    getAcceptedRequests,
+    generateCancellationOtp,
+    verifyCancellationOtpAndCancel,
+  } = useRequestStore();
   const [actionLoading, setActionLoading] = useState(false);
+
+  // Modal states
+  const [showDetailsModal, setShowDetailsModal] = useState(false);
+  const [showDatesModal, setShowDatesModal] = useState(false);
+  const [showCancellationOtpModal, setShowCancellationOtpModal] =
+    useState(false);
+
+  // Store generated cancellation OTP data
+  const [cancellationOtpData, setCancellationOtpData] = useState<{
+    requestId: string;
+    senderName: string;
+  } | null>(null);
 
   useEffect(() => {
     if (id) {
@@ -33,45 +62,153 @@ export default function TripDetailsScreen() {
     }
   }, [id]);
 
-  const handleCancelTrip = () => {
-    haptics.light();
-    Alert.alert(
-      "Cancel Trip",
-      "Are you sure you want to cancel this trip? This action cannot be undone.",
-      [
-        { text: "No", style: "cancel" },
-        {
-          text: "Yes, Cancel",
-          style: "destructive",
-          onPress: async () => {
-            try {
-              setActionLoading(true);
-              haptics.success();
-              await deleteTrip(id);
-              Alert.alert("Success", "Trip cancelled");
-              router.back();
-            } catch (error) {
-              haptics.error();
-              Alert.alert("Error", "Failed to cancel trip");
-            } finally {
-              setActionLoading(false);
-            }
-          },
-        },
-      ],
+  useEffect(() => {
+    // Fetch accepted requests to check pickup status
+    if (user?.id) {
+      getAcceptedRequests(user.id);
+    }
+  }, [user?.id]);
+
+  // Check if any request for this trip has been picked up
+  const checkIfPickedUp = (): {
+    hasPickup: boolean;
+    pickedUpRequest?: any;
+  } => {
+    const linkedRequest = acceptedRequests.find(
+      (req) => req.trip_id === id && req.status === "picked_up",
     );
+
+    return {
+      hasPickup: !!linkedRequest,
+      pickedUpRequest: linkedRequest,
+    };
+  };
+
+  // Handle trip cancellation with OTP check
+  const handleCancelTrip = async () => {
+    haptics.light();
+
+    // Check if any parcel has been picked up
+    const { hasPickup, pickedUpRequest } = checkIfPickedUp();
+
+    if (hasPickup && pickedUpRequest) {
+      // CASE 1: After pickup - Need OTP from sender
+      Alert.alert(
+        "Cancellation Requires OTP",
+        "A parcel has been picked up for this trip. To cancel, you need a cancellation OTP from the sender.",
+        [
+          { text: "Cancel", style: "cancel" },
+          {
+            text: "Get OTP",
+            style: "default",
+            onPress: async () => {
+              try {
+                setActionLoading(true);
+
+                // Generate cancellation OTP
+                await generateCancellationOtp(pickedUpRequest.id);
+
+                // Store request info for OTP modal
+                setCancellationOtpData({
+                  requestId: pickedUpRequest.id,
+                  senderName: pickedUpRequest.sender?.full_name || "the sender",
+                });
+
+                haptics.success();
+                setActionLoading(false);
+
+                // Show OTP modal
+                setShowCancellationOtpModal(true);
+              } catch (error: any) {
+                haptics.error();
+                setActionLoading(false);
+                Alert.alert(
+                  "Error",
+                  error.message || "Failed to generate cancellation OTP",
+                );
+              }
+            },
+          },
+        ],
+      );
+    } else {
+      // CASE 2: Before pickup - Direct cancellation
+      Alert.alert(
+        "Cancel Trip",
+        "Are you sure you want to cancel this trip? This action cannot be undone.",
+        [
+          { text: "No", style: "cancel" },
+          {
+            text: "Yes, Cancel",
+            style: "destructive",
+            onPress: async () => {
+              try {
+                setActionLoading(true);
+                await deleteTrip(id);
+                haptics.success();
+                Alert.alert("Success", "Trip cancelled successfully", [
+                  { text: "OK", onPress: () => router.back() },
+                ]);
+              } catch (error: any) {
+                haptics.error();
+                Alert.alert("Error", error.message || "Failed to cancel trip");
+              } finally {
+                setActionLoading(false);
+              }
+            },
+          },
+        ],
+      );
+    }
+  };
+
+  // Handle cancellation OTP verification
+  const handleVerifyCancellationOtp = async (otp: string): Promise<boolean> => {
+    if (!cancellationOtpData) return false;
+
+    try {
+      // Pass trip ID to match the backend function
+      const isValid = await verifyCancellationOtpAndCancel(id, otp);
+
+      if (isValid) {
+        haptics.success();
+        Alert.alert(
+          "Trip Cancelled",
+          "Your trip and the linked request have been cancelled successfully.",
+          [{ text: "OK", onPress: () => router.back() }],
+        );
+        return true;
+      }
+
+      return false;
+    } catch (error: any) {
+      console.error("Cancellation OTP verification failed:", error);
+      throw error;
+    }
   };
 
   const handleViewTicket = () => {
     haptics.light();
     if (currentTrip?.ticket_file_url) {
-      Linking.openURL(currentTrip.ticket_file_url);
+      Linking.openURL(currentTrip.ticket_file_url).catch(() => {
+        Alert.alert("Error", "Unable to open ticket file");
+      });
     }
   };
 
   const handleBack = () => {
     haptics.light();
     router.back();
+  };
+
+  const handleEditDetails = () => {
+    haptics.light();
+    setShowDetailsModal(true);
+  };
+
+  const handleEditDates = () => {
+    haptics.light();
+    setShowDatesModal(true);
   };
 
   if (loading || !currentTrip) {
@@ -96,14 +233,15 @@ export default function TripDetailsScreen() {
   const status = currentTrip.status as TripStatus;
   const statusConfig = TRIP_STATUS_CONFIG[status];
   const statusColor = colors[statusConfig.colorKey];
-  const canCancel = status === "upcoming";
+  const canCancel = status === "upcoming" || status === "locked";
+  const canEdit = status === "upcoming";
 
   return (
     <SafeAreaView
       style={[styles.container, { backgroundColor: colors.background.primary }]}
       edges={["top"]}
     >
-      {/* FIXED: Header with status and left-aligned title */}
+      {/* Header */}
       <View style={[styles.header, { borderBottomColor: colors.border.light }]}>
         <Pressable
           onPress={handleBack}
@@ -119,7 +257,6 @@ export default function TripDetailsScreen() {
           <Text style={[styles.headerTitle, { color: colors.text.primary }]}>
             Trip Details
           </Text>
-          {/* NEW: Status badge in header */}
           <View style={styles.statusBadge}>
             <Ionicons name={statusConfig.icon} size={14} color={statusColor} />
             <Text style={[styles.statusBadgeText, { color: statusColor }]}>
@@ -127,6 +264,20 @@ export default function TripDetailsScreen() {
             </Text>
           </View>
         </View>
+
+        {/* Edit button - only for upcoming trips */}
+        {canEdit && (
+          <Pressable
+            onPress={handleEditDetails}
+            hitSlop={10}
+            style={[
+              styles.editButton,
+              { backgroundColor: colors.background.secondary },
+            ]}
+          >
+            <Ionicons name="create-outline" size={20} color={colors.primary} />
+          </Pressable>
+        )}
       </View>
 
       <ScrollView
@@ -191,83 +342,108 @@ export default function TripDetailsScreen() {
             style={[styles.divider, { backgroundColor: colors.border.light }]}
           />
 
-          {/* Schedule Grid */}
-          <View style={styles.scheduleGrid}>
-            {/* Departure */}
-            <View style={styles.scheduleBlock}>
-              <View
-                style={[
-                  styles.scheduleIconContainer,
-                  { backgroundColor: colors.primary + "10" },
-                ]}
+          {/* Schedule Grid with Edit Button */}
+          <View style={styles.scheduleSection}>
+            <View style={styles.scheduleSectionHeader}>
+              <Text
+                style={[styles.sectionLabel, { color: colors.text.tertiary }]}
               >
-                <Ionicons
-                  name="arrow-up-circle"
-                  size={20}
-                  color={colors.primary}
-                />
-              </View>
-              <View style={styles.scheduleDetails}>
-                <Text
-                  style={[
-                    styles.scheduleLabel,
-                    { color: colors.text.tertiary },
-                  ]}
-                >
-                  Departure
-                </Text>
-                <Text
-                  style={[styles.scheduleDate, { color: colors.text.primary }]}
-                >
-                  {formatDate(currentTrip.departure_date)}
-                </Text>
-                <Text
-                  style={[
-                    styles.scheduleTime,
-                    { color: colors.text.secondary },
-                  ]}
-                >
-                  {formatTime(currentTrip.departure_time)}
-                </Text>
-              </View>
+                SCHEDULE
+              </Text>
+              {canEdit && (
+                <Pressable onPress={handleEditDates} hitSlop={8}>
+                  <Ionicons
+                    name="create-outline"
+                    size={18}
+                    color={colors.primary}
+                  />
+                </Pressable>
+              )}
             </View>
 
-            {/* Arrival */}
-            <View style={styles.scheduleBlock}>
-              <View
-                style={[
-                  styles.scheduleIconContainer,
-                  { backgroundColor: colors.success + "10" },
-                ]}
-              >
-                <Ionicons
-                  name="arrow-down-circle"
-                  size={20}
-                  color={colors.success}
-                />
+            <View style={styles.scheduleGrid}>
+              {/* Departure */}
+              <View style={styles.scheduleBlock}>
+                <View
+                  style={[
+                    styles.scheduleIconContainer,
+                    { backgroundColor: colors.primary + "10" },
+                  ]}
+                >
+                  <Ionicons
+                    name="arrow-up-circle"
+                    size={20}
+                    color={colors.primary}
+                  />
+                </View>
+                <View style={styles.scheduleDetails}>
+                  <Text
+                    style={[
+                      styles.scheduleLabel,
+                      { color: colors.text.tertiary },
+                    ]}
+                  >
+                    Departure
+                  </Text>
+                  <Text
+                    style={[
+                      styles.scheduleDate,
+                      { color: colors.text.primary },
+                    ]}
+                  >
+                    {formatDate(currentTrip.departure_date)}
+                  </Text>
+                  <Text
+                    style={[
+                      styles.scheduleTime,
+                      { color: colors.text.secondary },
+                    ]}
+                  >
+                    {formatTime(currentTrip.departure_time)}
+                  </Text>
+                </View>
               </View>
-              <View style={styles.scheduleDetails}>
-                <Text
+
+              {/* Arrival */}
+              <View style={styles.scheduleBlock}>
+                <View
                   style={[
-                    styles.scheduleLabel,
-                    { color: colors.text.tertiary },
+                    styles.scheduleIconContainer,
+                    { backgroundColor: colors.success + "10" },
                   ]}
                 >
-                  Arrival
-                </Text>
-                <Text
-                  style={[styles.scheduleDate, { color: colors.text.primary }]}
-                >
-                  {formatDate(currentTrip.arrival_date)}
-                </Text>
-                <Text
-                  style={[
-                    styles.scheduleTime,
-                    { color: colors.text.secondary },
-                  ]}
-                >
-                  {formatTime(currentTrip.arrival_time)}
-                </Text>
+                  <Ionicons
+                    name="arrow-down-circle"
+                    size={20}
+                    color={colors.success}
+                  />
+                </View>
+                <View style={styles.scheduleDetails}>
+                  <Text
+                    style={[
+                      styles.scheduleLabel,
+                      { color: colors.text.tertiary },
+                    ]}
+                  >
+                    Arrival
+                  </Text>
+                  <Text
+                    style={[
+                      styles.scheduleDate,
+                      { color: colors.text.primary },
+                    ]}
+                  >
+                    {formatDate(currentTrip.arrival_date)}
+                  </Text>
+                  <Text
+                    style={[
+                      styles.scheduleTime,
+                      { color: colors.text.secondary },
+                    ]}
+                  >
+                    {formatTime(currentTrip.arrival_time)}
+                  </Text>
+                </View>
               </View>
             </View>
           </View>
@@ -286,7 +462,7 @@ export default function TripDetailsScreen() {
                 ]}
               >
                 <Ionicons
-                  name={TRANSPORT_ICONS[currentTrip.transport_mode]}
+                  name={TRANSPORT_CONFIG[currentTrip.transport_mode].icon}
                   size={18}
                   color={colors.primary}
                 />
@@ -313,18 +489,22 @@ export default function TripDetailsScreen() {
                   { backgroundColor: colors.success + "10" },
                 ]}
               >
-                <Ionicons name="cube" size={18} color={colors.success} />
+                <Ionicons
+                  name={getSizeCapacityIcon(currentTrip.parcel_size_capacity)}
+                  size={18}
+                  color={colors.success}
+                />
               </View>
               <View>
                 <Text
                   style={[styles.infoLabel, { color: colors.text.tertiary }]}
                 >
-                  Slots
+                  Parcel Size
                 </Text>
                 <Text
                   style={[styles.infoValue, { color: colors.text.primary }]}
                 >
-                  {currentTrip.available_slots}/{currentTrip.total_slots}
+                  {getSizeCapacityLabel(currentTrip.parcel_size_capacity)}
                 </Text>
               </View>
             </View>
@@ -413,8 +593,7 @@ export default function TripDetailsScreen() {
           </View>
         </View>
 
-        {/* REMOVED: Complete Trip button */}
-        {/* Action Buttons - Only Cancel */}
+        {/* Cancel Button */}
         {canCancel && (
           <Pressable
             style={[
@@ -444,6 +623,35 @@ export default function TripDetailsScreen() {
 
         <View style={{ height: Spacing.xxxl }} />
       </ScrollView>
+
+      {/* Modals */}
+      {currentTrip && (
+        <>
+          <EditTripDetailsModal
+            visible={showDetailsModal}
+            onClose={() => setShowDetailsModal(false)}
+            trip={currentTrip}
+          />
+          <EditTripDatesModal
+            visible={showDatesModal}
+            onClose={() => setShowDatesModal(false)}
+            trip={currentTrip}
+          />
+          {/* Cancellation OTP Modal */}
+          {cancellationOtpData && (
+            <CancellationOtpModal
+              visible={showCancellationOtpModal}
+              onClose={() => {
+                setShowCancellationOtpModal(false);
+                setCancellationOtpData(null);
+              }}
+              onVerify={handleVerifyCancellationOtp}
+              senderName={cancellationOtpData.senderName}
+              requestId={cancellationOtpData.requestId}
+            />
+          )}
+        </>
+      )}
     </SafeAreaView>
   );
 }
@@ -492,6 +700,13 @@ const styles = StyleSheet.create({
   statusBadgeText: {
     fontSize: Typography.sizes.sm,
     fontWeight: Typography.weights.semibold,
+  },
+  editButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    alignItems: "center",
+    justifyContent: "center",
   },
   scrollView: {
     flex: 1,
@@ -543,10 +758,23 @@ const styles = StyleSheet.create({
     height: 1,
     marginVertical: Spacing.md,
   },
+  scheduleSection: {
+    marginBottom: Spacing.md,
+  },
+  scheduleSectionHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginBottom: Spacing.sm,
+  },
+  sectionLabel: {
+    fontSize: Typography.sizes.xs,
+    fontWeight: Typography.weights.semibold,
+    letterSpacing: 0.5,
+  },
   scheduleGrid: {
     flexDirection: "row",
     gap: Spacing.md,
-    marginBottom: Spacing.md,
   },
   scheduleBlock: {
     flex: 1,
