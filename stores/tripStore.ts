@@ -113,19 +113,18 @@ export const useTripStore = create<TripState>((set, get) => ({
         p_destination: data.destination.trim(),
         p_departure_date: data.departure_date,
         p_departure_time: data.departure_time,
-        p_arrival_date: data.arrival_date,
-        p_arrival_time: data.arrival_time,
+        p_arrival_date: data.arrival_date || data.departure_date,
+        p_arrival_time: data.arrival_time || data.departure_time,
         p_transport_mode: data.transport_mode,
-        p_parcel_size_capacity: data.parcel_size_capacity, // NEW
+        p_parcel_size_capacity: data.parcel_size_capacity,
         p_pnr_number: data.pnr_number.trim(),
         p_ticket_file_url: data.ticket_file_url,
         p_allowed_categories: data.allowed_categories,
-        // REMOVED: p_total_slots
       };
 
-      // Only add p_notes if it exists
-      if (data.notes) {
-        rpcParams.p_notes = data.notes;
+      // Only add notes if not empty
+      if (data.notes && data.notes.trim()) {
+        rpcParams.p_notes = data.notes.trim();
       }
 
       // Use RPC function for server-side validation
@@ -135,6 +134,7 @@ export const useTripStore = create<TripState>((set, get) => ({
       );
 
       if (rpcError) throw rpcError;
+      if (!tripId) throw new Error("No trip ID returned from function");
 
       // Fetch the created trip
       const { data: trip, error: fetchError } = await supabase
