@@ -21,6 +21,14 @@ type DeliveryOtpVerificationResult = {
   delivered_at: string;
 };
 
+// Add type definition for the RPC return at the top of the file
+type CancellationVerificationResult = {
+  trip_id: string;
+  request_id: string;
+  status: string;
+  message: string;
+};
+
 // Extended type with trip information
 export interface ParcelRequest extends DbParcelRequest {
   trip?: {
@@ -93,6 +101,12 @@ interface RequestState {
 
   // NEW: Generate cancellation OTP for trip cancellation after pickup
   generateCancellationOtp: (requestId: string) => Promise<string>;
+
+  // UPDATED: Takes tripId (not requestId) to match backend function
+  verifyCancellationOtpAndCancel: (
+    tripId: string,
+    otp: string,
+  ) => Promise<boolean>;
 
   // NEW: Check if request details can be edited
   canEditRequestDetails: (requestId: string) => Promise<boolean>;
@@ -821,6 +835,50 @@ export const useRequestStore = create<RequestState>((set, get) => ({
     } catch (error: any) {
       const errorMessage = parseSupabaseError(error);
       logger.error("Update request details failed", error);
+      set({ loading: false, error: errorMessage });
+      throw new Error(errorMessage);
+    }
+  },
+
+  // ============================================================================
+  // NEW: Verify cancellation OTP and cancel trip + request
+  // ============================================================================
+  verifyCancellationOtpAndCancel: async (
+    tripId: string,
+    otp: string,
+  ): Promise<boolean> => {
+    try {
+      set({ loading: true, error: null });
+
+      // Use the EXISTING RPC function from Migration 5
+      const { data, error } = await supabase.rpc(
+        "verify_cancellation_otp_and_cancel_trip",
+        {
+          p_trip_id: tripId,
+          p_otp: otp,
+        },
+      );
+
+      if (error) throw error;
+
+      // FIXED: Cast data to the correct type
+      const result = data as unknown as CancellationVerificationResult;
+
+      // Check if cancellation was successful
+      if (result && result.status === "cancelled") {
+        set({ loading: false });
+        logger.info("Cancellation OTP verified and trip cancelled", {
+          tripId,
+          requestId: result.request_id,
+        });
+        return true;
+      }
+
+      set({ loading: false });
+      return false;
+    } catch (error: any) {
+      const errorMessage = parseSupabaseError(error);
+      logger.error("Verify cancellation OTP failed", error);
       set({ loading: false, error: errorMessage });
       throw new Error(errorMessage);
     }
