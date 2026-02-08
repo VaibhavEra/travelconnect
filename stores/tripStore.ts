@@ -19,7 +19,7 @@ export type Trip = {
   departure_time: string;
   arrival_date: string;
   arrival_time: string;
-  parcel_size_capacity: "small" | "medium" | "large"; // NEW: Replaces total_slots/available_slots
+  parcel_size_capacity: "small" | "medium" | "large";
   allowed_categories: string[];
   pnr_number: string;
   ticket_file_url: string;
@@ -33,8 +33,27 @@ export type Trip = {
     | "expired";
   created_at: string;
   updated_at: string;
-  // REMOVED: total_slots, available_slots
 };
+
+// NEW: Type for editable general fields (before acceptance)
+type EditableGeneralTripFields = Pick<
+  DbTrip,
+  | "parcel_size_capacity"
+  | "allowed_categories"
+  | "departure_date"
+  | "departure_time"
+  | "arrival_date"
+  | "arrival_time"
+  | "pnr_number"
+  | "ticket_file_url"
+  | "notes" // TODO: Remove after Issue #5
+>;
+
+// NEW: Type for date-only updates (after acceptance)
+type EditableDateFields = Pick<
+  DbTrip,
+  "departure_date" | "departure_time" | "arrival_date" | "arrival_time"
+>;
 
 // Trip store state interface
 interface TripState {
@@ -50,16 +69,24 @@ interface TripState {
   getAvailableTrips: () => Promise<void>;
   getTripById: (tripId: string) => Promise<Trip | null>;
   canEditTrip: (tripId: string) => Promise<boolean>;
-  canEditTripDates: (tripId: string) => Promise<boolean>; // NEW: Check if dates can be edited
-  updateTrip: (tripId: string, updates: Partial<DbTrip>) => Promise<void>;
+  canEditTripDates: (tripId: string) => Promise<boolean>;
+
+  // NEW: Separate methods for different edit scenarios (Issue #4 + #27)
+  updateTripGeneralFields: (
+    tripId: string,
+    updates: Partial<EditableGeneralTripFields>,
+  ) => Promise<void>;
   updateTripDates: (
-    // NEW: Update only dates
     tripId: string,
     departure_date: string,
     departure_time: string,
     arrival_date: string,
     arrival_time: string,
   ) => Promise<void>;
+
+  // DEPRECATED: Will be removed in Issue #11
+  updateTrip: (tripId: string, updates: Partial<DbTrip>) => Promise<void>;
+
   updateTripStatus: (tripId: string, status: Trip["status"]) => Promise<void>;
   deleteTrip: (tripId: string) => Promise<void>;
   clearError: () => void;
@@ -81,7 +108,7 @@ const normalizeTrip = (dbTrip: DbTrip): Trip => {
     arrival_date: dbTrip.arrival_date,
     arrival_time: dbTrip.arrival_time,
     parcel_size_capacity:
-      dbTrip.parcel_size_capacity as Trip["parcel_size_capacity"], // NEW
+      dbTrip.parcel_size_capacity as Trip["parcel_size_capacity"],
     allowed_categories: dbTrip.allowed_categories,
     pnr_number: dbTrip.pnr_number,
     ticket_file_url: dbTrip.ticket_file_url,
@@ -89,7 +116,6 @@ const normalizeTrip = (dbTrip: DbTrip): Trip => {
     status: validStatus,
     created_at: dbTrip.created_at,
     updated_at: dbTrip.updated_at,
-    // REMOVED: total_slots, available_slots normalization
   };
 };
 
@@ -101,7 +127,7 @@ export const useTripStore = create<TripState>((set, get) => ({
   error: null,
 
   // ============================================================================
-  // UPDATED: Create new trip with server-side validation
+  // Create new trip with server-side validation
   // ============================================================================
   createTrip: async (data: TripFormData, userId: string) => {
     try {
@@ -188,7 +214,7 @@ export const useTripStore = create<TripState>((set, get) => ({
     }
   },
 
-  // UPDATED: Get all available trips (for senders to browse)
+  // Get all available trips (for senders to browse)
   getAvailableTrips: async () => {
     try {
       set({ loading: true, error: null });
@@ -203,12 +229,11 @@ export const useTripStore = create<TripState>((set, get) => ({
       const { data: trips, error } = await supabase
         .from("trips")
         .select("*")
-        .eq("status", "upcoming") // UPDATED: Only upcoming, not locked
+        .eq("status", "upcoming")
         .gte("departure_date", today)
-        .neq("traveller_id", user?.id || "") // Filter out own trips
+        .neq("traveller_id", user?.id || "")
         .order("departure_date", { ascending: true })
         .order("departure_time", { ascending: true });
-      // REMOVED: .gt("available_slots", 0) check
 
       if (error) throw error;
 
@@ -249,7 +274,7 @@ export const useTripStore = create<TripState>((set, get) => ({
     }
   },
 
-  // Check if trip can be edited
+  // Check if trip can be edited (Issue #4: Simplified, no 24h restriction)
   canEditTrip: async (tripId: string): Promise<boolean> => {
     try {
       const { data, error } = await supabase.rpc("can_edit_trip", {
@@ -268,21 +293,84 @@ export const useTripStore = create<TripState>((set, get) => ({
     }
   },
 
-  // UPDATED: With permission check
-  updateTrip: async (tripId: string, updates: Partial<DbTrip>) => {
+  // Check if trip dates can be edited (Issue #4: Same as canEditTrip now)
+  canEditTripDates: async (tripId: string): Promise<boolean> => {
+    try {
+      const { data, error } = await supabase.rpc("can_edit_trip_dates", {
+        p_trip_id: tripId,
+      });
+
+      if (error) {
+        logger.error("Check date edit permission failed", error);
+        return false;
+      }
+
+      return data ?? false;
+    } catch (error) {
+      logger.error("canEditTripDates error", error);
+      return false;
+    }
+  },
+
+  // ============================================================================
+  // NEW: Update general trip fields (Issue #4 + #27)
+  // Can only be used BEFORE any request is accepted
+  // ============================================================================
+  updateTripGeneralFields: async (
+    tripId: string,
+    updates: Partial<EditableGeneralTripFields>,
+  ) => {
     try {
       set({ loading: true, error: null });
 
-      const canEdit = await get().canEditTrip(tripId);
-      if (!canEdit) {
+      // Whitelist only editable general fields
+      const allowedFields: (keyof EditableGeneralTripFields)[] = [
+        "parcel_size_capacity",
+        "allowed_categories",
+        "departure_date",
+        "departure_time",
+        "arrival_date",
+        "arrival_time",
+        "pnr_number",
+        "ticket_file_url",
+        "notes", // TODO: Remove after Issue #5
+      ];
+
+      // Filter to only allowed fields
+      const filteredUpdates = Object.keys(updates)
+        .filter((key) =>
+          allowedFields.includes(key as keyof EditableGeneralTripFields),
+        )
+        .reduce(
+          (obj, key) => {
+            obj[key] = updates[key as keyof EditableGeneralTripFields];
+            return obj;
+          },
+          {} as Record<string, any>,
+        );
+
+      // Validate we have fields to update
+      if (Object.keys(filteredUpdates).length === 0) {
         throw new Error(
-          "Cannot edit trip within 24h of departure or with accepted requests",
+          "No valid fields to update. Allowed fields: parcel_size_capacity, allowed_categories, dates, pnr_number, ticket_file_url, notes.",
         );
       }
 
+      // Check edit permission (no accepted requests)
+      const canEdit = await get().canEditTrip(tripId);
+      if (!canEdit) {
+        throw new Error(
+          "Cannot edit trip after pickup or in completed/cancelled state. To edit dates after acceptance (before pickup), use updateTripDates().",
+        );
+      }
+
+      // Perform update with RLS protection
       const { data: trip, error } = await supabase
         .from("trips")
-        .update(updates)
+        .update({
+          ...filteredUpdates,
+          updated_at: new Date().toISOString(),
+        })
         .eq("id", tripId)
         .select()
         .single();
@@ -297,17 +385,130 @@ export const useTripStore = create<TripState>((set, get) => ({
         loading: false,
       }));
 
-      // Update currentTrip if it's the same trip
       if (get().currentTrip?.id === tripId) {
         set({ currentTrip: normalizedTrip });
       }
 
-      logger.info("Trip updated", { tripId });
+      logger.info("Trip general fields updated", {
+        tripId,
+        updatedFields: Object.keys(filteredUpdates),
+      });
     } catch (error: any) {
       const errorMessage = parseSupabaseError(error);
-      logger.error("Update trip failed", error);
+      logger.error("Update trip general fields failed", error);
       set({ loading: false, error: errorMessage });
       throw new Error(errorMessage);
+    }
+  },
+
+  // ============================================================================
+  // UPDATED: Update only dates (Issue #4)
+  // Allowed even after acceptance, before pickup
+  // ============================================================================
+  updateTripDates: async (
+    tripId: string,
+    departure_date: string,
+    departure_time: string,
+    arrival_date: string,
+    arrival_time: string,
+  ) => {
+    try {
+      set({ loading: true, error: null });
+
+      // Check date edit permission
+      const canEdit = await get().canEditTripDates(tripId);
+      if (!canEdit) {
+        throw new Error(
+          "Cannot edit trip dates after pickup or in completed/cancelled state",
+        );
+      }
+
+      // Validate dates using backend function
+      const { data: isValid, error: validationError } = await supabase.rpc(
+        "validate_trip_dates",
+        {
+          p_departure_date: departure_date,
+          p_departure_time: departure_time,
+          p_arrival_date: arrival_date,
+          p_arrival_time: arrival_time,
+        },
+      );
+
+      if (validationError) throw validationError;
+      if (!isValid) throw new Error("Invalid trip dates");
+
+      // Update dates only with RLS protection
+      const { data: trip, error } = await supabase
+        .from("trips")
+        .update({
+          departure_date,
+          departure_time,
+          arrival_date,
+          arrival_time,
+          updated_at: new Date().toISOString(),
+        })
+        .eq("id", tripId)
+        .select()
+        .single();
+
+      if (error) throw error;
+
+      const normalizedTrip = normalizeTrip(trip);
+
+      set((state) => ({
+        trips: state.trips.map((t) => (t.id === tripId ? normalizedTrip : t)),
+        loading: false,
+      }));
+
+      if (get().currentTrip?.id === tripId) {
+        set({ currentTrip: normalizedTrip });
+      }
+
+      logger.info("Trip dates updated", { tripId });
+
+      // TODO: Issue #14 - Trigger sender notification if accepted requests exist
+    } catch (error: any) {
+      const errorMessage = parseSupabaseError(error);
+      logger.error("Update trip dates failed", error);
+      set({ loading: false, error: errorMessage });
+      throw new Error(errorMessage);
+    }
+  },
+
+  // ============================================================================
+  // DEPRECATED: Use updateTripGeneralFields() or updateTripDates() instead
+  // TODO: Remove in Issue #11 after updating all component usages
+  // ============================================================================
+  updateTrip: async (tripId: string, updates: Partial<DbTrip>) => {
+    logger.warn(
+      "updateTrip() is deprecated. Use updateTripGeneralFields() or updateTripDates() instead. This will be removed in Issue #11.",
+    );
+
+    // Temporary: Route to appropriate method based on fields
+    const dateFields = [
+      "departure_date",
+      "departure_time",
+      "arrival_date",
+      "arrival_time",
+    ];
+    const updateKeys = Object.keys(updates);
+    const isDatesOnly = updateKeys.every((key) => dateFields.includes(key));
+
+    if (isDatesOnly && updateKeys.length === 4) {
+      // Route to updateTripDates
+      return get().updateTripDates(
+        tripId,
+        updates.departure_date!,
+        updates.departure_time!,
+        updates.arrival_date!,
+        updates.arrival_time!,
+      );
+    } else {
+      // Route to updateTripGeneralFields
+      return get().updateTripGeneralFields(
+        tripId,
+        updates as Partial<EditableGeneralTripFields>,
+      );
     }
   },
 
@@ -367,76 +568,6 @@ export const useTripStore = create<TripState>((set, get) => ({
     } catch (error: any) {
       const errorMessage = parseSupabaseError(error);
       logger.error("Delete trip failed", error);
-      set({ loading: false, error: errorMessage });
-      throw new Error(errorMessage);
-    }
-  },
-
-  // Add new method to check if dates can be edited
-  canEditTripDates: async (tripId: string): Promise<boolean> => {
-    try {
-      const { data, error } = await supabase.rpc("can_edit_trip_dates", {
-        p_trip_id: tripId,
-      });
-
-      if (error) {
-        logger.error("Check date edit permission failed", error);
-        return false;
-      }
-
-      return data ?? false;
-    } catch (error) {
-      logger.error("canEditTripDates error", error);
-      return false;
-    }
-  },
-
-  // Add method to update only dates
-  updateTripDates: async (
-    tripId: string,
-    departure_date: string,
-    departure_time: string,
-    arrival_date: string,
-    arrival_time: string,
-  ) => {
-    try {
-      set({ loading: true, error: null });
-
-      const canEdit = await get().canEditTripDates(tripId);
-      if (!canEdit) {
-        throw new Error("Cannot edit trip dates after pickup");
-      }
-
-      const { data: trip, error } = await supabase
-        .from("trips")
-        .update({
-          departure_date,
-          departure_time,
-          arrival_date,
-          arrival_time,
-          updated_at: new Date().toISOString(),
-        })
-        .eq("id", tripId)
-        .select()
-        .single();
-
-      if (error) throw error;
-
-      const normalizedTrip = normalizeTrip(trip);
-
-      set((state) => ({
-        trips: state.trips.map((t) => (t.id === tripId ? normalizedTrip : t)),
-        loading: false,
-      }));
-
-      if (get().currentTrip?.id === tripId) {
-        set({ currentTrip: normalizedTrip });
-      }
-
-      logger.info("Trip dates updated", { tripId });
-    } catch (error: any) {
-      const errorMessage = parseSupabaseError(error);
-      logger.error("Update trip dates failed", error);
       set({ loading: false, error: errorMessage });
       throw new Error(errorMessage);
     }
