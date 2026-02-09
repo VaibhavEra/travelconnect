@@ -48,6 +48,79 @@
 
 ---
 
+### Issue #2 - Remove 24h cancellation restriction ✅
+
+**Type:** Critical - Business Logic - Backend  
+**Priority:** CRITICAL  
+**Time:** 1.5 hours  
+**Date:** 2026-02-09
+
+**Problem:**
+
+- `cancel_request_with_validation()` blocked cancellations within 24 hours of departure
+- `prevent_cancellation_with_pickups` trigger blocked trip cancellation even with OTP verification
+- Users couldn't cancel requests/trips in legitimate scenarios
+
+**Backend Changes (Applied via Supabase SQL Editor - 2026-02-09):**
+
+1. **`cancel_request_with_validation()` function** (Updated)
+   - **Removed:** 24-hour time restriction logic
+   - **Removed:** `v_departure_datetime` and `v_hours_until_departure` variables
+   - **Simplified:** Status check now only verifies `pending` or `accepted` (blocks `picked_up` directly)
+   - **Kept:** All authorization checks (sender/traveller verification)
+
+2. **`prevent_cancellation_with_pickups` trigger** (Dropped)
+   - Completely removed - was blocking OTP-based emergency cancellations
+
+3. **`prevent_cancellation_with_pickups()` function** (Dropped)
+   - Completely removed along with trigger
+
+4. **`validate_status_transition()` function** (Updated)
+   - **Added:** Logic to allow cascade cancellation of `picked_up` requests
+   - **Added:** Check for trip status to differentiate cascade vs direct cancellation
+   - **Kept:** All other status transition validations
+
+**New Cancellation Rules:**
+
+| Scenario                          | Before Fix | After Fix ✅         |
+| --------------------------------- | ---------- | -------------------- |
+| Cancel pending request            | ✓ Allowed  | ✓ Allowed            |
+| Cancel accepted request (<24h)    | ❌ Blocked | ✅ Allowed           |
+| Cancel picked_up request directly | ❌ Blocked | ❌ Blocked (correct) |
+| OTP-based trip cancellation       | ❌ Blocked | ✅ Allowed           |
+
+**OTP-Based Cancellation Flow:**
+
+1. Traveller calls `generate_cancellation_otp(request_id)` (backend)
+2. 6-digit OTP generated with 24h expiry
+3. Traveller shares OTP with sender
+4. Traveller calls `verify_cancellation_otp_and_cancel_trip(trip_id, otp)` (backend)
+5. Both trip and request are cancelled
+
+**Testing:**
+
+- ✅ Test 1: Cancel pending request - PASSED
+- ✅ Test 2: Cancel accepted request within 24h - **PASSED (KEY FIX)**
+- ✅ Test 3: Try to cancel picked_up request - PASSED (properly blocked)
+- ✅ Test 4: OTP-based trip cancellation - PASSED
+
+**Acceptance Criteria:**
+
+- ✅ Requests can be cancelled anytime before pickup (no 24h restriction)
+- ✅ Requests CANNOT be cancelled after pickup (without OTP)
+- ✅ Trip can be cancelled via OTP even with picked_up parcels
+- ✅ Cascade cancellation still works
+
+**Frontend Changes:**
+
+- None required - `cancelRequest()` in `requestStore.ts` already calls updated backend function
+
+**Type Updates:**
+
+- None required - function signatures unchanged
+
+---
+
 ### Issue #1 - Fix trip status transitions (Critical) ✅
 
 **Type:** Critical Bug - Backend Logic  
@@ -128,13 +201,15 @@ Trip status was incorrectly transitioning to `in_progress` when parcel was picke
 ### Files Changed
 
 - `stores/tripStore.ts` - Core implementation (Issues #4, #27)
+- `stores/requestStore.ts` - No changes required (Issue #2)
 
 ### Backend (No Migration Files)
 
 Backend changes applied manually via Supabase SQL Editor:
 
 - **2026-02-08:** Issues #4, #27 (permission functions + RLS policies)
-- **2026-02-09:** Issue #1 (triggers, cron job, function updates)
+- **2026-02-09 (Morning):** Issue #1 (triggers, cron job, function updates)
+- **2026-02-09 (Evening):** Issue #2 (cancellation logic, trigger removal, validation update)
 
 No migration files created to avoid conflicts with production database.
 
@@ -145,5 +220,4 @@ No migration files created to avoid conflicts with production database.
 - **Functions:** Permission checks validate business logic
 - **Triggers:** Automatic status transitions maintain data integrity
 - **Cron Jobs:** Time-based transitions ensure accurate trip lifecycle
-
----
+- **OTP Verification:** Secure cancellation flow for emergency scenarios
