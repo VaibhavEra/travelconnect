@@ -1,5 +1,99 @@
 ## Issues Resolved
 
+### Issue #3 - Implement request expiry logic ✅
+
+**Type:** Critical - Backend Logic  
+**Priority:** CRITICAL  
+**Time:** 1.5 hours  
+**Date:** 2026-02-09
+
+**Problem:**
+Pending requests were not automatically expiring when trips transitioned to `in_progress`. Travelers never accepted/rejected these requests, leaving them in limbo.
+
+**Backend Changes (Applied via Supabase SQL Editor - 2026-02-09):**
+
+1. **`expire_pending_requests_on_trip_start_row()` function** (Created)
+   - **Purpose:** Row-level trigger function to expire pending requests
+   - **Logic:** When trip moves to `in_progress`, all `pending` requests → `expired`
+   - **Condition:** Only fires on transition FROM `upcoming`/`locked` TO `in_progress`
+
+2. **`expire_pending_on_trip_start_trigger` trigger** (Created)
+   - **Purpose:** Automatically calls expiry function when trip status changes
+   - **Target:** `trips` table
+   - **Timing:** AFTER UPDATE
+   - **Condition:** `NEW.status = 'in_progress' AND OLD.status != 'in_progress'`
+
+**How It Works:**
+
+### Automatic Flow (via Cron Job)
+
+1. `transition-trips-to-in-progress` cron job runs every 5 minutes
+2. Identifies trips with `departure_date + departure_time <= NOW()`
+3. Updates trip status: `upcoming`/`locked` → `in_progress`
+4. **Trigger fires automatically** when trip status changes
+5. All `pending` requests on that trip → `expired`
+
+### Manual Flow (Direct Update)
+
+```sql
+UPDATE trips SET status = 'in_progress' WHERE id = '<trip_id>';
+```
+
+- Trigger fires automatically
+- Pending requests expire instantly
+
+**Status Behavior Summary:**
+
+| Request Status | Trip Transitions to in_progress | Result            |
+| -------------- | ------------------------------- | ----------------- |
+| pending        | ✓ Trigger fires                 | → expired         |
+| accepted       | ✓ Trigger fires                 | → stays accepted  |
+| picked_up      | ✓ Trigger fires                 | → stays picked_up |
+| delivered      | ✓ Trigger fires                 | → stays delivered |
+| cancelled      | ✓ Trigger fires                 | → stays cancelled |
+| rejected       | ✓ Trigger fires                 | → stays rejected  |
+
+**Only `pending` requests are affected.**
+
+**Testing:**
+
+- ✅ Test 1: Pending requests expire on trip start - PASSED
+- ✅ Test 2: Accepted requests remain accepted - PASSED
+- ✅ Test 3: Mixed statuses - only pending expire - PASSED
+- ✅ Test 4: No expiry from invalid transitions - PASSED
+- ✅ Visual verification test - PASSED
+
+**Acceptance Criteria:**
+
+- ✅ When trip moves to `in_progress`, all `pending` requests become `expired`
+- ✅ Requests in other statuses are NOT affected
+- ✅ Expired requests visible in sender's my-requests tab
+- ✅ Works automatically via cron job
+- ✅ Works manually via direct UPDATE
+- ✅ No duplicate triggers or functions
+
+**Frontend Changes:**
+
+- **None required** - `expired` status already exists in types
+- `requestStore.getMyRequests()` already fetches all statuses including `expired`
+- Status filters in UI already handle `expired` display
+
+**Type Updates:**
+
+- **None required** - `expired` already defined in `requeststatus` enum
+
+**Database Objects Created:**
+
+1. Function: `expire_pending_requests_on_trip_start_row()`
+2. Trigger: `expire_pending_on_trip_start_trigger` on `trips` table
+
+**Related Issues:**
+
+- Depends on: Issue #1 (Trip status transitions) ✅ Resolved
+- Blocks: Issue #17, #18 (Request filtering logic)
+
+---
+
 ### Issue #29 - Verify RLS policy for receiver details ✅
 
 **Type:** Security Verification  
@@ -201,7 +295,7 @@ Trip status was incorrectly transitioning to `in_progress` when parcel was picke
 ### Files Changed
 
 - `stores/tripStore.ts` - Core implementation (Issues #4, #27)
-- `stores/requestStore.ts` - No changes required (Issue #2)
+- `stores/requestStore.ts` - No changes required (Issues #2, #3)
 
 ### Backend (No Migration Files)
 
@@ -210,6 +304,7 @@ Backend changes applied manually via Supabase SQL Editor:
 - **2026-02-08:** Issues #4, #27 (permission functions + RLS policies)
 - **2026-02-09 (Morning):** Issue #1 (triggers, cron job, function updates)
 - **2026-02-09 (Evening):** Issue #2 (cancellation logic, trigger removal, validation update)
+- **2026-02-09 (Night):** Issue #3 (request expiry trigger, function)
 
 No migration files created to avoid conflicts with production database.
 
