@@ -1,5 +1,104 @@
 ## Issues Resolved
 
+### Issue #5 - Align backend validation with Zod schemas (notes removal) ✅
+
+**Type:** Backend Validation + Schema Cleanup  
+**Priority:** HIGH  
+**Time:** 30–45 minutes  
+**Date:** 2026-02-10
+
+**Problem:**
+
+- Backend `create_trip_with_validation()` still accepted a `p_notes` parameter and wrote to `trips.notes`.
+- Frontend Zod schemas and flows are moving away from a free-form `notes` field.
+- This mismatch risked inconsistent validation and an unnecessary nullable column.
+
+**Backend Changes (Applied via Supabase SQL Editor - 2026-02-10):**
+
+1. **`create_trip_with_validation()` function** (Updated)
+   - **Removed parameter:** `p_notes text DEFAULT NULL`.
+   - **Updated INSERT:** no longer inserts into a `notes` column.
+   - **Validation preserved:**
+     - Departure datetime parsed from `p_departure_date` + `p_departure_time` and must be at least 1 hour in the future.
+     - Arrival datetime parsed from `p_arrival_date` + `p_arrival_time` and must be strictly after departure.
+     - `p_parcel_size_capacity` must be one of `'small' | 'medium' | 'large'`.
+     - `p_transport_mode` must be one of `'flight' | 'train' | 'bus' | 'car'`.
+     - `p_allowed_categories` must be a non-empty array.
+     - `p_source` and `p_destination` must be different (case-insensitive, trimmed).
+
+2. **`trips` table schema** (Updated)
+   - **Dropped column:** `notes`.
+   - Verified via `information_schema.columns` that `notes` no longer exists.
+
+3. **Function overload cleanup**
+   - Dropped legacy function signature that still included `p_notes`.
+   - Recreated the canonical `create_trip_with_validation` with the new parameter list only.
+
+**How It Works Now:**
+
+- Frontend calls `create_trip_with_validation` with:
+  - `p_source`, `p_destination`
+  - `p_departure_date`, `p_departure_time`
+  - `p_arrival_date`, `p_arrival_time`
+  - `p_transport_mode`
+  - `p_parcel_size_capacity`
+  - `p_pnr_number`
+  - `p_ticket_file_url`
+  - `p_allowed_categories`
+- Backend:
+  - Ensures the user is authenticated via `auth.uid()`.
+  - Validates datetime formats and business rules (future departure, arrival after departure).
+  - Validates enums and arrays.
+  - Inserts a new row into `trips` **without any `notes` column** and returns the new `id`.
+
+**Testing:**
+
+- ✅ SQL-level test:
+  - Called `create_trip_with_validation(...)` directly from SQL editor with valid data.
+  - Received a valid UUID `trip_id`.
+  - Confirmed row inserted into `trips` with correct values and no `notes` column.
+- ✅ App-level test:
+  - Created a trip from the frontend UI.
+  - Trip created successfully; no errors about `p_notes` or missing column.
+  - New trip appears correctly in “My Trips”.
+
+**Acceptance Criteria:**
+
+- ✅ `create_trip_with_validation()` no longer has a `p_notes` parameter.
+- ✅ `trips` table no longer has a `notes` column.
+- ✅ Trip creation works via SQL and via the app.
+- ✅ Backend validation behavior is consistent with Zod expectations (dates, enums, categories).
+- ✅ No runtime errors related to `notes`.
+
+**Frontend Changes:**
+
+- **Deferred to Issue #7 (notes removal / cleanup):**
+  - `Trip` type in `tripStore.ts` still has `notes: string | null`.
+  - `EditableGeneralTripFields` still includes `notes` with a TODO.
+  - `createTrip()` in `tripStore` still conditionally passes `p_notes` in `rpcParams`.
+  - UI components may still show notes fields.
+
+These will be removed/refactored in Issue #7, together with a **regeneration of `database.types.ts`** so the generated `trips` row type no longer includes `notes`.
+
+**Type Updates:**
+
+- **Not yet regenerated.**
+  - `Database["public"]["Tables"]["trips"]["Row"]` still includes `notes` until types are regenerated.
+  - Type regeneration is planned with the frontend cleanup (Issue #7) to avoid breaking the current UI.
+
+**Database Objects Touched:**
+
+1. Function: `create_trip_with_validation(...)` (signature and body updated).
+2. Table: `trips` (dropped `notes` column).
+3. Legacy function variant with `p_notes` (dropped).
+
+**Related Issues:**
+
+- Depends on: Issue #1 (trip status behavior stable) ✅
+- Blocks:
+  - Issue #7 (frontend removal of notes field, forms + types).
+  - Issue #19 (my-requests detail UI consistency – no stray notes usage).
+
 ### Issue #3 - Implement request expiry logic ✅
 
 **Type:** Critical - Backend Logic  
