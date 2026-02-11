@@ -5,8 +5,8 @@ import BaseModal from "@/components/shared/BaseModal";
 import { dateToISO, dateToTimeString } from "@/lib/utils/dateTime";
 import { haptics } from "@/lib/utils/haptics";
 import {
-  TripDatesFormData,
-  tripDatesSchema,
+  TripEditDatesFormData,
+  tripEditDatesSchema,
 } from "@/lib/validations/trip-edit";
 import { Trip, useTripStore } from "@/stores/tripStore";
 import { BorderRadius, Spacing, Typography } from "@/styles";
@@ -36,7 +36,7 @@ export default function EditTripDatesModal({
   trip,
 }: EditTripDatesModalProps) {
   const colors = useThemeColors();
-  const { updateTrip, canEditTripDates } = useTripStore();
+  const { updateTripDates, canEditTripDates } = useTripStore();
   const [loading, setLoading] = useState(false);
   const [checking, setChecking] = useState(false);
 
@@ -44,18 +44,21 @@ export default function EditTripDatesModal({
     control,
     handleSubmit,
     formState: { errors, isValid, isDirty },
-  } = useForm<TripDatesFormData>({
-    resolver: zodResolver(tripDatesSchema),
+    watch,
+  } = useForm<TripEditDatesFormData>({
+    resolver: zodResolver(tripEditDatesSchema),
     mode: "onChange",
     defaultValues: {
       departure_date: trip.departure_date,
       departure_time: trip.departure_time,
-      arrival_date: trip.arrival_date || null,
-      arrival_time: trip.arrival_time || null,
+      arrival_date: trip.arrival_date,
+      arrival_time: trip.arrival_time,
     },
   });
 
-  const onSubmit = async (data: TripDatesFormData) => {
+  const departureDate = watch("departure_date");
+
+  const onSubmit = async (data: TripEditDatesFormData) => {
     try {
       setChecking(true);
 
@@ -65,7 +68,7 @@ export default function EditTripDatesModal({
         haptics.error();
         Alert.alert(
           "Cannot Edit Dates",
-          "Dates cannot be edited after parcels have been picked up.",
+          "Dates cannot be edited after parcels have been picked up or in completed/cancelled state.",
         );
         return;
       }
@@ -74,17 +77,20 @@ export default function EditTripDatesModal({
       setLoading(true);
       haptics.light();
 
-      // Map form field names to database field names
-      // Convert null to undefined for database
-      await updateTrip(trip.id, {
-        departure_date: data.departure_date,
-        departure_time: data.departure_time,
-        arrival_date: data.arrival_date || undefined,
-        arrival_time: data.arrival_time || undefined,
-      });
+      // Use updateTripDates (dedicated method for date-only updates)
+      await updateTripDates(
+        trip.id,
+        data.departure_date,
+        data.departure_time,
+        data.arrival_date,
+        data.arrival_time,
+      );
 
       haptics.success();
-      Alert.alert("Success", "Trip dates updated successfully");
+      Alert.alert(
+        "Success",
+        "Trip dates updated successfully. Affected senders will be notified.",
+      );
       onClose();
     } catch (error: any) {
       haptics.error();
@@ -96,13 +102,13 @@ export default function EditTripDatesModal({
   };
 
   // Helper to convert ISO date string to Date object for picker
-  const parseDate = (dateStr: string | null) => {
-    return dateStr ? new Date(dateStr) : null;
+  const parseDate = (dateStr: string) => {
+    return dateStr ? new Date(dateStr) : new Date();
   };
 
   // Helper to convert time string (HH:MM) to Date object for picker
-  const parseTime = (timeStr: string | null) => {
-    if (!timeStr) return null;
+  const parseTime = (timeStr: string) => {
+    if (!timeStr) return new Date();
     const [hours, minutes] = timeStr.split(":").map(Number);
     const date = new Date();
     date.setHours(hours, minutes, 0, 0);
@@ -141,7 +147,8 @@ export default function EditTripDatesModal({
         >
           <Ionicons name="alert-circle" size={20} color={colors.warning} />
           <Text style={[styles.warningText, { color: colors.warning }]}>
-            Dates cannot be changed after parcels have been picked up
+            Dates can be edited after acceptance but not after pickup. Affected
+            senders will be notified of changes.
           </Text>
         </View>
 
@@ -158,7 +165,7 @@ export default function EditTripDatesModal({
                 <DatePickerInput
                   label="Date"
                   value={parseDate(value)}
-                  onChange={(date) => onChange(date ? dateToISO(date) : null)}
+                  onChange={(date) => onChange(date ? dateToISO(date) : "")}
                   error={errors.departure_date?.message}
                   minimumDate={new Date()}
                 />
@@ -173,7 +180,7 @@ export default function EditTripDatesModal({
                   label="Time"
                   value={parseTime(value)}
                   onChange={(time) =>
-                    onChange(time ? dateToTimeString(time) : null)
+                    onChange(time ? dateToTimeString(time) : "")
                   }
                   error={errors.departure_time?.message}
                 />
@@ -185,7 +192,7 @@ export default function EditTripDatesModal({
         {/* Arrival Section */}
         <View style={styles.section}>
           <Text style={[styles.sectionTitle, { color: colors.text.primary }]}>
-            Arrival (Optional)
+            Arrival
           </Text>
           <View style={styles.dateTimeRow}>
             <Controller
@@ -195,9 +202,9 @@ export default function EditTripDatesModal({
                 <DatePickerInput
                   label="Date"
                   value={parseDate(value)}
-                  onChange={(date) => onChange(date ? dateToISO(date) : null)}
+                  onChange={(date) => onChange(date ? dateToISO(date) : "")}
                   error={errors.arrival_date?.message}
-                  minimumDate={new Date()}
+                  minimumDate={parseDate(departureDate) || new Date()}
                 />
               )}
             />
@@ -210,7 +217,7 @@ export default function EditTripDatesModal({
                   label="Time"
                   value={parseTime(value)}
                   onChange={(time) =>
-                    onChange(time ? dateToTimeString(time) : null)
+                    onChange(time ? dateToTimeString(time) : "")
                   }
                   error={errors.arrival_time?.message}
                 />

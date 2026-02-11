@@ -35,7 +35,14 @@ export default function TripDetailsScreen() {
   const colors = useThemeColors();
   const { id } = useLocalSearchParams<{ id: string }>();
   const user = useAuthStore((state) => state.user);
-  const { currentTrip, loading, getTripById, deleteTrip } = useTripStore();
+  const {
+    currentTrip,
+    loading,
+    getTripById,
+    deleteTrip,
+    canEditTrip,
+    canEditTripDates,
+  } = useTripStore();
   const {
     acceptedRequests,
     getAcceptedRequests,
@@ -56,6 +63,10 @@ export default function TripDetailsScreen() {
     senderName: string;
   } | null>(null);
 
+  // Permission states
+  const [canEditDetails, setCanEditDetails] = useState(false);
+  const [canEditDates, setCanEditDates] = useState(false);
+
   useEffect(() => {
     if (id) {
       getTripById(id);
@@ -68,6 +79,20 @@ export default function TripDetailsScreen() {
       getAcceptedRequests(user.id);
     }
   }, [user?.id]);
+
+  // Check edit permissions when trip loads or status changes
+  useEffect(() => {
+    const checkPermissions = async () => {
+      if (id) {
+        const detailsPermission = await canEditTrip(id);
+        const datesPermission = await canEditTripDates(id);
+        setCanEditDetails(detailsPermission);
+        setCanEditDates(datesPermission);
+      }
+    };
+
+    checkPermissions();
+  }, [id, currentTrip?.status]);
 
   // Check if any request for this trip has been picked up
   const checkIfPickedUp = (): {
@@ -234,14 +259,13 @@ export default function TripDetailsScreen() {
   const statusConfig = TRIP_STATUS_CONFIG[status];
   const statusColor = colors[statusConfig.colorKey];
   const canCancel = status === "upcoming" || status === "locked";
-  const canEdit = status === "upcoming";
 
   return (
     <SafeAreaView
       style={[styles.container, { backgroundColor: colors.background.primary }]}
       edges={["top"]}
     >
-      {/* Header */}
+      {/* Header - NO GLOBAL EDIT BUTTON */}
       <View style={[styles.header, { borderBottomColor: colors.border.light }]}>
         <Pressable
           onPress={handleBack}
@@ -264,20 +288,6 @@ export default function TripDetailsScreen() {
             </Text>
           </View>
         </View>
-
-        {/* Edit button - only for upcoming trips */}
-        {canEdit && (
-          <Pressable
-            onPress={handleEditDetails}
-            hitSlop={10}
-            style={[
-              styles.editButton,
-              { backgroundColor: colors.background.secondary },
-            ]}
-          >
-            <Ionicons name="create-outline" size={20} color={colors.primary} />
-          </Pressable>
-        )}
       </View>
 
       <ScrollView
@@ -292,7 +302,7 @@ export default function TripDetailsScreen() {
             { backgroundColor: colors.background.secondary },
           ]}
         >
-          {/* Route */}
+          {/* Route (READ-ONLY - never editable) */}
           <View style={styles.routeContainer}>
             <View style={styles.routePoint}>
               <View
@@ -342,7 +352,7 @@ export default function TripDetailsScreen() {
             style={[styles.divider, { backgroundColor: colors.border.light }]}
           />
 
-          {/* Schedule Grid with Edit Button */}
+          {/* Schedule Section with CONDITIONAL Edit Button */}
           <View style={styles.scheduleSection}>
             <View style={styles.scheduleSectionHeader}>
               <Text
@@ -350,7 +360,7 @@ export default function TripDetailsScreen() {
               >
                 SCHEDULE
               </Text>
-              {canEdit && (
+              {canEditDates && (
                 <Pressable onPress={handleEditDates} hitSlop={8}>
                   <Ionicons
                     name="create-outline"
@@ -452,61 +462,91 @@ export default function TripDetailsScreen() {
             style={[styles.divider, { backgroundColor: colors.border.light }]}
           />
 
-          {/* Trip Info Row */}
-          <View style={styles.infoRow}>
-            <View style={styles.infoItem}>
-              <View
-                style={[
-                  styles.infoIcon,
-                  { backgroundColor: colors.primary + "10" },
-                ]}
+          {/* Trip Details Section with CONDITIONAL Edit Button */}
+          <View style={styles.tripDetailsSection}>
+            <View style={styles.tripDetailsSectionHeader}>
+              <Text
+                style={[styles.sectionLabel, { color: colors.text.tertiary }]}
               >
-                <Ionicons
-                  name={TRANSPORT_CONFIG[currentTrip.transport_mode].icon}
-                  size={18}
-                  color={colors.primary}
-                />
+                TRIP DETAILS
+              </Text>
+              {canEditDetails && (
+                <Pressable onPress={handleEditDetails} hitSlop={8}>
+                  <Ionicons
+                    name="create-outline"
+                    size={18}
+                    color={colors.primary}
+                  />
+                </Pressable>
+              )}
+            </View>
+
+            {/* Transport (READ-ONLY) and Parcel Size (editable) */}
+            <View style={styles.infoRow}>
+              <View style={styles.infoItem}>
+                <View
+                  style={[
+                    styles.infoIcon,
+                    { backgroundColor: colors.primary + "10" },
+                  ]}
+                >
+                  <Ionicons
+                    name={TRANSPORT_CONFIG[currentTrip.transport_mode].icon}
+                    size={18}
+                    color={colors.primary}
+                  />
+                </View>
+                <View>
+                  <Text
+                    style={[styles.infoLabel, { color: colors.text.tertiary }]}
+                  >
+                    Transport
+                  </Text>
+                  <Text
+                    style={[styles.infoValue, { color: colors.text.primary }]}
+                  >
+                    {currentTrip.transport_mode.charAt(0).toUpperCase() +
+                      currentTrip.transport_mode.slice(1)}
+                  </Text>
+                </View>
               </View>
-              <View>
-                <Text
-                  style={[styles.infoLabel, { color: colors.text.tertiary }]}
+
+              <View style={styles.infoItem}>
+                <View
+                  style={[
+                    styles.infoIcon,
+                    { backgroundColor: colors.success + "10" },
+                  ]}
                 >
-                  Transport
-                </Text>
-                <Text
-                  style={[styles.infoValue, { color: colors.text.primary }]}
-                >
-                  {currentTrip.transport_mode.charAt(0).toUpperCase() +
-                    currentTrip.transport_mode.slice(1)}
-                </Text>
+                  <Ionicons
+                    name={getSizeCapacityIcon(currentTrip.parcel_size_capacity)}
+                    size={18}
+                    color={colors.success}
+                  />
+                </View>
+                <View>
+                  <Text
+                    style={[styles.infoLabel, { color: colors.text.tertiary }]}
+                  >
+                    Parcel Size
+                  </Text>
+                  <Text
+                    style={[styles.infoValue, { color: colors.text.primary }]}
+                  >
+                    {getSizeCapacityLabel(currentTrip.parcel_size_capacity)}
+                  </Text>
+                </View>
               </View>
             </View>
 
-            <View style={styles.infoItem}>
-              <View
-                style={[
-                  styles.infoIcon,
-                  { backgroundColor: colors.success + "10" },
-                ]}
-              >
-                <Ionicons
-                  name={getSizeCapacityIcon(currentTrip.parcel_size_capacity)}
-                  size={18}
-                  color={colors.success}
-                />
-              </View>
-              <View>
-                <Text
-                  style={[styles.infoLabel, { color: colors.text.tertiary }]}
-                >
-                  Parcel Size
-                </Text>
-                <Text
-                  style={[styles.infoValue, { color: colors.text.primary }]}
-                >
-                  {getSizeCapacityLabel(currentTrip.parcel_size_capacity)}
-                </Text>
-              </View>
+            {/* PNR Number (editable via modal) */}
+            <View style={styles.pnrSection}>
+              <Text style={[styles.pnrLabel, { color: colors.text.tertiary }]}>
+                PNR Number
+              </Text>
+              <Text style={[styles.pnrValue, { color: colors.text.primary }]}>
+                {currentTrip.pnr_number}
+              </Text>
             </View>
           </View>
 
@@ -514,21 +554,7 @@ export default function TripDetailsScreen() {
             style={[styles.divider, { backgroundColor: colors.border.light }]}
           />
 
-          {/* PNR Number */}
-          <View style={styles.pnrSection}>
-            <Text style={[styles.pnrLabel, { color: colors.text.tertiary }]}>
-              PNR Number
-            </Text>
-            <Text style={[styles.pnrValue, { color: colors.text.primary }]}>
-              {currentTrip.pnr_number}
-            </Text>
-          </View>
-
-          <View
-            style={[styles.divider, { backgroundColor: colors.border.light }]}
-          />
-
-          {/* Categories */}
+          {/* Categories (editable via modal) */}
           <View style={styles.categoriesSection}>
             <Text
               style={[styles.categoriesTitle, { color: colors.text.primary }]}
@@ -567,7 +593,7 @@ export default function TripDetailsScreen() {
             style={[styles.divider, { backgroundColor: colors.border.light }]}
           />
 
-          {/* Ticket */}
+          {/* Ticket (editable via modal) */}
           <View style={styles.ticketSection}>
             <Text style={[styles.ticketTitle, { color: colors.text.primary }]}>
               Travel Ticket
@@ -701,13 +727,6 @@ const styles = StyleSheet.create({
     fontSize: Typography.sizes.sm,
     fontWeight: Typography.weights.semibold,
   },
-  editButton: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    alignItems: "center",
-    justifyContent: "center",
-  },
   scrollView: {
     flex: 1,
   },
@@ -803,6 +822,15 @@ const styles = StyleSheet.create({
   scheduleTime: {
     fontSize: Typography.sizes.xs,
   },
+  tripDetailsSection: {
+    marginBottom: Spacing.md,
+  },
+  tripDetailsSectionHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginBottom: Spacing.sm,
+  },
   infoRow: {
     flexDirection: "row",
     gap: Spacing.md,
@@ -829,7 +857,7 @@ const styles = StyleSheet.create({
     fontWeight: Typography.weights.semibold,
   },
   pnrSection: {
-    marginBottom: Spacing.md,
+    marginBottom: 0,
   },
   pnrLabel: {
     fontSize: Typography.sizes.xs,

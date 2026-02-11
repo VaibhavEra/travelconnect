@@ -1,13 +1,12 @@
 // components/trip/EditTripDetailsModal.tsx
 import CategoryCheckboxes from "@/components/forms/CategoryCheckboxes";
-import CityDropdown from "@/components/forms/CityDropdown";
 import ParcelSizeSelector from "@/components/forms/ParcelSizeSelector";
-import TransportModeSelector from "@/components/forms/TransportModeSelector";
+import TextInput from "@/components/forms/TextInput";
 import BaseModal from "@/components/shared/BaseModal";
 import { haptics } from "@/lib/utils/haptics";
 import {
-  TripDetailsFormData,
-  tripDetailsSchema,
+  TripEditDetailsFormData,
+  tripEditDetailsSchema,
 } from "@/lib/validations/trip-edit";
 import { Trip, useTripStore } from "@/stores/tripStore";
 import { BorderRadius, Spacing, Typography } from "@/styles";
@@ -37,41 +36,50 @@ export default function EditTripDetailsModal({
   trip,
 }: EditTripDetailsModalProps) {
   const colors = useThemeColors();
-  const { updateTrip } = useTripStore();
+  const { updateTripGeneralFields, canEditTrip } = useTripStore();
   const [loading, setLoading] = useState(false);
+  const [checking, setChecking] = useState(false);
 
   const {
     control,
     handleSubmit,
     formState: { errors, isValid, isDirty },
-    watch,
-    setValue,
-  } = useForm<TripDetailsFormData>({
-    resolver: zodResolver(tripDetailsSchema),
+  } = useForm<TripEditDetailsFormData>({
+    resolver: zodResolver(tripEditDetailsSchema),
     mode: "onChange",
     defaultValues: {
-      source: trip.source,
-      destination: trip.destination,
-      transport_mode: trip.transport_mode,
       parcel_size_capacity: trip.parcel_size_capacity,
       allowed_categories: trip.allowed_categories as any,
-      // REMOVED: notes (Issue #7)
+      pnr_number: trip.pnr_number,
+      ticket_file_url: trip.ticket_file_url,
     },
   });
 
-  const onSubmit = async (data: TripDetailsFormData) => {
+  const onSubmit = async (data: TripEditDetailsFormData) => {
     try {
+      setChecking(true);
+
+      // Check permission first
+      const canEdit = await canEditTrip(trip.id);
+      if (!canEdit) {
+        haptics.error();
+        Alert.alert(
+          "Cannot Edit Details",
+          "Trip details cannot be edited after parcels have been picked up or in completed/cancelled state.",
+        );
+        return;
+      }
+
+      setChecking(false);
       setLoading(true);
       haptics.light();
 
-      // Map form field names to database field names
-      await updateTrip(trip.id, {
-        source: data.source.trim(),
-        destination: data.destination.trim(),
-        transport_mode: data.transport_mode,
+      // Use updateTripGeneralFields (enforces whitelist)
+      await updateTripGeneralFields(trip.id, {
         parcel_size_capacity: data.parcel_size_capacity,
         allowed_categories: data.allowed_categories,
-        // REMOVED: notes (Issue #7)
+        pnr_number: data.pnr_number,
+        ticket_file_url: data.ticket_file_url,
       });
 
       haptics.success();
@@ -82,16 +90,7 @@ export default function EditTripDetailsModal({
       Alert.alert("Error", error.message || "Failed to update trip details");
     } finally {
       setLoading(false);
-    }
-  };
-
-  const handleSwap = () => {
-    const currentSource = watch("source");
-    const currentDest = watch("destination");
-    if (currentSource && currentDest) {
-      haptics.light();
-      setValue("source", currentDest, { shouldValidate: true });
-      setValue("destination", currentSource, { shouldValidate: true });
+      setChecking(false);
     }
   };
 
@@ -100,8 +99,8 @@ export default function EditTripDetailsModal({
       visible={visible}
       onClose={onClose}
       title="Edit Trip Details"
-      subtitle="Update route, transport, and parcel info"
-      loading={loading}
+      subtitle="Update parcel size, categories, and ticket info"
+      loading={loading || checking}
       scrollable
       icon={
         <View
@@ -115,70 +114,22 @@ export default function EditTripDetailsModal({
       }
     >
       <View style={styles.form}>
-        {/* Route Section */}
-        <View style={styles.section}>
-          <Text style={[styles.sectionTitle, { color: colors.text.primary }]}>
-            Route
+        {/* Warning */}
+        <View
+          style={[
+            styles.warningBox,
+            {
+              backgroundColor: `${colors.warning}10`,
+              borderColor: `${colors.warning}30`,
+            },
+          ]}
+        >
+          <Ionicons name="alert-circle" size={20} color={colors.warning} />
+          <Text style={[styles.warningText, { color: colors.warning }]}>
+            Details cannot be changed after parcels have been picked up. Route
+            and transport mode are never editable.
           </Text>
-
-          <Controller
-            control={control}
-            name="source"
-            render={({ field: { value, onChange } }) => (
-              <CityDropdown
-                label="From"
-                value={value}
-                onChange={onChange}
-                error={errors.source?.message}
-                placeholder="Select origin city"
-              />
-            )}
-          />
-
-          {/* Swap Button */}
-          <View style={styles.swapContainer}>
-            <Pressable
-              style={[
-                styles.swapButton,
-                {
-                  backgroundColor: colors.background.secondary,
-                  borderColor: colors.border.default,
-                },
-              ]}
-              onPress={handleSwap}
-            >
-              <Ionicons name="swap-vertical" size={20} color={colors.primary} />
-            </Pressable>
-          </View>
-
-          <Controller
-            control={control}
-            name="destination"
-            render={({ field: { value, onChange } }) => (
-              <CityDropdown
-                label="To"
-                value={value}
-                onChange={onChange}
-                error={errors.destination?.message}
-                placeholder="Select destination city"
-              />
-            )}
-          />
         </View>
-
-        {/* Transport Mode */}
-        <Controller
-          control={control}
-          name="transport_mode"
-          render={({ field: { value, onChange } }) => (
-            <TransportModeSelector
-              label="Transport Mode"
-              value={value}
-              onChange={onChange}
-              error={errors.transport_mode?.message}
-            />
-          )}
-        />
 
         {/* Parcel Size Capacity */}
         <Controller
@@ -207,6 +158,39 @@ export default function EditTripDetailsModal({
             />
           )}
         />
+
+        {/* PNR Number */}
+        <Controller
+          control={control}
+          name="pnr_number"
+          render={({ field: { value, onChange } }) => (
+            <TextInput
+              label="PNR Number"
+              value={value}
+              onChangeText={onChange}
+              error={errors.pnr_number?.message}
+              placeholder="Enter PNR number"
+              autoCapitalize="characters"
+            />
+          )}
+        />
+
+        {/* Ticket File URL */}
+        <Controller
+          control={control}
+          name="ticket_file_url"
+          render={({ field: { value, onChange } }) => (
+            <TextInput
+              label="Ticket File URL"
+              value={value}
+              onChangeText={onChange}
+              error={errors.ticket_file_url?.message}
+              placeholder="https://..."
+              keyboardType="url"
+              autoCapitalize="none"
+            />
+          )}
+        />
       </View>
 
       {/* Action Buttons */}
@@ -218,7 +202,7 @@ export default function EditTripDetailsModal({
             { backgroundColor: colors.background.secondary },
           ]}
           onPress={onClose}
-          disabled={loading}
+          disabled={loading || checking}
         >
           <Text
             style={[styles.cancelButtonText, { color: colors.text.secondary }]}
@@ -232,12 +216,13 @@ export default function EditTripDetailsModal({
             styles.button,
             styles.saveButton,
             { backgroundColor: colors.primary },
-            (!isValid || !isDirty || loading) && styles.saveButtonDisabled,
+            (!isValid || !isDirty || loading || checking) &&
+              styles.saveButtonDisabled,
           ]}
           onPress={handleSubmit(onSubmit)}
-          disabled={!isValid || !isDirty || loading}
+          disabled={!isValid || !isDirty || loading || checking}
         >
-          {loading ? (
+          {loading || checking ? (
             <ActivityIndicator color={colors.text.inverse} size="small" />
           ) : (
             <>
@@ -270,25 +255,17 @@ const styles = StyleSheet.create({
   form: {
     gap: Spacing.md,
   },
-  section: {
+  warningBox: {
+    flexDirection: "row",
     gap: Spacing.sm,
-  },
-  sectionTitle: {
-    fontSize: Typography.sizes.md,
-    fontWeight: Typography.weights.semibold,
-    marginBottom: Spacing.xs,
-  },
-  swapContainer: {
-    alignItems: "center",
-    marginVertical: Spacing.xs,
-  },
-  swapButton: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    alignItems: "center",
-    justifyContent: "center",
+    padding: Spacing.md,
+    borderRadius: BorderRadius.md,
     borderWidth: 1,
+  },
+  warningText: {
+    flex: 1,
+    fontSize: Typography.sizes.sm,
+    lineHeight: Typography.sizes.sm * 1.4,
   },
   actions: {
     flexDirection: "row",
