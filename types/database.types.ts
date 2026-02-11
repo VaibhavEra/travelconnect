@@ -12,31 +12,6 @@ export type Database = {
   __InternalSupabase: {
     PostgrestVersion: "14.1"
   }
-  graphql_public: {
-    Tables: {
-      [_ in never]: never
-    }
-    Views: {
-      [_ in never]: never
-    }
-    Functions: {
-      graphql: {
-        Args: {
-          extensions?: Json
-          operationName?: string
-          query?: string
-          variables?: Json
-        }
-        Returns: Json
-      }
-    }
-    Enums: {
-      [_ in never]: never
-    }
-    CompositeTypes: {
-      [_ in never]: never
-    }
-  }
   public: {
     Tables: {
       failed_login_attempts: {
@@ -211,7 +186,6 @@ export type Database = {
           departure_time: string
           destination: string
           id: string
-          notes: string | null
           parcel_size_capacity: string
           pnr_number: string
           source: string
@@ -230,7 +204,6 @@ export type Database = {
           departure_time: string
           destination: string
           id?: string
-          notes?: string | null
           parcel_size_capacity: string
           pnr_number: string
           source: string
@@ -249,7 +222,6 @@ export type Database = {
           departure_time?: string
           destination?: string
           id?: string
-          notes?: string | null
           parcel_size_capacity?: string
           pnr_number?: string
           source?: string
@@ -318,7 +290,6 @@ export type Database = {
           p_departure_date: string
           p_departure_time: string
           p_destination: string
-          p_notes?: string
           p_parcel_size_capacity: string
           p_pnr_number: string
           p_source: string
@@ -541,9 +512,6 @@ export type CompositeTypes<
     : never
 
 export const Constants = {
-  graphql_public: {
-    Enums: {},
-  },
   public: {
     Enums: {
       cancellation_source: ["sender", "traveller"],
