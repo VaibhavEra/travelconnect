@@ -29,7 +29,10 @@ export const SIZE_CAPACITY_DESCRIPTIONS: Record<ParcelSizeCapacity, string> = {
 };
 
 // Helper function for consistent date parsing
-const parseDateTime = (dateStr: string, timeStr: string): Date | null => {
+export const parseDateTime = (
+  dateStr: string,
+  timeStr: string,
+): Date | null => {
   if (!dateStr || !timeStr) return null;
 
   // Parse date components
