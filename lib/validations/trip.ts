@@ -28,6 +28,27 @@ export const SIZE_CAPACITY_DESCRIPTIONS: Record<ParcelSizeCapacity, string> = {
   large: "Up to 5 kg",
 };
 
+// Helper function for consistent date parsing
+const parseDateTime = (dateStr: string, timeStr: string): Date | null => {
+  if (!dateStr || !timeStr) return null;
+
+  // Parse date components
+  const [year, month, day] = dateStr.split("-").map(Number);
+  if (!year || !month || !day) return null;
+
+  // Parse time components
+  const [hours, minutes] = timeStr.split(":").map(Number);
+  if (hours === undefined || minutes === undefined) return null;
+
+  // Create date using local timezone (consistent with backend)
+  const date = new Date(year, month - 1, day, hours, minutes, 0, 0);
+
+  // Validate the date is valid
+  if (isNaN(date.getTime())) return null;
+
+  return date;
+};
+
 // Trip creation schema
 export const tripSchema = z
   .object({
@@ -54,7 +75,7 @@ export const tripSchema = z
     arrival_date: z.string().min(1, "Arrival date is required"),
     arrival_time: z.string().min(1, "Arrival time is required"),
 
-    // Parcel size capacity (replaces total_slots)
+    // Parcel size capacity
     parcel_size_capacity: z.enum(PARCEL_SIZE_CAPACITY, {
       message: "Please select parcel size capacity",
     }),
@@ -63,15 +84,17 @@ export const tripSchema = z
     allowed_categories: z
       .array(z.enum(PACKAGE_CATEGORIES))
       .min(1, "Select at least one category"),
+
     pnr_number: z
       .string()
       .min(1, "PNR number is required")
       .regex(/^[A-Z0-9]+$/i, "PNR should be alphanumeric")
       .min(3, "PNR must be at least 3 characters")
       .max(20, "PNR must be less than 20 characters"),
+
     ticket_file_url: z.string().min(1, "Ticket file is required").pipe(z.url()),
-    // REMOVED: notes field (Issue #7)
   })
+  // Validation 1: Source and destination must be different
   .refine(
     (data) => {
       return (
@@ -84,49 +107,60 @@ export const tripSchema = z
       path: ["destination"],
     },
   )
-  // Departure validation
+  // Validation 2: Departure must be at least 1 hour in the future (matches backend)
   .refine(
     (data) => {
-      // Skip validation if date or time is empty
-      if (!data.departure_date || !data.departure_time) {
-        return true;
-      }
+      const departureDateTime = parseDateTime(
+        data.departure_date,
+        data.departure_time,
+      );
 
-      // Parse departure date and time with UTC to avoid timezone issues
-      const [year, month, day] = data.departure_date.split("-").map(Number);
-      const [hours, minutes] = data.departure_time.split(":").map(Number);
+      if (!departureDateTime) return false;
 
-      const departureDateTime = new Date(year, month - 1, day, hours, minutes);
       const now = new Date();
+      const oneHourFromNow = new Date(now.getTime() + 60 * 60 * 1000);
 
-      // Allow departure if it's in the future (even by 1 minute)
-      return departureDateTime.getTime() > now.getTime();
+      return departureDateTime >= oneHourFromNow;
     },
     {
-      message: "Departure cannot be in the past",
-      path: ["departure_date"],
+      message: "Departure must be at least 1 hour in the future",
+      path: ["departure_time"],
     },
   )
-
-  // Arrival validation - only if both date and time are provided
+  // Validation 3: Arrival must be after departure
   .refine(
     (data) => {
-      if (!data.arrival_date || !data.arrival_time) {
-        return true; // Skip if arrival not set
-      }
+      const departureDateTime = parseDateTime(
+        data.departure_date,
+        data.departure_time,
+      );
+      const arrivalDateTime = parseDateTime(
+        data.arrival_date,
+        data.arrival_time,
+      );
 
-      const departureDateTime = new Date(
-        `${data.departure_date}T${data.departure_time}:00`,
-      );
-      const arrivalDateTime = new Date(
-        `${data.arrival_date}T${data.arrival_time}:00`,
-      );
+      if (!departureDateTime || !arrivalDateTime) return false;
 
       return arrivalDateTime.getTime() > departureDateTime.getTime();
     },
     {
       message: "Arrival must be after departure",
-      path: ["arrival_date"],
+      path: ["arrival_time"],
+    },
+  )
+  // Validation 4: Same date requires different times
+  .refine(
+    (data) => {
+      // Only apply if dates are the same
+      if (data.departure_date !== data.arrival_date) return true;
+
+      // If same date, times must be different
+      return data.departure_time !== data.arrival_time;
+    },
+    {
+      message:
+        "Arrival time must be different from departure time on the same day",
+      path: ["arrival_time"],
     },
   );
 
@@ -144,13 +178,12 @@ export const formatTripForDatabase = (
     transport_mode: data.transport_mode,
     departure_date: data.departure_date,
     departure_time: data.departure_time,
-    arrival_date: data.arrival_date || data.departure_date,
-    arrival_time: data.arrival_time || data.departure_time,
+    arrival_date: data.arrival_date,
+    arrival_time: data.arrival_time,
     parcel_size_capacity: data.parcel_size_capacity,
     allowed_categories: data.allowed_categories,
     pnr_number: data.pnr_number.trim(),
     ticket_file_url: data.ticket_file_url,
-    // REMOVED: notes (Issue #7)
     status: "upcoming" as const,
   };
 };
