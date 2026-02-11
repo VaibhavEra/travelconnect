@@ -70,11 +70,7 @@ export const tripSchema = z
       .min(3, "PNR must be at least 3 characters")
       .max(20, "PNR must be less than 20 characters"),
     ticket_file_url: z.string().min(1, "Ticket file is required").pipe(z.url()),
-    notes: z
-      .string()
-      .max(500, "Notes are too long")
-      .optional()
-      .or(z.literal("")),
+    // REMOVED: notes field (Issue #7)
   })
   .refine(
     (data) => {
@@ -148,13 +144,13 @@ export const formatTripForDatabase = (
     transport_mode: data.transport_mode,
     departure_date: data.departure_date,
     departure_time: data.departure_time,
-    arrival_date: data.arrival_date || data.departure_date, // Changed
-    arrival_time: data.arrival_time || data.departure_time, // Changed
+    arrival_date: data.arrival_date || data.departure_date,
+    arrival_time: data.arrival_time || data.departure_time,
     parcel_size_capacity: data.parcel_size_capacity,
     allowed_categories: data.allowed_categories,
     pnr_number: data.pnr_number.trim(),
     ticket_file_url: data.ticket_file_url,
-    notes: data.notes || null,
+    // REMOVED: notes (Issue #7)
     status: "upcoming" as const,
   };
 };
