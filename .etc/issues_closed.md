@@ -99,6 +99,57 @@ These will be removed/refactored in Issue #7, together with a **regeneration of 
   - Issue #7 (frontend removal of notes field, forms + types).
   - Issue #19 (my-requests detail UI consistency – no stray notes usage).
 
+---
+
+### Issue #7 - Remove notes field from frontend ✅
+
+**Type:** Frontend Cleanup + Type Regeneration  
+**Priority:** MEDIUM  
+**Time:** 2-3 hours  
+**Date:** 2026-02-11
+
+**Problem:**
+
+- Backend already removed `notes` column and `p_notes` parameter (Issue #5)
+- Frontend still had references to `notes` in validation schemas, types, stores, and UI
+- Type mismatch between database schema and TypeScript types
+- Dead code in forms and components
+
+**Frontend Changes (Applied via GitHub PR - 2026-02-11):**
+
+1. **`lib/validations/trip.ts`** (Updated)
+   - **Removed:** `notes` field from `tripSchema`
+   - **Removed:** `notes` from `formatTripForDatabase()` helper
+   - **Kept:** All date/time validation logic unchanged
+
+2. **`lib/validations/trip-edit.ts`** (Updated)
+   - **Removed:** `notes` field from `tripDetailsSchema`
+   - **Kept:** `tripDatesSchema` unchanged (no notes there)
+
+3. **`stores/tripStore.ts`** (Updated)
+   - **Removed:** `notes: string | null` from `Trip` type
+   - **Removed:** `notes` from `EditableGeneralTripFields` type
+   - **Removed:** Conditional `p_notes` logic from `createTrip()` method
+   - **Removed:** `notes` mapping from `normalizeTrip()` helper
+   - **Updated:** `allowedFields` whitelist in `updateTripGeneralFields()` (removed notes)
+
+4. **`app/create-trip.tsx`** (Updated)
+   - **Removed:** `notes: ""` from form `defaultValues`
+   - **Removed:** `notes: ""` from form `reset()` call
+
+5. **`components/trip/EditTripDetailsModal.tsx`** (Updated)
+   - **Removed:** `notes: trip.notes || ""` from `defaultValues`
+   - **Removed:** `notes: data.notes || null` from `updateTrip()` call
+   - **Removed:** Entire `<Controller>` block for notes `<TextInput>` field
+
+**Type Regeneration (Direct commit to main - 2026-02-11):**
+
+```bash
+npx supabase gen types typescript --project-id <project-id> > types/database.types.ts
+```
+
+---
+
 ### Issue #3 - Implement request expiry logic ✅
 
 **Type:** Critical - Backend Logic  
