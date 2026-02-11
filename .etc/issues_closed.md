@@ -261,6 +261,315 @@ const parseDateTime = (dateStr: string, timeStr: string): Date | null => {
 
 ---
 
+### Issue #11 - Prevent editing source/destination/transport mode ✅
+
+**Type:** Frontend UI - Security Enhancement  
+**Priority:** HIGH  
+**Time:** 1-2 hours  
+**Date:** 2026-02-12
+
+**Problem:**
+
+- Travelers could edit source, destination, and transport mode in trip details page
+- These fields should **never** be editable after trip creation
+- Edit button in header allowed editing all fields indiscriminately
+- No visual distinction between editable and read-only fields
+
+**Frontend Changes (Applied via GitHub PR - 2026-02-12):**
+
+1. **`app/(tabs)/my-trips/[id].tsx`** (Updated)
+   - **Removed:** Global header edit button
+   - **Added:** Permission state management (`canEditDetails`, `canEditDates`)
+   - **Added:** `useEffect` hook to check permissions dynamically based on trip status
+   - **Added:** TRIP DETAILS section wrapper with conditional edit button
+   - **Added:** SCHEDULE section header with conditional edit button
+   - **Changed:** Route (source/destination) and transport shown as READ-ONLY (no edit UI)
+   - **Added:** Permission checks using `canEditTrip()` and `canEditTripDates()`
+
+2. **`components/trip/EditTripDetailsModal.tsx`** (Updated)
+   - **Removed:** `source` field with CityDropdown
+   - **Removed:** `destination` field with CityDropdown
+   - **Removed:** City swap button and section
+   - **Removed:** `transport_mode` field with TransportModeSelector
+   - **Kept:** `parcel_size_capacity`, `allowed_categories`, `pnr_number`, `ticket_file_url`
+   - **Updated:** Warning message to explicitly state "Route and transport mode are never editable"
+   - **Updated:** Modal subtitle from "Update route, transport, and parcel info" → "Update parcel size, categories, and ticket info"
+
+3. **`components/trip/EditTripDatesModal.tsx`** (Updated)
+   - **No changes required** - dates modal never had route/transport fields
+
+**How It Works Now:**
+
+### Trip Details Screen Layout
+
+```
+
+┌─────────────────────────────────────┐
+│ Header (Back + Title + Status) │ ← No edit button
+└─────────────────────────────────────┘
+│ │
+│ ┌─────────────────────────────────┐│
+│ │ Route (READ-ONLY) ││
+│ │ From: Jaipur → To: Delhi ││
+│ │ Transport: Flight ││ ← No edit button
+│ └─────────────────────────────────┘│
+│ │
+│ ┌─────────────────────────────────┐│
+│ │ SCHEDULE [Edit Icon] ││ ← Conditional edit button
+│ │ Departure: Feb 15, 10:00 AM ││
+│ │ Arrival: Feb 15, 12:30 PM ││
+│ └─────────────────────────────────┘│
+│ │
+│ ┌─────────────────────────────────┐│
+│ │ TRIP DETAILS [Edit Icon] ││ ← Conditional edit button
+│ │ Transport: Flight ││
+│ │ Parcel Size: Medium ││
+│ │ PNR: ABC123 ││
+│ └─────────────────────────────────┘│
+
+```
+
+---
+
+### Permission Logic
+
+| Trip State                           | canEditDetails | canEditDates | What Can Be Edited                   |
+| ------------------------------------ | -------------- | ------------ | ------------------------------------ |
+| **Before acceptance**                | ✓ true         | ✓ true       | Size, categories, PNR, ticket, dates |
+| **After acceptance (before pickup)** | ❌ false       | ✓ true       | Dates only                           |
+| **After pickup**                     | ❌ false       | ❌ false     | Nothing                              |
+| **Completed/Cancelled**              | ❌ false       | ❌ false     | Nothing                              |
+
+**Never Editable:** source, destination, transport_mode
+
+**Testing:**
+
+- ✅ Test 1: Trip details screen shows route/transport READ-ONLY - PASSED
+- ✅ Test 2: No global edit button in header - PASSED
+- ✅ Test 3: Edit buttons appear per section based on permissions - PASSED
+- ✅ Test 4: Edit details modal only shows 4 fields - PASSED
+- ✅ Test 5: Cannot edit details after pickup - PASSED
+- ✅ Test 6: Can edit dates after acceptance (before pickup) - PASSED
+- ✅ Test 7: Permission checks prevent unauthorized edits - PASSED
+
+**Acceptance Criteria:**
+
+- ✅ Source, destination, transport mode displayed as read-only text
+- ✅ No edit buttons for source, destination, transport mode
+- ✅ Edit details modal only shows: size, categories, PNR, ticket
+- ✅ Edit dates modal only shows: departure/arrival date/time
+- ✅ Conditional edit buttons based on trip status and pickup state
+- ✅ Permission checks before allowing any edits
+
+**Frontend Changes:**
+
+- `app/(tabs)/my-trips/[id].tsx` - Added permission logic and conditional UI
+- `components/trip/EditTripDetailsModal.tsx` - Removed never-editable fields
+
+**Type Updates:**
+
+- None required - using existing Trip type
+
+**Database Objects Touched:**
+
+- None - frontend-only changes
+
+**Related Issues:**
+
+- Depends on: Issue #27 (updateTrip field whitelist) ✅ Resolved
+- Depends on: Issue #4 (Remove 24h editing restriction) ✅ Resolved
+- Completed with: Issue #14, #15 (same PR)
+
+---
+
+### Issue #14 - Remove notes from trip edit modals ✅
+
+**Type:** Frontend Cleanup
+**Priority:** MEDIUM
+**Time:** 1 hour
+**Date:** 2026-02-12
+
+**Problem:**
+
+- `EditTripDetailsModal` and `EditTripDatesModal` still had notes field references
+- Backend already removed notes column (Issue #5)
+- Frontend types already removed notes (Issue #7)
+- Dead code and potential runtime errors
+
+**Frontend Changes (Applied via GitHub PR - 2026-02-12):**
+
+1. **`components/trip/EditTripDetailsModal.tsx`** (Updated)
+   - **Verified:** No notes field (already removed in Issue #7)
+   - **Verified:** Uses `tripEditDetailsSchema` (correct validation)
+   - **Verified:** Uses `updateTripGeneralFields()` (correct method)
+   - **Status:** Already compliant ✅
+
+2. **`components/trip/EditTripDatesModal.tsx`** (Updated)
+   - **Verified:** No notes field (never had it)
+   - **Verified:** Uses `tripEditDatesSchema` (correct validation)
+   - **Verified:** Uses `updateTripDates()` (correct method)
+   - **Status:** Already compliant ✅
+
+**How It Works Now:**
+
+Both modals are now completely free of notes references:
+
+- ✅ No notes input fields
+- ✅ No notes in default values
+- ✅ No notes in submit payloads
+- ✅ Validation schemas don't include notes
+
+**Testing:**
+
+- ✅ Test 1: Edit details modal works without errors - PASSED
+- ✅ Test 2: Edit dates modal works without errors - PASSED
+- ✅ Test 3: Can successfully edit trip details - PASSED
+- ✅ Test 4: Can successfully edit trip dates - PASSED
+- ✅ Test 5: No runtime errors about notes field - PASSED
+
+**Acceptance Criteria:**
+
+- ✅ No notes field in EditTripDetailsModal
+- ✅ No notes field in EditTripDatesModal
+- ✅ Modals work without errors
+- ✅ Can edit trip details successfully
+- ✅ Can edit trip dates successfully
+
+**Frontend Changes:**
+
+- No actual changes needed - verification only
+- Modals already updated in Issue #7
+
+**Type Updates:**
+
+- None required - already handled in Issue #7
+
+**Database Objects Touched:**
+
+- None - frontend-only verification
+
+**Related Issues:**
+
+- Depends on: Issue #5 (Backend notes removal) ✅ Resolved
+- Depends on: Issue #7 (Frontend notes removal) ✅ Resolved
+- Completed with: Issue #11, #15 (same PR)
+
+---
+
+### Issue #15 - Update trip-edit.ts validation schema ✅
+
+**Type:** Frontend Validation - Cleanup
+**Priority:** HIGH
+**Time:** 1-2 hours
+**Date:** 2026-02-12
+
+**Problem:**
+
+- `lib/validations/trip-edit.ts` had deprecated backward compatibility exports
+- Old schema names (`tripDetailsSchema`, `tripDatesSchema`) causing confusion
+- Validation schemas needed alignment with new edit rules (no source/destination/transport)
+- Modals already importing new schema names but aliases still existed
+
+**Frontend Changes (Applied via GitHub PR - 2026-02-12):**
+
+1. **`lib/validations/trip-edit.ts`** (Updated)
+   - **Removed:** Deprecated export `tripDetailsSchema = tripEditDetailsSchema`
+   - **Removed:** Deprecated export `TripDetailsFormData = TripEditDetailsFormData`
+   - **Removed:** Deprecated export `tripDatesSchema = tripEditDatesSchema`
+   - **Removed:** Deprecated export `TripDatesFormData = TripEditDatesFormData`
+   - **Removed:** TODO comment about Issue #11
+   - **Kept:** Clean final schemas (`tripEditDetailsSchema`, `tripEditDatesSchema`)
+   - **Verified:** Uses `parseDateTime` from `trip.ts` for consistency
+   - **Verified:** Proper validation rules (1hr departure buffer, arrival > departure)
+
+2. **Schema Contents Verification:**
+
+   **`tripEditDetailsSchema` (4 fields only):**
+
+   ```typescript
+   - parcel_size_capacity: enum ['small', 'medium', 'large']
+   - allowed_categories: array (min 1)
+   - pnr_number: string (3-20 chars, alphanumeric)
+   - ticket_file_url: string (valid URL)
+   ```
+
+**`tripEditDatesSchema` (4 fields only):**
+
+```typescript
+- departure_date: string (required)
+- departure_time: string (required, ≥ now + 1hr)
+- arrival_date: string (required)
+- arrival_time: string (required, > departure, different if same date)
+```
+
+**How It Works Now:**
+
+### Clean Import Structure
+
+```typescript
+// Modals now import clean schema names (no aliases)
+import {
+  tripEditDetailsSchema,
+  TripEditDetailsFormData,
+} from "@/lib/validations/trip-edit";
+
+import {
+  tripEditDatesSchema,
+  TripEditDatesFormData,
+} from "@/lib/validations/trip-edit";
+```
+
+### Validation Rules Match Backend
+
+| Field       | Frontend Validation     | Backend Validation | Status      |
+| ----------- | ----------------------- | ------------------ | ----------- |
+| Departure   | ≥ now + 1hr             | ≥ now + 1hr        | ✅ Match    |
+| Arrival     | > departure             | > departure        | ✅ Match    |
+| Same date   | Different times         | Different times    | ✅ Match    |
+| PNR         | 3-20 chars alphanumeric | No specific check  | ✅ Stricter |
+| Parcel size | enum validation         | enum validation    | ✅ Match    |
+| Categories  | min 1                   | non-empty array    | ✅ Match    |
+
+**Testing:**
+
+- ✅ Test 1: Import new schema names in modals - PASSED
+- ✅ Test 2: Old alias names no longer exported - PASSED
+- ✅ Test 3: Details validation works correctly - PASSED
+- ✅ Test 4: Dates validation works correctly - PASSED
+- ✅ Test 5: Departure 1hr buffer enforced - PASSED
+- ✅ Test 6: Arrival after departure enforced - PASSED
+- ✅ Test 7: Same date different time enforced - PASSED
+
+**Acceptance Criteria:**
+
+- ✅ Removed deprecated backward compatibility exports
+- ✅ Clean schemas with only editable fields
+- ✅ No 24-hour restriction (removed in Issue #4)
+- ✅ Schemas match backend validation
+- ✅ Edit modals use correct schema names
+- ✅ Uses `parseDateTime` from `trip.ts` for consistency
+
+**Frontend Changes:**
+
+- `lib/validations/trip-edit.ts` - Removed deprecated exports
+
+**Type Updates:**
+
+- None required - Zod infers types from schemas
+
+**Database Objects Touched:**
+
+- None - frontend-only changes
+
+**Related Issues:**
+
+- Depends on: Issue #4 (Remove 24h editing restriction) ✅ Resolved
+- Depends on: Issue #27 (updateTrip field whitelist) ✅ Resolved
+- Depends on: Issue #7 (Notes removal) ✅ Resolved
+- Completed with: Issue #11, #14 (same PR)
+
+---
+
 ### Issue #3 - Implement request expiry logic ✅
 
 **Type:** Critical - Backend Logic  
@@ -557,6 +866,13 @@ Trip status was incorrectly transitioning to `in_progress` when parcel was picke
 
 - `stores/tripStore.ts` - Core implementation (Issues #4, #27)
 - `stores/requestStore.ts` - No changes required (Issues #2, #3)
+- `lib/validations/trip.ts` - Date validation fixes (Issue #6)
+- `lib/validations/trip-edit.ts` - Schema cleanup (Issue #15)
+- `app/create-trip.tsx` - Error handling simplification (Issue #6)
+- `app/(tabs)/my-trips/[id].tsx` - Permission-based UI (Issue #11)
+- `components/trip/EditTripDetailsModal.tsx` - Remove never-editable fields (Issue #11)
+- `components/trip/EditTripDatesModal.tsx` - Verification only (Issue #14)
+- `types/database.types.ts` - Type regeneration (Issue #7)
 
 ### Backend (No Migration Files)
 
@@ -566,6 +882,9 @@ Backend changes applied manually via Supabase SQL Editor:
 - **2026-02-09 (Morning):** Issue #1 (triggers, cron job, function updates)
 - **2026-02-09 (Evening):** Issue #2 (cancellation logic, trigger removal, validation update)
 - **2026-02-09 (Night):** Issue #3 (request expiry trigger, function)
+- **2026-02-10:** Issue #5 (notes column drop, function update)
+- **2026-02-11:** Issue #6, #7 (frontend validation and cleanup)
+- **2026-02-12:** Issues #11, #14, #15 (trip edit restrictions) - **Combined PR**
 
 No migration files created to avoid conflicts with production database.
 
