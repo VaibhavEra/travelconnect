@@ -126,7 +126,7 @@ export default function CreateTripScreen() {
       allowed_categories: [],
       pnr_number: "",
       ticket_file_url: "",
-      notes: "",
+      // REMOVED: notes (Issue #7)
     },
   });
 
@@ -182,7 +182,7 @@ export default function CreateTripScreen() {
         allowed_categories: [],
         pnr_number: "",
         ticket_file_url: "",
-        notes: "",
+        // REMOVED: notes (Issue #7)
       });
 
       haptics.success();

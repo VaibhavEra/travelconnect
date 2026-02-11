@@ -8,7 +8,7 @@ import { create } from "zustand";
 // Type for trip from database (with proper non-null assertions)
 type DbTrip = Database["public"]["Tables"]["trips"]["Row"];
 
-// Refined Trip type with guaranteed non-null values
+// Refined Trip type with guaranteed non-null values (REMOVED notes - Issue #7)
 export type Trip = {
   id: string;
   traveller_id: string;
@@ -23,7 +23,7 @@ export type Trip = {
   allowed_categories: string[];
   pnr_number: string;
   ticket_file_url: string;
-  notes: string | null;
+  // REMOVED: notes field (Issue #7)
   status:
     | "upcoming"
     | "locked"
@@ -35,7 +35,7 @@ export type Trip = {
   updated_at: string;
 };
 
-// NEW: Type for editable general fields (before acceptance)
+// Type for editable general fields (before acceptance) - REMOVED notes (Issue #7)
 type EditableGeneralTripFields = Pick<
   DbTrip,
   | "parcel_size_capacity"
@@ -46,10 +46,10 @@ type EditableGeneralTripFields = Pick<
   | "arrival_time"
   | "pnr_number"
   | "ticket_file_url"
-  | "notes" // TODO: Remove after Issue #5
+  // REMOVED: notes (Issue #7)
 >;
 
-// NEW: Type for date-only updates (after acceptance)
+// Type for date-only updates (after acceptance)
 type EditableDateFields = Pick<
   DbTrip,
   "departure_date" | "departure_time" | "arrival_date" | "arrival_time"
@@ -71,7 +71,7 @@ interface TripState {
   canEditTrip: (tripId: string) => Promise<boolean>;
   canEditTripDates: (tripId: string) => Promise<boolean>;
 
-  // NEW: Separate methods for different edit scenarios (Issue #4 + #27)
+  // Separate methods for different edit scenarios (Issue #4 + #27)
   updateTripGeneralFields: (
     tripId: string,
     updates: Partial<EditableGeneralTripFields>,
@@ -92,7 +92,7 @@ interface TripState {
   clearError: () => void;
 }
 
-// Helper to convert DbTrip to Trip (handle nulls)
+// Helper to convert DbTrip to Trip (REMOVED notes - Issue #7)
 const normalizeTrip = (dbTrip: DbTrip): Trip => {
   // Ensure status is valid
   const validStatus = dbTrip.status as Trip["status"];
@@ -112,7 +112,7 @@ const normalizeTrip = (dbTrip: DbTrip): Trip => {
     allowed_categories: dbTrip.allowed_categories,
     pnr_number: dbTrip.pnr_number,
     ticket_file_url: dbTrip.ticket_file_url,
-    notes: dbTrip.notes,
+    // REMOVED: notes mapping (Issue #7)
     status: validStatus,
     created_at: dbTrip.created_at,
     updated_at: dbTrip.updated_at,
@@ -127,14 +127,14 @@ export const useTripStore = create<TripState>((set, get) => ({
   error: null,
 
   // ============================================================================
-  // Create new trip with server-side validation
+  // Create new trip (REMOVED notes parameter - Issue #7)
   // ============================================================================
   createTrip: async (data: TripFormData, userId: string) => {
     try {
       set({ loading: true, error: null });
 
-      // Prepare RPC parameters (only include p_notes if it has a value)
-      const rpcParams: any = {
+      // Prepare RPC parameters (NO p_notes - Issue #7)
+      const rpcParams = {
         p_source: data.source.trim(),
         p_destination: data.destination.trim(),
         p_departure_date: data.departure_date,
@@ -146,12 +146,8 @@ export const useTripStore = create<TripState>((set, get) => ({
         p_pnr_number: data.pnr_number.trim(),
         p_ticket_file_url: data.ticket_file_url,
         p_allowed_categories: data.allowed_categories,
+        // REMOVED: p_notes conditional logic (Issue #7)
       };
-
-      // Only add notes if not empty
-      if (data.notes && data.notes.trim()) {
-        rpcParams.p_notes = data.notes.trim();
-      }
 
       // Use RPC function for server-side validation
       const { data: tripId, error: rpcError } = await supabase.rpc(
@@ -313,7 +309,7 @@ export const useTripStore = create<TripState>((set, get) => ({
   },
 
   // ============================================================================
-  // NEW: Update general trip fields (Issue #4 + #27)
+  // Update general trip fields (REMOVED notes - Issue #7)
   // Can only be used BEFORE any request is accepted
   // ============================================================================
   updateTripGeneralFields: async (
@@ -323,7 +319,7 @@ export const useTripStore = create<TripState>((set, get) => ({
     try {
       set({ loading: true, error: null });
 
-      // Whitelist only editable general fields
+      // Whitelist only editable general fields (REMOVED notes - Issue #7)
       const allowedFields: (keyof EditableGeneralTripFields)[] = [
         "parcel_size_capacity",
         "allowed_categories",
@@ -333,7 +329,7 @@ export const useTripStore = create<TripState>((set, get) => ({
         "arrival_time",
         "pnr_number",
         "ticket_file_url",
-        "notes", // TODO: Remove after Issue #5
+        // REMOVED: notes (Issue #7)
       ];
 
       // Filter to only allowed fields
@@ -352,7 +348,7 @@ export const useTripStore = create<TripState>((set, get) => ({
       // Validate we have fields to update
       if (Object.keys(filteredUpdates).length === 0) {
         throw new Error(
-          "No valid fields to update. Allowed fields: parcel_size_capacity, allowed_categories, dates, pnr_number, ticket_file_url, notes.",
+          "No valid fields to update. Allowed fields: parcel_size_capacity, allowed_categories, dates, pnr_number, ticket_file_url.",
         );
       }
 
@@ -402,7 +398,7 @@ export const useTripStore = create<TripState>((set, get) => ({
   },
 
   // ============================================================================
-  // UPDATED: Update only dates (Issue #4)
+  // Update only dates (Issue #4)
   // Allowed even after acceptance, before pickup
   // ============================================================================
   updateTripDates: async (

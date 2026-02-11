@@ -2,7 +2,6 @@
 import CategoryCheckboxes from "@/components/forms/CategoryCheckboxes";
 import CityDropdown from "@/components/forms/CityDropdown";
 import ParcelSizeSelector from "@/components/forms/ParcelSizeSelector";
-import TextInput from "@/components/forms/TextInput";
 import TransportModeSelector from "@/components/forms/TransportModeSelector";
 import BaseModal from "@/components/shared/BaseModal";
 import { haptics } from "@/lib/utils/haptics";
@@ -56,7 +55,7 @@ export default function EditTripDetailsModal({
       transport_mode: trip.transport_mode,
       parcel_size_capacity: trip.parcel_size_capacity,
       allowed_categories: trip.allowed_categories as any,
-      notes: trip.notes || "",
+      // REMOVED: notes (Issue #7)
     },
   });
 
@@ -72,7 +71,7 @@ export default function EditTripDetailsModal({
         transport_mode: data.transport_mode,
         parcel_size_capacity: data.parcel_size_capacity,
         allowed_categories: data.allowed_categories,
-        notes: data.notes || null,
+        // REMOVED: notes (Issue #7)
       });
 
       haptics.success();
@@ -205,26 +204,6 @@ export default function EditTripDetailsModal({
               value={value}
               onChange={onChange}
               error={errors.allowed_categories?.message}
-            />
-          )}
-        />
-
-        {/* Notes */}
-        <Controller
-          control={control}
-          name="notes"
-          render={({ field: { value, onChange, onBlur } }) => (
-            <TextInput
-              label="Notes (Optional)"
-              placeholder="Add any additional information..."
-              value={value}
-              onChangeText={onChange}
-              onBlur={onBlur}
-              error={errors.notes?.message}
-              multiline
-              numberOfLines={3}
-              maxLength={500}
-              style={{ minHeight: 80, textAlignVertical: "top" }}
             />
           )}
         />

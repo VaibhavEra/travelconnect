@@ -26,11 +26,7 @@ export const tripDetailsSchema = z
     allowed_categories: z
       .array(z.enum(PACKAGE_CATEGORIES))
       .min(1, "Select at least one category"),
-    notes: z
-      .string()
-      .max(500, "Notes are too long")
-      .optional()
-      .or(z.literal("")),
+    // REMOVED: notes field (Issue #7)
   })
   .refine(
     (data) => {
