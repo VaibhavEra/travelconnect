@@ -40,52 +40,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 const getErrorMessage = (error: any): { title: string; message: string } => {
   const errorMessage = error.message || "";
 
-  if (errorMessage.includes("past") || errorMessage.includes("before")) {
-    return {
-      title: "Invalid Date",
-      message:
-        "Departure date cannot be in the past. Please select a future date.",
-    };
-  }
-
-  if (errorMessage.includes("after departure")) {
-    return {
-      title: "Invalid Time",
-      message: "Arrival time must be after departure time.",
-    };
-  }
-
-  if (errorMessage.includes("same route")) {
-    return {
-      title: "Duplicate Route",
-      message: "Source and destination cannot be the same city.",
-    };
-  }
-
-  if (
-    errorMessage.includes("category") ||
-    errorMessage.includes("categories")
-  ) {
-    return {
-      title: "Categories Required",
-      message: "Please select at least one package category to allow.",
-    };
-  }
-
-  if (errorMessage.includes("PNR")) {
-    return {
-      title: "Invalid PNR",
-      message: "Please check your PNR number and try again.",
-    };
-  }
-
-  if (errorMessage.includes("ticket")) {
-    return {
-      title: "Ticket Required",
-      message: "Please upload your ticket file for verification.",
-    };
-  }
-
+  // Network/connection errors
   if (errorMessage.includes("network") || errorMessage.includes("fetch")) {
     return {
       title: "Connection Error",
@@ -93,9 +48,26 @@ const getErrorMessage = (error: any): { title: string; message: string } => {
     };
   }
 
+  // Database/permission errors
+  if (errorMessage.includes("policy") || errorMessage.includes("permission")) {
+    return {
+      title: "Access Denied",
+      message: "You don't have permission to create this trip.",
+    };
+  }
+
+  // File upload errors
+  if (errorMessage.includes("storage") || errorMessage.includes("upload")) {
+    return {
+      title: "Upload Failed",
+      message: "Failed to upload ticket file. Please try again.",
+    };
+  }
+
+  // Generic fallback for unexpected backend errors
   return {
-    title: "Error",
-    message: errorMessage || "Failed to create trip. Please try again.",
+    title: "Unable to Create Trip",
+    message: errorMessage || "An unexpected error occurred. Please try again.",
   };
 };
 
@@ -411,7 +383,7 @@ export default function CreateTripScreen() {
                     value={parseDate(value)}
                     onChange={(date) => onChange(date ? dateToISO(date) : null)}
                     error={errors.arrival_date?.message}
-                    minimumDate={parseDate(departureDate) || undefined}
+                    minimumDate={parseDate(departureDate) || new Date()}
                     placeholder="Select date"
                   />
                 )}
