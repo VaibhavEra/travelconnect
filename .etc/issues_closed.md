@@ -150,6 +150,117 @@ npx supabase gen types typescript --project-id <project-id> > types/database.typ
 
 ---
 
+### Issue #6 - Fix create-trip form date/time validation ✅
+
+**Type:** Frontend Validation - Bug Fix  
+**Priority:** HIGH  
+**Time:** 2 hours  
+**Date:** 2026-02-11
+
+**Problem:**
+
+- Date parsing was inconsistent between validation checks (mixed Date constructors)
+- Departure validation allowed trips less than 1 hour in future (backend requires ≥1 hour)
+- No validation for same date + same time scenario (departure and arrival)
+- Error messages displayed on wrong fields (date fields instead of time fields)
+- `getErrorMessage()` function duplicated Zod validation checks
+- Arrival date picker allowed past dates when departure not yet selected
+
+**Frontend Changes (Applied via GitHub PR #33 - 2026-02-11):**
+
+1. **`lib/validations/trip.ts`** (Updated)
+   - **Added:** `parseDateTime()` helper function
+     - Consistent local timezone parsing using `new Date(year, month-1, day, hours, minutes)`
+     - Matches backend `create_trip_with_validation()` parsing logic
+     - Explicit NaN validation for invalid dates
+   - **Updated Validation #1:** Source ≠ Destination (unchanged, already working)
+   - **Updated Validation #2:** Departure must be ≥ now + 1 hour (was just > now)
+     - Error path changed: `["departure_date"]` → `["departure_time"]`
+   - **Updated Validation #3:** Arrival must be after departure
+     - Error path changed: `["arrival_date"]` → `["arrival_time"]`
+   - **Added Validation #4:** Same date requires different times
+     - New check: if `departure_date === arrival_date`, then `departure_time !== arrival_time`
+     - Error path: `["arrival_time"]`
+   - **Removed:** Redundant empty string checks (Zod `.min(1)` already handles it)
+
+2. **`app/create-trip.tsx`** (Updated)
+   - **Simplified:** `getErrorMessage()` function (59 lines → 26 lines)
+     - **Removed:** Date validation error handling (Zod catches it)
+     - **Removed:** Arrival/departure validation error handling (Zod catches it)
+     - **Removed:** Category validation error handling (Zod catches it)
+     - **Removed:** Route validation error handling (Zod catches it)
+     - **Kept:** Network/connection error handling
+     - **Kept:** RLS/permission error handling
+     - **Kept:** File upload error handling
+     - **Kept:** Generic fallback for unexpected errors
+   - **Fixed:** Arrival date picker `minimumDate` prop
+     - Before: `parseDate(departureDate) || undefined` (allowed past dates)
+     - After: `parseDate(departureDate) || new Date()` (fallback to today)
+
+**How It Works Now:**
+
+**Validation Rules (Final):**
+
+| #   | Validation            | Triggers On                 | Error Field      | Error Message                                                        |
+| --- | --------------------- | --------------------------- | ---------------- | -------------------------------------------------------------------- |
+| 1   | Source ≠ Destination  | Case-insensitive comparison | `destination`    | "Source and destination must be different"                           |
+| 2   | Departure ≥ Now + 1hr | Parse departure datetime    | `departure_time` | "Departure must be at least 1 hour in the future"                    |
+| 3   | Arrival > Departure   | Parse both datetimes        | `arrival_time`   | "Arrival must be after departure"                                    |
+| 4   | Same date check       | If dates match              | `arrival_time`   | "Arrival time must be different from departure time on the same day" |
+
+**Date Parsing Logic:**
+
+```typescript
+const parseDateTime = (dateStr: string, timeStr: string): Date | null => {
+  const [year, month, day] = dateStr.split("-").map(Number);
+  const [hours, minutes] = timeStr.split(":").map(Number);
+  return new Date(year, month - 1, day, hours, minutes, 0, 0);
+};
+```
+
+**Testing:**
+
+- ✅ Test 1: Departure less than 1 hour from now - BLOCKED
+- ✅ Test 2: Departure in past (today + past time) - BLOCKED
+- ✅ Test 3: Same date with same time - BLOCKED
+- ✅ Test 4: Arrival before departure - BLOCKED
+- ✅ Test 5: Arrival date picker enforces minimum (departure or today) - WORKING
+- ✅ Test 6: Error messages show on correct fields (time vs date) - WORKING
+- ✅ Test 7: Submit button disabled until validations pass - WORKING
+- ✅ Test 8: Backend errors show user-friendly alerts - WORKING
+
+**Acceptance Criteria:**
+
+- ✅ Departure cannot be in the past
+- ✅ Departure must be at least 1 hour in the future (matches backend)
+- ✅ Cannot select past time if departure date is today
+- ✅ Arrival date/time must be after departure date/time
+- ✅ Same date requires different times
+- ✅ Clear error messages for each validation failure
+- ✅ Submit button disabled until all validations pass
+- ✅ Date pickers enforce minimum constraints (no past dates)
+
+**Frontend Changes:**
+
+- `lib/validations/trip.ts` - Complete validation rewrite with consistent parsing
+- `app/create-trip.tsx` - Simplified error handling, fixed date picker minimumDate
+
+**Type Updates:**
+
+- None required - validation schema types inferred from Zod
+
+**Database Objects Touched:**
+
+- None - frontend-only changes
+
+**Related Issues:**
+
+- Depends on: Issue #5 (Backend validation alignment) ✅
+- Depends on: Issue #7 (Notes field removal) ✅
+- Blocks: None
+
+---
+
 ### Issue #3 - Implement request expiry logic ✅
 
 **Type:** Critical - Backend Logic  
