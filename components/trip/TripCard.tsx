@@ -61,7 +61,7 @@ export default function TripCard({ trip }: TripCardProps) {
         style={[
           styles.card,
           {
-            backgroundColor: colors.background.secondary,
+            backgroundColor: colors.background.primary,
             borderColor: colors.border.default,
           },
           isCancelled && { opacity: 0.7 },
@@ -151,7 +151,7 @@ export default function TripCard({ trip }: TripCardProps) {
               <View
                 style={[
                   styles.sizeChip,
-                  { backgroundColor: withOpacity(colors.success, "light") },
+                  { backgroundColor: withOpacity(colors.success, "subtle") },
                 ]}
               >
                 <Ionicons
@@ -171,23 +171,43 @@ export default function TripCard({ trip }: TripCardProps) {
                 const config =
                   CATEGORY_CONFIG[category as keyof typeof CATEGORY_CONFIG];
                 return (
-                  <Ionicons
+                  <View
                     key={category}
-                    name={config?.icon || "cube"}
-                    size={16}
-                    color={colors.text.tertiary}
-                  />
+                    style={[
+                      styles.categoryChip,
+                      {
+                        backgroundColor: withOpacity(colors.primary, "subtle"),
+                      },
+                    ]}
+                  >
+                    <Ionicons
+                      name={config?.icon || "cube"}
+                      size={14}
+                      color={colors.primary}
+                    />
+                    <Text
+                      style={[styles.categoryText, { color: colors.primary }]}
+                    >
+                      {config?.label || category}
+                    </Text>
+                  </View>
                 );
               })}
               {trip.allowed_categories.length > 2 && (
-                <Text
+                <View
                   style={[
-                    styles.moreCategoriesText,
-                    { color: colors.text.tertiary },
+                    styles.categoryChip,
+                    {
+                      backgroundColor: withOpacity(colors.primary, "subtle"),
+                    },
                   ]}
                 >
-                  +{trip.allowed_categories.length - 2}
-                </Text>
+                  <Text
+                    style={[styles.categoryText, { color: colors.primary }]}
+                  >
+                    +{trip.allowed_categories.length - 2}
+                  </Text>
+                </View>
               )}
             </View>
           </View>
@@ -195,14 +215,10 @@ export default function TripCard({ trip }: TripCardProps) {
 
         {/* Footer */}
         <View style={[styles.footer, { borderTopColor: colors.border.light }]}>
-          <Text style={[styles.footerText, { color: colors.text.tertiary }]}>
-            View Details
+          <Text style={[styles.footerText, { color: colors.primary }]}>
+            View Full Details
           </Text>
-          <Ionicons
-            name="chevron-forward"
-            size={16}
-            color={colors.text.tertiary}
-          />
+          <Ionicons name="arrow-forward" size={18} color={colors.primary} />
         </View>
       </Pressable>
     </Animated.View>
@@ -292,12 +308,20 @@ const styles = StyleSheet.create({
   },
   categoriesContainer: {
     flexDirection: "row",
-    alignItems: "center",
+    flexWrap: "wrap",
     gap: Spacing.xs,
   },
-  moreCategoriesText: {
+  categoryChip: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    paddingHorizontal: Spacing.sm,
+    paddingVertical: Spacing.xs,
+    borderRadius: BorderRadius.sm,
+  },
+  categoryText: {
     fontSize: Typography.sizes.xs,
-    fontWeight: Typography.weights.medium,
+    fontWeight: Typography.weights.semibold,
   },
   footer: {
     flexDirection: "row",
@@ -309,6 +333,6 @@ const styles = StyleSheet.create({
   },
   footerText: {
     fontSize: Typography.sizes.sm,
-    fontWeight: Typography.weights.medium,
+    fontWeight: Typography.weights.semibold,
   },
 });

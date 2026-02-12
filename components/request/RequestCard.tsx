@@ -5,7 +5,7 @@ import { TRANSPORT_ICONS } from "@/lib/constants/transport";
 import { formatDate, formatTime } from "@/lib/utils/dateTime";
 import { haptics } from "@/lib/utils/haptics";
 import { ParcelRequest } from "@/stores/requestStore";
-import { BorderRadius, Spacing, Typography } from "@/styles";
+import { BorderRadius, Spacing, Typography, withOpacity } from "@/styles";
 import { useThemeColors } from "@/styles/theme";
 import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
@@ -45,7 +45,7 @@ export default function RequestCard({ request }: RequestCardProps) {
       style={({ pressed }) => [
         styles.card,
         {
-          backgroundColor: colors.background.secondary,
+          backgroundColor: colors.background.primary,
           borderColor: colors.border.default,
           opacity: pressed ? 0.7 : 1,
         },
@@ -58,7 +58,7 @@ export default function RequestCard({ request }: RequestCardProps) {
           <View
             style={[
               styles.statusBadge,
-              { backgroundColor: statusColor + "15" },
+              { backgroundColor: withOpacity(statusColor, "light") },
             ]}
           >
             <Ionicons name={statusConfig.icon} size={14} color={statusColor} />
@@ -92,7 +92,7 @@ export default function RequestCard({ request }: RequestCardProps) {
               <View
                 style={[
                   styles.transportIcon,
-                  { backgroundColor: colors.primary + "15" },
+                  { backgroundColor: withOpacity(colors.primary, "light") },
                 ]}
               >
                 <Ionicons
@@ -136,7 +136,7 @@ export default function RequestCard({ request }: RequestCardProps) {
           <View
             style={[
               styles.categoryChip,
-              { backgroundColor: colors.primary + "10" },
+              { backgroundColor: withOpacity(colors.primary, "subtle") },
             ]}
           >
             <Ionicons
@@ -156,9 +156,17 @@ export default function RequestCard({ request }: RequestCardProps) {
             <Text style={[styles.detailLabel, { color: colors.text.tertiary }]}>
               Trip Accepts
             </Text>
-            <Text style={[styles.detailValue, { color: colors.text.primary }]}>
-              {getSizeCapacityLabel(request.trip.parcel_size_capacity)}
-            </Text>
+            <View
+              style={[
+                styles.sizeChip,
+                { backgroundColor: withOpacity(colors.success, "subtle") },
+              ]}
+            >
+              <Ionicons name="cube" size={14} color={colors.success} />
+              <Text style={[styles.sizeText, { color: colors.success }]}>
+                {getSizeCapacityLabel(request.trip.parcel_size_capacity)}
+              </Text>
+            </View>
           </View>
         )}
       </View>
@@ -191,9 +199,9 @@ export default function RequestCard({ request }: RequestCardProps) {
       {/* Footer - View Details */}
       <View style={[styles.footer, { borderTopColor: colors.border.light }]}>
         <Text style={[styles.footerText, { color: colors.primary }]}>
-          View Details
+          View Full Details
         </Text>
-        <Ionicons name="arrow-forward" size={16} color={colors.primary} />
+        <Ionicons name="arrow-forward" size={18} color={colors.primary} />
       </View>
     </Pressable>
   );
@@ -206,7 +214,7 @@ const styles = StyleSheet.create({
     overflow: "hidden",
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
+    shadowOpacity: 0.06,
     shadowRadius: 8,
     elevation: 2,
   },
@@ -288,10 +296,6 @@ const styles = StyleSheet.create({
     fontSize: Typography.sizes.xs,
     fontWeight: Typography.weights.medium,
   },
-  detailValue: {
-    fontSize: Typography.sizes.sm,
-    fontWeight: Typography.weights.semibold,
-  },
   categoryChip: {
     flexDirection: "row",
     alignItems: "center",
@@ -302,6 +306,19 @@ const styles = StyleSheet.create({
     borderRadius: BorderRadius.sm,
   },
   categoryText: {
+    fontSize: Typography.sizes.xs,
+    fontWeight: Typography.weights.semibold,
+  },
+  sizeChip: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    alignSelf: "flex-start",
+    paddingHorizontal: Spacing.sm,
+    paddingVertical: 4,
+    borderRadius: BorderRadius.sm,
+  },
+  sizeText: {
     fontSize: Typography.sizes.xs,
     fontWeight: Typography.weights.semibold,
   },

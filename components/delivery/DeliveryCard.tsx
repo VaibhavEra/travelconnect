@@ -59,11 +59,6 @@ export default function DeliveryCard({
   const categoryConfig =
     CATEGORY_CONFIG[request.category as keyof typeof CATEGORY_CONFIG];
 
-  // UPDATED: Show trip capacity instead of request size
-  const capacityLabel = request.trip?.parcel_size_capacity
-    ? getSizeCapacityLabel(request.trip.parcel_size_capacity)
-    : "Unknown";
-
   const showPickupButton = status === "accepted";
   const showDeliveryButton = status === "picked_up";
 
@@ -73,7 +68,7 @@ export default function DeliveryCard({
         style={[
           styles.card,
           {
-            backgroundColor: colors.background.secondary,
+            backgroundColor: colors.background.primary,
             borderColor: colors.border.default,
           },
         ]}
@@ -104,26 +99,39 @@ export default function DeliveryCard({
             {request.item_description}
           </Text>
 
-          {/* Category & Trip Capacity */}
-          <View style={styles.metaRow}>
-            <View style={styles.metaItem}>
+          {/* Category & Trip Capacity Chips */}
+          <View style={styles.chipsRow}>
+            {/* Category Chip */}
+            <View
+              style={[
+                styles.categoryChip,
+                { backgroundColor: withOpacity(colors.primary, "subtle") },
+              ]}
+            >
               <Ionicons
                 name={categoryConfig.icon}
                 size={14}
-                color={colors.text.tertiary}
+                color={colors.primary}
               />
-              <Text style={[styles.metaText, { color: colors.text.tertiary }]}>
+              <Text style={[styles.categoryText, { color: colors.primary }]}>
                 {categoryConfig.label}
               </Text>
             </View>
 
-            {/* UPDATED: Show trip capacity instead of size */}
-            <View style={styles.metaItem}>
-              <Ionicons name="cube" size={14} color={colors.text.tertiary} />
-              <Text style={[styles.metaText, { color: colors.text.tertiary }]}>
-                Trip: {capacityLabel}
-              </Text>
-            </View>
+            {/* Parcel Size Chip */}
+            {request.trip?.parcel_size_capacity && (
+              <View
+                style={[
+                  styles.sizeChip,
+                  { backgroundColor: withOpacity(colors.success, "subtle") },
+                ]}
+              >
+                <Ionicons name="cube" size={14} color={colors.success} />
+                <Text style={[styles.sizeText, { color: colors.success }]}>
+                  {getSizeCapacityLabel(request.trip.parcel_size_capacity)}
+                </Text>
+              </View>
+            )}
           </View>
         </View>
 
@@ -191,14 +199,10 @@ export default function DeliveryCard({
 
         {/* Footer */}
         <View style={[styles.footer, { borderTopColor: colors.border.light }]}>
-          <Text style={[styles.footerText, { color: colors.text.tertiary }]}>
-            View Details
+          <Text style={[styles.footerText, { color: colors.primary }]}>
+            View Full Details
           </Text>
-          <Ionicons
-            name="chevron-forward"
-            size={16}
-            color={colors.text.tertiary}
-          />
+          <Ionicons name="arrow-forward" size={18} color={colors.primary} />
         </View>
       </Pressable>
     </Animated.View>
@@ -237,18 +241,34 @@ const styles = StyleSheet.create({
     fontWeight: Typography.weights.medium,
     lineHeight: Typography.sizes.md * 1.4,
   },
-  metaRow: {
+  chipsRow: {
     flexDirection: "row",
-    gap: Spacing.lg,
-  },
-  metaItem: {
-    flexDirection: "row",
-    alignItems: "center",
+    flexWrap: "wrap",
     gap: Spacing.xs,
   },
-  metaText: {
-    fontSize: Typography.sizes.sm,
-    fontWeight: Typography.weights.medium,
+  categoryChip: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    paddingHorizontal: Spacing.sm,
+    paddingVertical: Spacing.xs,
+    borderRadius: BorderRadius.sm,
+  },
+  categoryText: {
+    fontSize: Typography.sizes.xs,
+    fontWeight: Typography.weights.semibold,
+  },
+  sizeChip: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    paddingHorizontal: Spacing.sm,
+    paddingVertical: 4,
+    borderRadius: BorderRadius.sm,
+  },
+  sizeText: {
+    fontSize: Typography.sizes.xs,
+    fontWeight: Typography.weights.semibold,
   },
   actionContainer: {
     paddingHorizontal: Spacing.lg,
@@ -272,12 +292,12 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
-    gap: 4,
-    paddingVertical: Spacing.sm,
+    gap: Spacing.xs,
+    paddingVertical: Spacing.md,
     borderTopWidth: 1,
   },
   footerText: {
-    fontSize: Typography.sizes.xs,
-    fontWeight: Typography.weights.medium,
+    fontSize: Typography.sizes.sm,
+    fontWeight: Typography.weights.semibold,
   },
 });
