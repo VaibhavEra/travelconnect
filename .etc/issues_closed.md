@@ -424,6 +424,120 @@ const photoUrls = await Promise.all(
 
 ---
 
+### Issue #10 - Add expired filter to my-trips tab ✅
+
+**Type:** Frontend Refactor - Filter Configuration  
+**Priority:** MEDIUM  
+**Time:** 1 hour  
+**Date:** 2026-02-12
+
+**Problem:**
+
+My-trips tab was missing the **expired** filter, preventing users from viewing trips that had expired (arrival time passed with no active requests). Additionally, the screen maintained its own local filter configuration instead of using the shared constant from `lib/constants/filters.ts`, creating code duplication and maintenance overhead.
+
+**Frontend Changes (Applied via GitHub PR - 2026-02-12):**
+
+1. **`lib/constants/filters.ts`** (Updated)
+   - **Added:** `expired` filter with `alert-circle` icon and "Expired" label
+   - **Added:** `locked` filter with `lock-closed` icon and "Locked" label
+   - **Added:** `in_progress` filter with `bicycle` icon and "In Progress" label
+   - **Updated:** `TRIP_FILTERS` now includes all 7 trip statuses (was only 4)
+   - **Ensured:** Filter array matches all possible trip statuses from backend enum
+
+2. **`app/(tabs)/my-trips/index.tsx`** (Refactored)
+   - **Removed:** Local `TripFilter` type definition (7 lines)
+   - **Removed:** Local `FILTER_CONFIG` array constant (8 lines)
+   - **Added:** Import of shared `TRIP_FILTERS` and `TripFilterKey` from filters.ts
+   - **Updated:** Component state to use `TripFilterKey` instead of local `TripFilter`
+   - **Updated:** `getFilterCount()` function signature to use `TripFilterKey`
+   - **Updated:** Filter chip mapping to reference `TRIP_FILTERS` instead of local config
+   - **Eliminated:** 25 lines of duplicate filter configuration code
+
+**How It Works Now:**
+
+### Filter Configuration (Centralized)
+
+**Before (Duplicated):**
+
+- `lib/constants/filters.ts` - Incomplete TRIP_FILTERS (only 4 statuses)
+- `app/(tabs)/my-trips/index.tsx` - Local FILTER_CONFIG (6 statuses, missing expired)
+
+**After (Single Source of Truth):**
+
+- `lib/constants/filters.ts` - Complete TRIP_FILTERS (all 7 statuses)
+- `app/(tabs)/my-trips/index.tsx` - Imports shared filters
+
+### Filter Bar Display
+
+```
+
+┌─────────────────────────────────────────────────────────────────────┐
+│ [All] [Upcoming] [Locked] [In Progress] [Completed] [Cancelled] [Expired] │
+└─────────────────────────────────────────────────────────────────────┘
+
+```
+
+### Visual Appearance of Expired Trips
+
+- **Status Banner:** Red background (light opacity) with "Expired" text
+- **Icon:** ⚠️ `alert-circle` (red)
+- **Opacity:** 100% (fully visible, not dimmed like cancelled trips)
+- **Color:** Red from `colors.error` via `TRIP_STATUS_CONFIG`
+- **Styling:** Automatically handled by existing `TripCard` component
+
+**Testing:**
+
+- ✅ Test 1: All 7 filters appear in my-trips tab - PASSED
+- ✅ Test 2: Clicking "Expired" shows only expired trips - PASSED
+- ✅ Test 3: Expired trips display with red banner and alert icon - PASSED
+- ✅ Test 4: Filter counts update dynamically for all statuses - PASSED
+- ✅ Test 5: TypeScript compiles without errors - PASSED
+- ✅ Test 6: No console warnings - PASSED
+- ✅ Test 7: Filter state persists when navigating - PASSED
+- ✅ Test 8: Trip details navigation works correctly - PASSED
+
+**Acceptance Criteria:**
+
+- ✅ "Expired" filter appears in my-trips tab
+- ✅ Clicking "Expired" shows only expired trips
+- ✅ Expired trips display with appropriate red styling
+- ✅ Filter state persists when navigating away and back
+- ✅ Code duplication eliminated via centralized filter config
+- ✅ Type safety improved with shared `TripFilterKey` type
+- ✅ All trip statuses now have corresponding filters
+
+**Frontend Changes:**
+
+- `lib/constants/filters.ts` - Added expired, locked, in_progress filters (+24 lines)
+- `app/(tabs)/my-trips/index.tsx` - Refactored to use shared constants (+1, -25 lines)
+
+**Type Updates:**
+
+- None required - using existing `TripFilterKey` type from filters.ts
+
+**Database Objects Touched:**
+
+- None - frontend-only changes
+
+**Related Issues:**
+
+- Depends on: Issue #1 (Trip status transitions - expired status exists) ✅ Resolved
+- Depends on: Issue #3 (Request expiry logic - automatic expiration) ✅ Resolved
+- Improves: Code maintainability and consistency
+- Backend already fully supports expired status
+- TripCard already handles expired styling via TRIP_STATUS_CONFIG
+- No backend or database changes required
+
+**Bonus Improvements:**
+
+- ✅ Centralized filter configuration (single source of truth)
+- ✅ Added missing `locked` and `in_progress` filters
+- ✅ Improved type safety with shared types
+- ✅ Reduced code duplication (eliminated 25 lines)
+- ✅ Better maintainability for future filter additions
+
+---
+
 ### Issue #6 - Fix create-trip form date/time validation ✅
 
 **Type:** Frontend Validation - Bug Fix  
