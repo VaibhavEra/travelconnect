@@ -206,7 +206,7 @@ Files were being uploaded immediately to Supabase storage when users selected th
 
 **How It Works Now:**
 
-### File Selection Flow
+#### File Selection Flow
 
 ```
 User selects file
@@ -232,7 +232,7 @@ Backend RPC called with URL
 ✅ No orphaned files!
 ```
 
-### Cache Management
+#### Cache Management
 
 **iOS:** `/var/mobile/Containers/Data/Application/{APP_ID}/Library/Caches/`  
 **Android:** `/data/data/{PACKAGE_NAME}/cache/`
@@ -333,7 +333,7 @@ ImagePicker component was uploading images immediately to Supabase storage durin
 
 **How It Works Now:**
 
-### Component Responsibility
+#### Component Responsibility
 
 **Before (Bad Pattern):**
 
@@ -360,7 +360,7 @@ request-form.tsx:
   - Calls backend with public URLs ✓
 ```
 
-### Parallel Upload Implementation
+#### Parallel Upload Implementation
 
 ```typescript
 // In request-form.tsx onSubmit()
@@ -455,7 +455,7 @@ My-trips tab was missing the **expired** filter, preventing users from viewing t
 
 **How It Works Now:**
 
-### Filter Configuration (Centralized)
+#### Filter Configuration (Centralized)
 
 **Before (Duplicated):**
 
@@ -467,7 +467,7 @@ My-trips tab was missing the **expired** filter, preventing users from viewing t
 - `lib/constants/filters.ts` - Complete TRIP_FILTERS (all 7 statuses)
 - `app/(tabs)/my-trips/index.tsx` - Imports shared filters
 
-### Filter Bar Display
+#### Filter Bar Display
 
 ```
 
@@ -477,7 +477,7 @@ My-trips tab was missing the **expired** filter, preventing users from viewing t
 
 ```
 
-### Visual Appearance of Expired Trips
+#### Visual Appearance of Expired Trips
 
 - **Status Banner:** Red background (light opacity) with "Expired" text
 - **Icon:** ⚠️ `alert-circle` (red)
@@ -584,7 +584,7 @@ rejected by travellers or expired due to trip status changes.
 
 **How It Works Now:**
 
-### Filter Bar
+#### Filter Bar
 
 The My Requests tab now exposes a dedicated filter for each status:
 
@@ -594,7 +594,7 @@ The My Requests tab now exposes a dedicated filter for each status:
 
 Each chip shows a count based on the number of matching requests.
 
-### Status Styling
+#### Status Styling
 
 No changes were required to `RequestCard`. It already uses
 `REQUEST_STATUS_CONFIG`, which defines:
@@ -704,7 +704,7 @@ RequestCard component was not displaying trip source/destination cities and arri
 
 **How It Works Now:**
 
-### RLS Policy Resolution
+#### RLS Policy Resolution
 
 **Before (Broken - Infinite Recursion):**
 
@@ -730,7 +730,7 @@ trips policy: "Users can view trips WHERE user_can_view_trip(id)"
 ✅ Returns boolean, no recursion
 ```
 
-### RequestCard Layout
+#### RequestCard Layout
 
 ```
 ┌──────────────────────────────────────────┐
@@ -748,7 +748,7 @@ trips policy: "Users can view trips WHERE user_can_view_trip(id)"
 └──────────────────────────────────────────┘
 ```
 
-### Data Flow
+#### Data Flow
 
 ```
 1. User opens My Requests tab
@@ -810,7 +810,7 @@ trips policy: "Users can view trips WHERE user_can_view_trip(id)"
 
 **Technical Details:**
 
-### Why SECURITY DEFINER Was Necessary
+#### Why SECURITY DEFINER Was Necessary
 
 RLS policies are evaluated recursively. When a policy on table A references table B, and table B's policy references table A, PostgreSQL enters an infinite loop. The solution is to use a `SECURITY DEFINER` function that:
 
@@ -819,7 +819,7 @@ RLS policies are evaluated recursively. When a policy on table A references tabl
 3. Returns a simple boolean result
 4. Breaks the recursion chain
 
-### Query Performance
+#### Query Performance
 
 The `user_can_view_trip()` function is marked `STABLE`, allowing PostgreSQL to:
 
@@ -988,7 +988,7 @@ const parseDateTime = (dateStr: string, timeStr: string): Date | null => {
 
 **How It Works Now:**
 
-### Trip Details Screen Layout
+#### Trip Details Screen Layout
 
 ```
 
@@ -1019,7 +1019,7 @@ const parseDateTime = (dateStr: string, timeStr: string): Date | null => {
 
 ---
 
-### Permission Logic
+#### Permission Logic
 
 | Trip State                           | canEditDetails | canEditDates | What Can Be Edited                   |
 | ------------------------------------ | -------------- | ------------ | ------------------------------------ |
@@ -1105,7 +1105,7 @@ In explore tab, the departure date filter was going 1 day backwards when users s
 
 **How It Works Now:**
 
-### Date Extraction Logic
+#### Date Extraction Logic
 
 **Before (Broken):**
 
@@ -1129,7 +1129,7 @@ export const dateToISOLocal = (date: Date): string => {
 };
 ```
 
-### Data Flow (Fixed)
+#### Data Flow (Fixed)
 
 ```
 1. User selects date in DatePicker
@@ -1187,7 +1187,7 @@ export const dateToISOLocal = (date: Date): string => {
 
 **Technical Details:**
 
-### Timezone Offset Impact
+#### Timezone Offset Impact
 
 | Timezone     | UTC Offset | Date Selected | Old Result (Bug) | New Result (Fix) |
 | ------------ | ---------- | ------------- | ---------------- | ---------------- |
@@ -1198,7 +1198,7 @@ export const dateToISOLocal = (date: Date): string => {
 
 Only positive UTC offset timezones were affected by the bug. The fix ensures consistency across all timezones.
 
-### Why toISOString() Was Wrong
+#### Why toISOString() Was Wrong
 
 ```typescript
 // JavaScript Date internally stores time in UTC
@@ -1297,7 +1297,7 @@ Cards across different tabs had inconsistent styling. Parcel size and allowed it
 
 **How It Works Now:**
 
-### Design Consistency Achieved
+#### Design Consistency Achieved
 
 All cards now match the **AvailableTripCard** reference design:
 
@@ -1313,7 +1313,7 @@ All cards now match the **AvailableTripCard** reference design:
 | Footer icon         | ✅ `arrow-forward` size 18 in primary color  |
 | Typography          | ✅ Consistent sizes and weights              |
 
-### Chip Styling Pattern
+#### Chip Styling Pattern
 
 **Parcel Size Chip:**
 
@@ -1593,7 +1593,7 @@ Both modals are now completely free of notes references:
 
 **How It Works Now:**
 
-### Clean Import Structure
+#### Clean Import Structure
 
 ```typescript
 // Modals now import clean schema names (no aliases)
@@ -1608,7 +1608,7 @@ import {
 } from "@/lib/validations/trip-edit";
 ```
 
-### Validation Rules Match Backend
+#### Validation Rules Match Backend
 
 | Field       | Frontend Validation     | Backend Validation | Status      |
 | ----------- | ----------------------- | ------------------ | ----------- |
@@ -1684,7 +1684,7 @@ Pending requests were not automatically expiring when trips transitioned to `in_
 
 **How It Works:**
 
-### Automatic Flow (via Cron Job)
+#### Automatic Flow (via Cron Job)
 
 1. `transition-trips-to-in-progress` cron job runs every 5 minutes
 2. Identifies trips with `departure_date + departure_time <= NOW()`
@@ -1692,7 +1692,7 @@ Pending requests were not automatically expiring when trips transitioned to `in_
 4. **Trigger fires automatically** when trip status changes
 5. All `pending` requests on that trip → `expired`
 
-### Manual Flow (Direct Update)
+#### Manual Flow (Direct Update)
 
 ```sql
 UPDATE trips SET status = 'in_progress' WHERE id = '<trip_id>';
