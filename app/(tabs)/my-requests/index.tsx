@@ -313,6 +313,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     paddingHorizontal: Spacing.lg,
     paddingVertical: Spacing.md,
+    borderBottomWidth: 1,
   },
   headerTitle: {
     fontSize: Typography.sizes.xl,
