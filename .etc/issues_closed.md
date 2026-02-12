@@ -150,6 +150,280 @@ npx supabase gen types typescript --project-id <project-id> > types/database.typ
 
 ---
 
+### Issue #8 - Store files locally until form submission ✅
+
+**Type:** Frontend Enhancement - File Upload Pattern  
+**Priority:** HIGH  
+**Time:** 2-3 hours  
+**Date:** 2026-02-12
+
+**Problem:**
+
+Files were being uploaded immediately to Supabase storage when users selected them, causing:
+
+- Orphaned files in storage when forms were abandoned
+- Wasted storage space and bandwidth
+- Unnecessary uploads for users who changed their mind
+- Poor UX (waiting during file selection instead of instant preview)
+
+**Frontend Changes (Applied via GitHub PR - 2026-02-12):**
+
+1. **`lib/utils/fileUpload.ts`** (Updated)
+   - **Added:** `uploadFile()` wrapper function for simpler upload interface
+   - **Interface:** Accepts local URI + bucket type → returns public URL
+   - **Logic:** Extracts file metadata, determines MIME type, calls existing `uploadTicketFile()`
+   - **Kept:** Existing `uploadTicketFile()` for backward compatibility
+
+2. **`components/forms/FileUploadButton.tsx`** (Updated)
+   - **Removed:** Immediate upload on file selection
+   - **Changed:** Now stores local `file://` URI in state
+   - **Removed:** `userId` prop (not needed until upload)
+   - **Updated:** Button text from "Upload Ticket" → "Select Ticket"
+   - **Preview:** Works from local URIs instantly
+
+3. **`components/forms/ImagePicker.tsx`** (Updated)
+   - **Removed:** All inline Supabase upload logic
+   - **Changed:** Now stores array of local `file://` URIs
+   - **Removed:** `uploadImage()` function entirely
+   - **Added:** `isSelecting` state for gallery loading indicator
+   - **Preview:** Works from local URIs instantly
+
+4. **`app/create-trip.tsx`** (Updated)
+   - **Added:** `uploadFile` import
+   - **Added:** `isSubmitting` state for upload progress
+   - **Updated:** `onSubmit()` uploads ticket file before calling `createTrip()`
+   - **Added:** Upload error handling with user-friendly alerts
+   - **Updated:** Form disabled state includes `isSubmitting`
+   - **Removed:** `userId` prop from FileUploadButton component
+
+5. **`app/explore/request-form.tsx`** (Updated)
+   - **Added:** `uploadFile` import
+   - **Added:** `isSubmitting` state for upload progress
+   - **Updated:** `onSubmit()` uploads all parcel photos in parallel
+   - **Added:** Upload error handling with user-friendly alerts
+   - **Updated:** Form disabled state includes `isSubmitting`
+   - **Future-proof:** Supports mix of local URIs and existing URLs (for edit functionality)
+
+**How It Works Now:**
+
+### File Selection Flow
+
+```
+User selects file
+    ↓
+Expo copies to device cache (file://...)
+    ↓
+Component stores URI string in React state
+    ↓
+Preview renders from local cache (instant)
+    ↓
+[User continues filling form]
+    ↓
+User clicks Submit
+    ↓
+Form calls uploadFile(uri, bucket)
+    ↓
+File uploaded to Supabase storage
+    ↓
+Public URL returned
+    ↓
+Backend RPC called with URL
+    ↓
+✅ No orphaned files!
+```
+
+### Cache Management
+
+**iOS:** `/var/mobile/Containers/Data/Application/{APP_ID}/Library/Caches/`  
+**Android:** `/data/data/{PACKAGE_NAME}/cache/`
+
+- Files automatically created by Expo when user picks them
+- Sandboxed (app-only access)
+- Ephemeral (OS manages cleanup)
+- We only store URI reference string
+- When form is abandoned, URI forgotten → no Supabase orphans
+
+**Benefits:**
+
+✅ **No orphaned files** - Upload only on confirmed submission  
+✅ **Instant preview** - No network latency during selection  
+✅ **Reduced bandwidth** - Only upload final selections  
+✅ **Better UX** - No waiting, no loading spinners during selection  
+✅ **Graceful errors** - User can retry without re-selecting files  
+✅ **Lower costs** - Reduced Supabase storage usage  
+✅ **Industry standard** - Pattern used by WhatsApp, Instagram, Gmail
+
+**Testing:**
+
+- ✅ Test 1: File selection shows instant preview (no upload) - PASSED
+- ✅ Test 2: Form abandonment leaves no orphaned Supabase files - PASSED
+- ✅ Test 3: Form submission uploads successfully - PASSED
+- ✅ Test 4: Upload errors show user-friendly alerts - PASSED
+- ✅ Test 5: Works with camera photos - PASSED
+- ✅ Test 6: Works with gallery selection - PASSED
+- ✅ Test 7: Works with document picker (PDFs) - PASSED
+- ✅ Test 8: Multiple images upload in parallel - PASSED
+
+**Acceptance Criteria:**
+
+- ✅ Files upload to Supabase only on form submission
+- ✅ No orphaned files in Supabase storage when forms abandoned
+- ✅ Preview works from local files immediately (no network delay)
+- ✅ Upload errors are handled gracefully with retry capability
+- ✅ Works with all file sources (camera, gallery, documents)
+- ✅ Consistent pattern across FileUploadButton and ImagePicker
+
+**Frontend Changes:**
+
+- `lib/utils/fileUpload.ts` - Added `uploadFile()` wrapper
+- `components/forms/FileUploadButton.tsx` - Store local URIs only
+- `components/forms/ImagePicker.tsx` - Store local URIs only
+- `app/create-trip.tsx` - Upload on submit
+- `app/explore/request-form.tsx` - Upload on submit (parallel)
+
+**Type Updates:**
+
+- None required - function signatures use existing types
+
+**Database Objects Touched:**
+
+- None - frontend-only changes
+
+**Related Issues:**
+
+- Completes with: Issue #9 (ImagePicker refactor)
+- Improves: Storage cost management
+- Enhances: User experience (instant feedback)
+
+---
+
+### Issue #9 - ImagePicker refactor to defer uploads ✅
+
+**Type:** Frontend Refactor - Component Enhancement  
+**Priority:** HIGH  
+**Time:** 1-2 hours  
+**Date:** 2026-02-12
+
+**Problem:**
+
+ImagePicker component was uploading images immediately to Supabase storage during selection, causing the same issues as FileUploadButton:
+
+- Orphaned files in storage bucket when users changed their mind
+- Inconsistent pattern between FileUploadButton and ImagePicker
+- No way for parent components to control upload timing
+- Duplicate upload logic in component instead of centralized utility
+
+**Frontend Changes (Applied via GitHub PR - 2026-02-12):**
+
+1. **`components/forms/ImagePicker.tsx`** (Complete Refactor)
+   - **Removed:** All Supabase import and upload logic
+   - **Removed:** `uploadImage()` function (was uploading immediately)
+   - **Changed:** `takePhoto()` now returns local URI only
+   - **Changed:** `pickFromGallery()` now returns local URIs only
+   - **Added:** `isSelecting` state for gallery multi-select loading
+   - **Updated:** Preview works from local `file://` URIs
+   - **Kept:** All permission checks (camera, gallery)
+   - **Kept:** UI/UX (progress text, warnings, validation)
+
+2. **`app/explore/request-form.tsx`** (Integration)
+   - **Responsibility:** Handles upload in `onSubmit()` using `uploadFile()` utility
+   - **Pattern:** Same as create-trip.tsx for consistency
+   - **Parallel uploads:** Uses `Promise.all()` for efficiency
+   - **Error handling:** Graceful alerts with retry capability
+
+**How It Works Now:**
+
+### Component Responsibility
+
+**Before (Bad Pattern):**
+
+```
+ImagePicker.tsx:
+  - Select images
+  - Upload to Supabase ❌
+  - Return public URLs
+  - Parent just receives URLs
+```
+
+**After (Good Pattern):**
+
+```
+ImagePicker.tsx:
+  - Select images
+  - Return local URIs
+  - Parent decides when to upload ✓
+
+request-form.tsx:
+  - Receives local URIs from ImagePicker
+  - User fills rest of form
+  - On submit: uploads all URIs
+  - Calls backend with public URLs ✓
+```
+
+### Parallel Upload Implementation
+
+```typescript
+// In request-form.tsx onSubmit()
+const photoUrls = await Promise.all(
+  data.parcel_photos.map((uri) => {
+    if (uri.startsWith("file://")) {
+      return uploadFile(uri, "parcel-photos");
+    }
+    return uri; // Already a public URL (future-proof for edits)
+  }),
+);
+```
+
+**Benefits:**
+
+✅ **Consistent pattern** - Matches FileUploadButton implementation  
+✅ **Centralized upload logic** - Uses shared `uploadFile()` utility  
+✅ **Parent control** - Forms decide when to upload  
+✅ **No orphaned files** - Only upload on form submission  
+✅ **Better separation of concerns** - Component handles selection, parent handles upload  
+✅ **Future-proof** - Supports mix of local/remote URIs for edit functionality
+
+**Testing:**
+
+- ✅ Test 1: Camera photo shows instant preview (no upload) - PASSED
+- ✅ Test 2: Gallery selection shows instant preview (no upload) - PASSED
+- ✅ Test 3: Multiple images preview correctly - PASSED
+- ✅ Test 4: Form abandonment leaves no orphaned files - PASSED
+- ✅ Test 5: Form submission uploads all images in parallel - PASSED
+- ✅ Test 6: Upload error shows user-friendly alert - PASSED
+- ✅ Test 7: Remove image works correctly - PASSED
+- ✅ Test 8: Exact count validation (2 photos) works - PASSED
+
+**Acceptance Criteria:**
+
+- ✅ ImagePicker uses expo-image-picker (was already using it)
+- ✅ Selected images stored as local URIs (not uploaded immediately)
+- ✅ Upload handled by parent component using fileUpload utils
+- ✅ Consistent implementation with FileUploadButton pattern
+- ✅ Preview works from local cache instantly
+- ✅ No duplicate upload logic in component
+
+**Frontend Changes:**
+
+- `components/forms/ImagePicker.tsx` - Removed upload logic, store URIs only
+- `app/explore/request-form.tsx` - Added parallel upload in onSubmit
+
+**Type Updates:**
+
+- None required - component props unchanged
+
+**Database Objects Touched:**
+
+- None - frontend-only changes
+
+**Related Issues:**
+
+- Completes with: Issue #8 (FileUploadButton defer uploads)
+- Depends on: Issue #8 (uploadFile utility created)
+- Pattern consistency: Both file components now follow same approach
+
+---
+
 ### Issue #6 - Fix create-trip form date/time validation ✅
 
 **Type:** Frontend Validation - Bug Fix  
@@ -864,7 +1138,12 @@ Trip status was incorrectly transitioning to `in_progress` when parcel was picke
 
 ### Files Changed
 
-- `stores/tripStore.ts` - Core implementation (Issues #4, #27)
+- `stores/tripStore.ts` - Core implementation (Issues #4, #7, #27)
+- `lib/utils/fileUpload.ts` - Added uploadFile() wrapper (Issue #8)
+- `components/forms/FileUploadButton.tsx` - Store local URIs, defer upload (Issue #8)
+- `components/forms/ImagePicker.tsx` - Store local URIs, defer upload (Issues #8, #9)
+- `app/create-trip.tsx` - Upload on submit, error handling (Issues #8)
+- `app/explore/request-form.tsx` - Parallel upload on submit (Issue #9)
 - `stores/requestStore.ts` - No changes required (Issues #2, #3)
 - `lib/validations/trip.ts` - Date validation fixes (Issue #6)
 - `lib/validations/trip-edit.ts` - Schema cleanup (Issue #15)
