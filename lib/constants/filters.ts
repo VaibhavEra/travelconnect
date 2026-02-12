@@ -31,6 +31,16 @@ export const TRIP_FILTERS = [
     icon: "time" as keyof typeof Ionicons.glyphMap,
   },
   {
+    key: "locked",
+    label: "Locked",
+    icon: "lock-closed" as keyof typeof Ionicons.glyphMap,
+  },
+  {
+    key: "in_progress",
+    label: "In Progress",
+    icon: "bicycle" as keyof typeof Ionicons.glyphMap,
+  },
+  {
     key: "completed",
     label: "Completed",
     icon: "checkmark-done" as keyof typeof Ionicons.glyphMap,
@@ -39,6 +49,11 @@ export const TRIP_FILTERS = [
     key: "cancelled",
     label: "Cancelled",
     icon: "close-circle" as keyof typeof Ionicons.glyphMap,
+  },
+  {
+    key: "expired",
+    label: "Expired",
+    icon: "alert-circle" as keyof typeof Ionicons.glyphMap,
   },
 ] as const;
 
