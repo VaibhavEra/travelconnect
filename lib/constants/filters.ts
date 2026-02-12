@@ -1,6 +1,5 @@
 import { Ionicons } from "@expo/vector-icons";
 
-// Request Filters
 export const REQUEST_FILTERS = [
   { key: "all", label: "All", icon: "apps" as keyof typeof Ionicons.glyphMap },
   {
@@ -17,6 +16,26 @@ export const REQUEST_FILTERS = [
     key: "rejected",
     label: "Rejected",
     icon: "close-circle" as keyof typeof Ionicons.glyphMap,
+  },
+  {
+    key: "picked_up",
+    label: "Picked Up",
+    icon: "cube" as keyof typeof Ionicons.glyphMap,
+  },
+  {
+    key: "delivered",
+    label: "Delivered",
+    icon: "checkmark-done" as keyof typeof Ionicons.glyphMap,
+  },
+  {
+    key: "cancelled",
+    label: "Cancelled",
+    icon: "close" as keyof typeof Ionicons.glyphMap,
+  },
+  {
+    key: "expired",
+    label: "Expired",
+    icon: "hourglass" as keyof typeof Ionicons.glyphMap,
   },
 ] as const;
 

@@ -1,6 +1,7 @@
 import RequestCard from "@/components/request/RequestCard";
 import FilterChip from "@/components/shared/FilterChip";
 import ModeSwitcher from "@/components/shared/ModeSwitcher";
+import { REQUEST_FILTERS, RequestFilterKey } from "@/lib/constants/filters";
 import { haptics } from "@/lib/utils/haptics";
 import { useAuthStore } from "@/stores/authStore";
 import { useRequestStore } from "@/stores/requestStore";
@@ -26,32 +27,11 @@ import Animated, {
 } from "react-native-reanimated";
 import { SafeAreaView } from "react-native-safe-area-context";
 
-type StatusFilter =
-  | "all"
-  | "pending"
-  | "accepted"
-  | "in_transit"
-  | "completed"
-  | "cancelled";
-
-const FILTER_CONFIG: Array<{
-  key: StatusFilter;
-  label: string;
-  icon: keyof typeof Ionicons.glyphMap;
-}> = [
-  { key: "all", label: "All", icon: "apps" },
-  { key: "pending", label: "Pending", icon: "time" },
-  { key: "accepted", label: "Accepted", icon: "checkmark-circle" },
-  { key: "in_transit", label: "In Transit", icon: "location" },
-  { key: "completed", label: "Completed", icon: "checkmark-done" },
-  { key: "cancelled", label: "Cancelled", icon: "close-circle" },
-];
-
 export default function MyRequestsScreen() {
   const colors = useThemeColors();
   const { user } = useAuthStore();
   const { myRequests, loading, getMyRequests } = useRequestStore();
-  const [filter, setFilter] = useState<StatusFilter>("all");
+  const [filter, setFilter] = useState<RequestFilterKey>("all");
   const [refreshing, setRefreshing] = useState(false);
 
   const scrollY = useSharedValue(0);
@@ -79,42 +59,19 @@ export default function MyRequestsScreen() {
     scrollY.value = event.nativeEvent.contentOffset.y;
   };
 
-  const filteredRequests = myRequests.filter((request) => {
-    if (filter === "all") return true;
-    if (filter === "in_transit") {
-      return request.status === "picked_up";
-    }
-    if (filter === "completed") {
-      return request.status === "delivered";
-    }
-    if (filter === "cancelled") {
-      return (
-        request.status === "cancelled" ||
-        request.status === "rejected" ||
-        request.status === "failed"
-      );
-    }
-    return request.status === filter;
-  });
+  const getFilteredRequests = () => {
+    if (filter === "all") return myRequests;
+    return myRequests.filter((request) => request.status === filter);
+  };
 
-  const getFilterCount = (filterType: StatusFilter) => {
+  const getFilterCount = (filterType: RequestFilterKey) => {
     if (filterType === "all") return myRequests.length;
-    if (filterType === "in_transit") {
-      return myRequests.filter((r) => r.status === "picked_up").length;
-    }
-    if (filterType === "completed") {
-      return myRequests.filter((r) => r.status === "delivered").length;
-    }
-    if (filterType === "cancelled") {
-      return myRequests.filter(
-        (r) =>
-          r.status === "cancelled" ||
-          r.status === "rejected" ||
-          r.status === "failed",
-      ).length;
-    }
     return myRequests.filter((r) => r.status === filterType).length;
   };
+
+  const filteredRequests = getFilteredRequests();
+  const pendingCount = getFilterCount("pending");
+  const deliveredCount = getFilterCount("delivered");
 
   if (loading && !refreshing) {
     return (
@@ -138,7 +95,7 @@ export default function MyRequestsScreen() {
       style={[styles.container, { backgroundColor: colors.background.primary }]}
       edges={["top"]}
     >
-      <View style={styles.header}>
+      <View style={[styles.header, { borderBottomColor: colors.border.light }]}>
         <View>
           <Text style={[styles.headerTitle, { color: colors.text.primary }]}>
             My Requests
@@ -193,7 +150,7 @@ export default function MyRequestsScreen() {
             >
               <Ionicons name="time" size={20} color={colors.warning} />
               <Text style={[styles.statNumber, { color: colors.warning }]}>
-                {getFilterCount("pending")}
+                {pendingCount}
               </Text>
               <Text style={[styles.statLabel, { color: colors.warning }]}>
                 Pending
@@ -212,10 +169,10 @@ export default function MyRequestsScreen() {
                 color={colors.success}
               />
               <Text style={[styles.statNumber, { color: colors.success }]}>
-                {getFilterCount("completed")}
+                {deliveredCount}
               </Text>
               <Text style={[styles.statLabel, { color: colors.success }]}>
-                Completed
+                Delivered
               </Text>
             </View>
           </Animated.View>
@@ -227,7 +184,7 @@ export default function MyRequestsScreen() {
             showsHorizontalScrollIndicator={false}
             contentContainerStyle={styles.filtersContainer}
           >
-            {FILTER_CONFIG.map((filterConfig) => {
+            {REQUEST_FILTERS.map((filterConfig) => {
               const count = getFilterCount(filterConfig.key);
               const isActive = filter === filterConfig.key;
 
