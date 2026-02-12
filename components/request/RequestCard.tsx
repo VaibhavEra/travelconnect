@@ -1,15 +1,26 @@
 import { CATEGORY_CONFIG } from "@/lib/constants/categories";
 import { getSizeCapacityLabel } from "@/lib/constants/parcel";
 import { REQUEST_STATUS_CONFIG, RequestStatus } from "@/lib/constants/status";
-import { TRANSPORT_ICONS } from "@/lib/constants/transport";
+import { TRANSPORT_CONFIG } from "@/lib/constants/transport";
 import { formatDate, formatTime } from "@/lib/utils/dateTime";
 import { haptics } from "@/lib/utils/haptics";
 import { ParcelRequest } from "@/stores/requestStore";
-import { BorderRadius, Spacing, Typography, withOpacity } from "@/styles";
+import {
+  Animations,
+  BorderRadius,
+  Spacing,
+  Typography,
+  withOpacity,
+} from "@/styles";
 import { useThemeColors } from "@/styles/theme";
 import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
 import { Pressable, StyleSheet, Text, View } from "react-native";
+import Animated, {
+  useAnimatedStyle,
+  useSharedValue,
+  withSpring,
+} from "react-native-reanimated";
 
 interface RequestCardProps {
   request: ParcelRequest;
@@ -17,6 +28,7 @@ interface RequestCardProps {
 
 export default function RequestCard({ request }: RequestCardProps) {
   const colors = useThemeColors();
+  const scale = useSharedValue(1);
 
   const handlePress = () => {
     haptics.light();
@@ -26,6 +38,18 @@ export default function RequestCard({ request }: RequestCardProps) {
     });
   };
 
+  const handlePressIn = () => {
+    scale.value = withSpring(Animations.scale.card);
+  };
+
+  const handlePressOut = () => {
+    scale.value = withSpring(1);
+  };
+
+  const animatedStyle = useAnimatedStyle(() => ({
+    transform: [{ scale: scale.value }],
+  }));
+
   const status = request.status as RequestStatus;
   const statusConfig =
     REQUEST_STATUS_CONFIG[status] || REQUEST_STATUS_CONFIG.pending;
@@ -34,176 +58,162 @@ export default function RequestCard({ request }: RequestCardProps) {
   const categoryConfig =
     CATEGORY_CONFIG[request.category as keyof typeof CATEGORY_CONFIG];
 
-  // Get transport icon safely
-  const transportMode = request.trip?.transport_mode || "";
-  const transportIcon =
-    TRANSPORT_ICONS[transportMode as keyof typeof TRANSPORT_ICONS] ||
-    "arrow-forward";
+  const isCancelled = request.status === "cancelled";
+
+  const transportMode = request.trip
+    ?.transport_mode as keyof typeof TRANSPORT_CONFIG;
+  const transportConfig = transportMode
+    ? TRANSPORT_CONFIG[transportMode]
+    : null;
 
   return (
-    <Pressable
-      style={({ pressed }) => [
-        styles.card,
-        {
-          backgroundColor: colors.background.primary,
-          borderColor: colors.border.default,
-          opacity: pressed ? 0.7 : 1,
-        },
-      ]}
-      onPress={handlePress}
-    >
-      {/* Header - Status and Route */}
-      <View style={styles.header}>
-        <View style={styles.headerLeft}>
-          <View
-            style={[
-              styles.statusBadge,
-              { backgroundColor: withOpacity(statusColor, "light") },
-            ]}
-          >
-            <Ionicons name={statusConfig.icon} size={14} color={statusColor} />
-            <Text style={[styles.statusText, { color: statusColor }]}>
-              {statusConfig.label}
-            </Text>
-          </View>
+    <Animated.View style={animatedStyle}>
+      <Pressable
+        style={[
+          styles.card,
+          {
+            backgroundColor: colors.background.primary,
+            borderColor: colors.border.default,
+          },
+          isCancelled && { opacity: 0.7 },
+        ]}
+        onPress={handlePress}
+        onPressIn={handlePressIn}
+        onPressOut={handlePressOut}
+      >
+        {/* Status Banner */}
+        <View
+          style={[
+            styles.statusBanner,
+            { backgroundColor: withOpacity(statusColor, "light") },
+          ]}
+        >
+          <Ionicons name={statusConfig.icon} size={16} color={statusColor} />
+          <Text style={[styles.statusText, { color: statusColor }]}>
+            {statusConfig.label}
+          </Text>
         </View>
-      </View>
 
-      {/* Route */}
-      {request.trip && (
-        <View style={styles.routeContainer}>
-          <View style={styles.routeRow}>
-            <View style={styles.cityContainer}>
-              <Text style={[styles.cityLabel, { color: colors.text.tertiary }]}>
-                From
-              </Text>
-              <Text style={[styles.cityName, { color: colors.text.primary }]}>
-                {request.trip.source}
-              </Text>
+        {/* Content */}
+        <View style={styles.content}>
+          {/* Cities Row */}
+          {request.trip && (
+            <View style={styles.citiesRow}>
+              <View style={styles.cityColumn}>
+                <Text style={[styles.cityName, { color: colors.text.primary }]}>
+                  {request.trip.source}
+                </Text>
+                <Text
+                  style={[styles.dateTime, { color: colors.text.secondary }]}
+                >
+                  {formatDate(request.trip.departure_date)}
+                </Text>
+                <Text
+                  style={[styles.dateTime, { color: colors.text.secondary }]}
+                >
+                  {formatTime(request.trip.departure_time)}
+                </Text>
+              </View>
+
+              <View style={styles.routeMiddle}>
+                <View
+                  style={[
+                    styles.routeLine,
+                    { backgroundColor: colors.border.default },
+                  ]}
+                />
+                <View
+                  style={[
+                    styles.transportIcon,
+                    { backgroundColor: withOpacity(colors.primary, "light") },
+                  ]}
+                >
+                  <Ionicons
+                    name={transportConfig?.icon || "arrow-forward"}
+                    size={18}
+                    color={colors.primary}
+                  />
+                </View>
+                <View
+                  style={[
+                    styles.routeLine,
+                    { backgroundColor: colors.border.default },
+                  ]}
+                />
+              </View>
+
+              <View style={[styles.cityColumn, { alignItems: "flex-end" }]}>
+                <Text style={[styles.cityName, { color: colors.text.primary }]}>
+                  {request.trip.destination}
+                </Text>
+                <Text
+                  style={[styles.dateTime, { color: colors.text.secondary }]}
+                >
+                  {formatDate(request.trip.arrival_date)}
+                </Text>
+                <Text
+                  style={[styles.dateTime, { color: colors.text.secondary }]}
+                >
+                  {formatTime(request.trip.arrival_time)}
+                </Text>
+              </View>
             </View>
+          )}
 
-            <View style={styles.routeMiddle}>
+          {/* Divider */}
+          <View
+            style={[styles.divider, { backgroundColor: colors.border.light }]}
+          />
+
+          {/* Info Row - Category + Parcel Size */}
+          <View style={styles.infoRow}>
+            {/* Category */}
+            <View style={styles.categoryContainer}>
               <View
                 style={[
-                  styles.routeLine,
-                  { backgroundColor: colors.border.default },
-                ]}
-              />
-              <View
-                style={[
-                  styles.transportIcon,
-                  { backgroundColor: withOpacity(colors.primary, "light") },
+                  styles.categoryChip,
+                  { backgroundColor: withOpacity(colors.primary, "subtle") },
                 ]}
               >
                 <Ionicons
-                  name={transportIcon}
+                  name={categoryConfig.icon}
                   size={14}
                   color={colors.primary}
                 />
+                <Text style={[styles.categoryText, { color: colors.primary }]}>
+                  {categoryConfig.label}
+                </Text>
               </View>
-              <View
-                style={[
-                  styles.routeLine,
-                  { backgroundColor: colors.border.default },
-                ]}
-              />
             </View>
 
-            <View style={[styles.cityContainer, { alignItems: "flex-end" }]}>
-              <Text style={[styles.cityLabel, { color: colors.text.tertiary }]}>
-                To
-              </Text>
-              <Text style={[styles.cityName, { color: colors.text.primary }]}>
-                {request.trip.destination}
-              </Text>
-            </View>
+            {/* Trip Parcel Size Capacity */}
+            {request.trip?.parcel_size_capacity && (
+              <View style={styles.sizeContainer}>
+                <View
+                  style={[
+                    styles.sizeChip,
+                    { backgroundColor: withOpacity(colors.success, "subtle") },
+                  ]}
+                >
+                  <Ionicons name="cube" size={14} color={colors.success} />
+                  <Text style={[styles.sizeText, { color: colors.success }]}>
+                    {getSizeCapacityLabel(request.trip.parcel_size_capacity)}
+                  </Text>
+                </View>
+              </View>
+            )}
           </View>
         </View>
-      )}
 
-      {/* Divider */}
-      <View
-        style={[styles.divider, { backgroundColor: colors.border.light }]}
-      />
-
-      {/* Details Grid */}
-      <View style={styles.detailsGrid}>
-        {/* Category */}
-        <View style={styles.detailItem}>
-          <Text style={[styles.detailLabel, { color: colors.text.tertiary }]}>
-            Category
+        {/* Footer */}
+        <View style={[styles.footer, { borderTopColor: colors.border.light }]}>
+          <Text style={[styles.footerText, { color: colors.primary }]}>
+            View Full Details
           </Text>
-          <View
-            style={[
-              styles.categoryChip,
-              { backgroundColor: withOpacity(colors.primary, "subtle") },
-            ]}
-          >
-            <Ionicons
-              name={categoryConfig.icon}
-              size={14}
-              color={colors.primary}
-            />
-            <Text style={[styles.categoryText, { color: colors.primary }]}>
-              {categoryConfig.label}
-            </Text>
-          </View>
+          <Ionicons name="arrow-forward" size={18} color={colors.primary} />
         </View>
-
-        {/* Parcel Size Capacity (from trip) */}
-        {request.trip?.parcel_size_capacity && (
-          <View style={styles.detailItem}>
-            <Text style={[styles.detailLabel, { color: colors.text.tertiary }]}>
-              Trip Accepts
-            </Text>
-            <View
-              style={[
-                styles.sizeChip,
-                { backgroundColor: withOpacity(colors.success, "subtle") },
-              ]}
-            >
-              <Ionicons name="cube" size={14} color={colors.success} />
-              <Text style={[styles.sizeText, { color: colors.success }]}>
-                {getSizeCapacityLabel(request.trip.parcel_size_capacity)}
-              </Text>
-            </View>
-          </View>
-        )}
-      </View>
-
-      {/* Divider */}
-      <View
-        style={[styles.divider, { backgroundColor: colors.border.light }]}
-      />
-
-      {/* Departure Info */}
-      {request.trip && (
-        <View style={styles.timingRow}>
-          <Ionicons
-            name="calendar-outline"
-            size={16}
-            color={colors.text.tertiary}
-          />
-          <View style={styles.timingDetails}>
-            <Text style={[styles.timingLabel, { color: colors.text.tertiary }]}>
-              Departure
-            </Text>
-            <Text style={[styles.timingValue, { color: colors.text.primary }]}>
-              {formatDate(request.trip.departure_date)} •{" "}
-              {formatTime(request.trip.departure_time)}
-            </Text>
-          </View>
-        </View>
-      )}
-
-      {/* Footer - View Details */}
-      <View style={[styles.footer, { borderTopColor: colors.border.light }]}>
-        <Text style={[styles.footerText, { color: colors.primary }]}>
-          View Full Details
-        </Text>
-        <Ionicons name="arrow-forward" size={18} color={colors.primary} />
-      </View>
-    </Pressable>
+      </Pressable>
+    </Animated.View>
   );
 }
 
@@ -218,102 +228,81 @@ const styles = StyleSheet.create({
     shadowRadius: 8,
     elevation: 2,
   },
-  header: {
+  statusBanner: {
     flexDirection: "row",
     alignItems: "center",
-    justifyContent: "space-between",
-    paddingHorizontal: Spacing.lg,
-    paddingTop: Spacing.md,
-    paddingBottom: Spacing.sm,
-  },
-  headerLeft: {
-    flex: 1,
-  },
-  statusBadge: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 6,
-    alignSelf: "flex-start",
-    paddingHorizontal: Spacing.sm,
-    paddingVertical: 6,
-    borderRadius: BorderRadius.sm,
-  },
-  statusText: {
-    fontSize: Typography.sizes.xs,
-    fontWeight: Typography.weights.semibold,
-  },
-  routeContainer: {
-    paddingHorizontal: Spacing.lg,
+    justifyContent: "center",
+    gap: Spacing.xs,
     paddingVertical: Spacing.sm,
   },
-  routeRow: {
+  statusText: {
+    fontSize: Typography.sizes.sm,
+    fontWeight: Typography.weights.semibold,
+  },
+  content: {
+    padding: Spacing.lg,
+  },
+  citiesRow: {
     flexDirection: "row",
     alignItems: "center",
+    marginBottom: Spacing.md,
   },
-  cityContainer: {
+  cityColumn: {
     flex: 1,
-  },
-  cityLabel: {
-    fontSize: Typography.sizes.xs,
-    marginBottom: 2,
+    gap: 2,
   },
   cityName: {
     fontSize: Typography.sizes.md,
     fontWeight: Typography.weights.bold,
+    marginBottom: Spacing.xs,
+  },
+  dateTime: {
+    fontSize: Typography.sizes.xs,
   },
   routeMiddle: {
     flexDirection: "row",
     alignItems: "center",
-    paddingHorizontal: Spacing.sm,
+    paddingHorizontal: Spacing.md,
   },
   routeLine: {
-    flex: 1,
+    width: 28,
     height: 2,
   },
   transportIcon: {
-    width: 24,
-    height: 24,
-    borderRadius: 12,
+    width: 36,
+    height: 36,
+    borderRadius: 18,
     alignItems: "center",
     justifyContent: "center",
-    marginHorizontal: Spacing.xs,
+    marginHorizontal: -10,
   },
   divider: {
     height: 1,
-    marginHorizontal: Spacing.lg,
+    marginBottom: Spacing.md,
   },
-  detailsGrid: {
+  infoRow: {
     flexDirection: "row",
-    gap: Spacing.md,
-    paddingHorizontal: Spacing.lg,
-    paddingVertical: Spacing.md,
+    justifyContent: "space-between",
+    alignItems: "center",
   },
-  detailItem: {
-    flex: 1,
-    gap: Spacing.xs,
-  },
-  detailLabel: {
-    fontSize: Typography.sizes.xs,
-    fontWeight: Typography.weights.medium,
-  },
+  categoryContainer: {},
   categoryChip: {
     flexDirection: "row",
     alignItems: "center",
     gap: 4,
-    alignSelf: "flex-start",
     paddingHorizontal: Spacing.sm,
-    paddingVertical: 4,
+    paddingVertical: Spacing.xs,
     borderRadius: BorderRadius.sm,
   },
   categoryText: {
     fontSize: Typography.sizes.xs,
     fontWeight: Typography.weights.semibold,
   },
+  sizeContainer: {},
   sizeChip: {
     flexDirection: "row",
     alignItems: "center",
     gap: 4,
-    alignSelf: "flex-start",
     paddingHorizontal: Spacing.sm,
     paddingVertical: 4,
     borderRadius: BorderRadius.sm,
@@ -322,30 +311,12 @@ const styles = StyleSheet.create({
     fontSize: Typography.sizes.xs,
     fontWeight: Typography.weights.semibold,
   },
-  timingRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: Spacing.sm,
-    paddingHorizontal: Spacing.lg,
-    paddingVertical: Spacing.md,
-  },
-  timingDetails: {
-    flex: 1,
-  },
-  timingLabel: {
-    fontSize: Typography.sizes.xs,
-    marginBottom: 2,
-  },
-  timingValue: {
-    fontSize: Typography.sizes.sm,
-    fontWeight: Typography.weights.medium,
-  },
   footer: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
     gap: Spacing.xs,
-    paddingVertical: Spacing.md,
+    paddingVertical: Spacing.sm,
     borderTopWidth: 1,
   },
   footerText: {
