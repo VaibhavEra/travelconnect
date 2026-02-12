@@ -645,6 +645,199 @@ badge color and icon once the filters expose them.
 
 ---
 
+### Issue #18 - Display trip cities and arrival time in RequestCard ✅
+
+**Type:** Frontend Bug Fix - Data Display + RLS Policy
+**Priority:** HIGH
+**Time:** 2-3 hours
+**Date:** 2026-02-13
+
+**Problem:**
+
+RequestCard component was not displaying trip source/destination cities and arrival times, showing only departure information. Investigation revealed two issues:
+
+- Incomplete query selections in `requestStore.ts` (missing `id`, `arrival_date`, `arrival_time` from trip)
+- RLS infinite recursion error when senders tried to access trip data through their requests
+- `parcel_requests` policy referenced `trips`, and `trips` policy referenced `parcel_requests` (circular dependency)
+
+**Backend Changes (Applied via Supabase SQL Editor - 2026-02-13):**
+
+1. **`user_can_view_trip()` function** (Created)
+   - **Purpose:** SECURITY DEFINER function to break RLS recursion
+   - **Logic:** Checks if user has any requests for the given trip_id
+   - **Attributes:** STABLE, SECURITY DEFINER (bypasses RLS during check)
+   - **Returns:** boolean (true if user is sender of any request for the trip)
+
+2. **"Users can view trips" RLS policy** (Updated)
+   - **Removed:** Direct subquery causing infinite recursion
+   - **Added:** Call to `user_can_view_trip(id)` function
+   - **Final logic:**
+     ```sql
+     traveller_id = auth.uid()  -- Travellers see their own trips
+     OR (status = 'upcoming' AND departure_date >= CURRENT_DATE)  -- Anyone browses upcoming
+     OR user_can_view_trip(id)  -- Senders see trips they've requested
+     ```
+
+**Frontend Changes (Applied via GitHub PR - 2026-02-13):**
+
+1. **`stores/requestStore.ts`** (Updated)
+   - **Updated `ParcelRequest` interface:**
+     - Added `trip.id` field (UUID)
+     - Added `trip.arrival_date` field (string)
+     - Added `trip.arrival_time` field (string)
+   - **Updated 5 query methods** to fetch complete trip data:
+     - `createRequest()` - Added id, arrival_date, arrival_time to SELECT
+     - `getMyRequests()` - Added id, arrival_date, arrival_time to SELECT
+     - `getIncomingRequests()` - Added id, arrival_date, arrival_time to SELECT
+     - `getAcceptedRequests()` - Added id, arrival_date, arrival_time to SELECT
+     - `getRequestById()` - Added id, arrival_date, arrival_time to SELECT
+
+2. **`components/request/RequestCard.tsx`** (Complete Redesign)
+   - **Replaced layout** to match TripCard design pattern
+   - **Added:** Status banner at top with colored background
+   - **Added:** City columns showing source and destination with dates/times
+   - **Added:** Transport mode icon in center with connecting lines
+   - **Added:** Animated press effect using Reanimated
+   - **Fixed:** Type-safe transport mode icon handling
+   - **Removed:** Old two-section layout (route + timing)
+   - **Styling:** Now consistent with TripCard (same spacing, colors, typography)
+
+**How It Works Now:**
+
+### RLS Policy Resolution
+
+**Before (Broken - Infinite Recursion):**
+
+```
+parcel_requests policy: "Senders can SELECT WHERE sender_id = auth.uid()"
+↓ User queries: SELECT * FROM parcel_requests JOIN trips
+trips policy: "Users can view trips WHERE EXISTS (SELECT FROM parcel_requests...)"
+↓ RLS evaluates trips policy
+↓ Subquery accesses parcel_requests
+↓ RLS evaluates parcel_requests policy
+↓ Policy references trips again
+❌ INFINITE RECURSION ERROR
+```
+
+**After (Fixed - SECURITY DEFINER breaks recursion):**
+
+```
+parcel_requests policy: "Senders can SELECT WHERE sender_id = auth.uid()"
+↓ User queries: SELECT * FROM parcel_requests JOIN trips
+trips policy: "Users can view trips WHERE user_can_view_trip(id)"
+↓ RLS calls function (SECURITY DEFINER)
+↓ Function bypasses RLS, directly checks parcel_requests
+✅ Returns boolean, no recursion
+```
+
+### RequestCard Layout
+
+```
+┌──────────────────────────────────────────┐
+│ [Pending] Status Banner (colored)        │
+├──────────────────────────────────────────┤
+│                                          │
+│  Jaipur        [🚂]         Delhi       │
+│  Feb 20, 2026               Feb 20, 2026 │
+│  10:00 AM                   3:30 PM      │
+│                                          │
+├──────────────────────────────────────────┤
+│  [📄 Documents]    [📦 Medium]           │
+├──────────────────────────────────────────┤
+│  View Full Details →                     │
+└──────────────────────────────────────────┘
+```
+
+### Data Flow
+
+```
+1. User opens My Requests tab
+   ↓
+2. requestStore.getMyRequests(userId) called
+   ↓
+3. Supabase query with JOIN on trips table
+   ↓
+4. RLS checks: sender_id = auth.uid() ✓
+   ↓
+5. RLS checks: user_can_view_trip(trip_id) ✓
+   ↓
+6. Returns complete data: request + trip (with cities)
+   ↓
+7. RequestCard renders with source/destination/arrival
+   ✅ Cities displayed correctly!
+```
+
+**Testing:**
+
+- ✅ Test 1: RLS policy allows senders to view trip data - PASSED
+- ✅ Test 2: No infinite recursion error - PASSED
+- ✅ Test 3: Cities display correctly (Jaipur→Delhi, Delhi→Mumbai) - PASSED
+- ✅ Test 4: Departure and arrival dates/times shown - PASSED
+- ✅ Test 5: Transport icon displays correctly - PASSED
+- ✅ Test 6: Card press animation works smoothly - PASSED
+- ✅ Test 7: Card styling matches TripCard design - PASSED
+- ✅ Test 8: TypeScript compilation passes - PASSED
+
+**Acceptance Criteria:**
+
+- ✅ RequestCard displays source and destination cities
+- ✅ RequestCard shows both departure and arrival information
+- ✅ RLS policies allow senders to read trip data without recursion
+- ✅ Card design matches TripCard for consistency
+- ✅ Press animation provides tactile feedback
+- ✅ Type-safe transport mode icon handling
+- ✅ All 5 query methods fetch complete trip data
+
+**Frontend Changes:**
+
+- `stores/requestStore.ts` - Updated ParcelRequest interface and 5 query methods
+- `components/request/RequestCard.tsx` - Complete redesign matching TripCard layout
+
+**Type Updates:**
+
+- `ParcelRequest` interface - Added trip.id, arrival_date, arrival_time fields
+
+**Database Objects Touched:**
+
+1. Function: `user_can_view_trip(uuid)` (created)
+2. Policy: "Users can view trips" on trips table (updated)
+
+**Related Issues:**
+
+- Depends on: Issue #13 (Card styling harmonization) ✅ Resolved
+- Pattern from: TripCard design (consistent UI)
+- Security: Fixes RLS infinite recursion vulnerability
+
+**Technical Details:**
+
+### Why SECURITY DEFINER Was Necessary
+
+RLS policies are evaluated recursively. When a policy on table A references table B, and table B's policy references table A, PostgreSQL enters an infinite loop. The solution is to use a `SECURITY DEFINER` function that:
+
+1. Executes with superuser privileges (bypasses RLS)
+2. Performs the check directly without triggering nested policy evaluation
+3. Returns a simple boolean result
+4. Breaks the recursion chain
+
+### Query Performance
+
+The `user_can_view_trip()` function is marked `STABLE`, allowing PostgreSQL to:
+
+- Cache results within a single transaction
+- Avoid re-executing for the same trip_id
+- Optimize JOIN operations with trips table
+
+**Benefits:**
+
+✅ **Fixed visual bug** - Cities now display correctly in RequestCard
+✅ **Resolved RLS recursion** - No more infinite loop errors
+✅ **Improved UX** - Consistent card design across tabs
+✅ **Type safety** - Complete trip data in TypeScript types
+✅ **Security maintained** - Senders can only view trips they've requested
+✅ **Performance optimized** - STABLE function allows query caching
+
+---
+
 ### Issue #6 - Fix create-trip form date/time validation ✅
 
 **Type:** Frontend Validation - Bug Fix  
