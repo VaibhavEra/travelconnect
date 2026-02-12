@@ -926,6 +926,172 @@ date.getDate(); // 15 (local) ✓
 
 ---
 
+### Issue #13 - Harmonize TripCard, RequestCard, and DeliveryCard styling ✅
+
+**Type:** Frontend Refactor - UI Consistency  
+**Priority:** MEDIUM  
+**Time:** 2 hours  
+**Date:** 2026-02-12
+
+**Problem:**
+
+Cards across different tabs had inconsistent styling. Parcel size and allowed items style needed to match AvailableTripCard from explore/results.tsx.
+
+**Issues Identified:**
+
+- **TripCard:**
+  - Background used `colors.background.secondary` (should be `primary`)
+  - Parcel size chip used `withOpacity("light")` instead of `"subtle"`
+  - Categories displayed as icon-only (no chips with labels)
+  - Footer text "View Details" instead of "View Full Details"
+  - Footer icon `chevron-forward` instead of `arrow-forward`
+  - Footer color tertiary instead of primary
+
+- **RequestCard:**
+  - Background used `colors.background.secondary` (should be `primary`)
+  - Shadow opacity 0.05 instead of 0.06
+  - Category chip used hardcoded hex opacity `colors.primary + "10"` instead of `withOpacity()`
+  - Parcel size displayed as plain text instead of styled chip
+  - Footer icon size 16 instead of 18
+
+- **DeliveryCard:**
+  - Background used `colors.background.secondary` (should be `primary`)
+  - Parcel size and category displayed as plain text with icons (metaRow)
+  - No chip styling for categories or size
+  - Footer text "View Details" instead of "View Full Details"
+  - Footer icon `chevron-forward` instead of `arrow-forward`
+  - Footer color tertiary instead of primary
+
+**Frontend Changes (Applied via GitHub PR - 2026-02-12):**
+
+1. **`components/trip/TripCard.tsx`** (Updated)
+   - **Changed:** Background from `colors.background.secondary` → `colors.background.primary`
+   - **Updated:** Parcel size chip opacity from `withOpacity(colors.success, "light")` → `withOpacity(colors.success, "subtle")`
+   - **Replaced:** Icon-only categories with full chips (icon + label)
+   - **Updated:** Categories now show up to 2 with labels, then "+N" overflow indicator
+   - **Updated:** Footer text "View Details" → "View Full Details"
+   - **Changed:** Footer icon `chevron-forward` → `arrow-forward`
+   - **Changed:** Footer color from `colors.text.tertiary` → `colors.primary`
+   - **Changed:** Footer icon size 16 → 18
+   - **Added:** `categoryChip` and `categoryText` styles matching reference design
+
+2. **`components/request/RequestCard.tsx`** (Updated)
+   - **Changed:** Background from `colors.background.secondary` → `colors.background.primary`
+   - **Fixed:** Shadow opacity from 0.05 → 0.06
+   - **Replaced:** Hardcoded hex opacity `colors.primary + "10"` → `withOpacity(colors.primary, "subtle")`
+   - **Converted:** Plain text parcel size → styled chip with green background and icon
+   - **Updated:** Footer text "View Details" → "View Full Details"
+   - **Changed:** Footer icon size 16 → 18
+   - **Added:** `sizeChip` and `sizeText` styles
+
+3. **`components/delivery/DeliveryCard.tsx`** (Updated)
+   - **Changed:** Background from `colors.background.secondary` → `colors.background.primary`
+   - **Replaced:** `metaRow` section → `chipsRow` with styled chips
+   - **Converted:** Plain text category → chip with `withOpacity(colors.primary, "subtle")` background
+   - **Converted:** Plain text parcel size → chip with `withOpacity(colors.success, "subtle")` background
+   - **Updated:** Footer text "View Details" → "View Full Details"
+   - **Changed:** Footer icon `chevron-forward` → `arrow-forward`
+   - **Changed:** Footer color from `colors.text.tertiary` → `colors.primary`
+   - **Changed:** Footer icon size 16 → 18
+   - **Replaced:** `metaRow/metaItem` styles → `chipsRow`, `categoryChip`, `categoryText`, `sizeChip`, `sizeText`
+
+**How It Works Now:**
+
+### Design Consistency Achieved
+
+All cards now match the **AvailableTripCard** reference design:
+
+| Feature             | Consistency                                  |
+| ------------------- | -------------------------------------------- |
+| Card background     | ✅ `colors.background.primary`               |
+| Shadow opacity      | ✅ 0.06                                      |
+| Border radius       | ✅ `BorderRadius.xl`                         |
+| Parcel size display | ✅ Green chip with icon + label              |
+| Category display    | ✅ Primary-colored chips with icons + labels |
+| Opacity helper      | ✅ Uses `withOpacity("subtle")` consistently |
+| Footer text         | ✅ "View Full Details" in primary color      |
+| Footer icon         | ✅ `arrow-forward` size 18 in primary color  |
+| Typography          | ✅ Consistent sizes and weights              |
+
+### Chip Styling Pattern
+
+**Parcel Size Chip:**
+
+```typescript
+<View
+  style={[
+    styles.sizeChip,
+    { backgroundColor: withOpacity(colors.success, "subtle") },
+  ]}
+>
+  <Ionicons name="cube" size={14} color={colors.success} />
+  <Text style={[styles.sizeText, { color: colors.success }]}>
+    {getSizeCapacityLabel(size)}
+  </Text>
+</View>
+```
+
+**Category Chip:**
+
+```typescript
+<View
+  style={[
+    styles.categoryChip,
+    { backgroundColor: withOpacity(colors.primary, "subtle") },
+  ]}
+>
+  <Ionicons name={icon} size={14} color={colors.primary} />
+  <Text style={[styles.categoryText, { color: colors.primary }]}>
+    {label}
+  </Text>
+</View>
+```
+
+**Testing:**
+
+- ✅ Test 1: TripCard displays consistent styling - PASSED
+- ✅ Test 2: RequestCard displays consistent styling - PASSED
+- ✅ Test 3: DeliveryCard displays consistent styling - PASSED
+- ✅ Test 4: All cards use primary background - PASSED
+- ✅ Test 5: Parcel size chips styled consistently - PASSED
+- ✅ Test 6: Category chips styled consistently - PASSED
+- ✅ Test 7: Footer styling matches across cards - PASSED
+- ✅ Test 8: No TypeScript errors - PASSED
+- ✅ Test 9: Theme switching works correctly - PASSED
+
+**Acceptance Criteria:**
+
+- ✅ All cards use consistent badge styling
+- ✅ Card layouts have consistent spacing
+- ✅ Typography sizes and weights are consistent
+- ✅ Colors match theme across all cards
+- ✅ Parcel size displays as chips with icons
+- ✅ Categories display as chips with icons and labels
+- ✅ Footer text and icons are consistent
+- ✅ Uses `withOpacity()` helper instead of hardcoded hex values
+
+**Frontend Changes:**
+
+- `components/trip/TripCard.tsx` - Updated styling to match reference
+- `components/request/RequestCard.tsx` - Updated styling to match reference
+- `components/delivery/DeliveryCard.tsx` - Updated styling to match reference
+
+**Type Updates:**
+
+- None required - no prop or type changes
+
+**Database Objects Touched:**
+
+- None - frontend-only changes
+
+**Related Issues:**
+
+- Related to: Issue #16 (global design consistency)
+- Improves: User experience and visual consistency
+- Pattern: Establishes chip styling standard for future components
+
+---
+
 ### Issue #14 - Remove notes from trip edit modals ✅
 
 **Type:** Frontend Cleanup
