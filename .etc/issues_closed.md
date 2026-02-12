@@ -770,6 +770,162 @@ const parseDateTime = (dateStr: string, timeStr: string): Date | null => {
 
 ---
 
+### Issue #12 - Fix explore tab departure date filter (timezone issue) ✅
+
+**Type:** Frontend Bug Fix - Timezone Handling  
+**Priority:** HIGH  
+**Time:** 1.5 hours  
+**Date:** 2026-02-12
+
+**Problem:**
+
+In explore tab, the departure date filter was going 1 day backwards when users selected a date. This occurred because the DateFilter component used `toISOString().split('T')[0]` which converts Date objects to UTC timezone before extracting the date string, causing an unintended day shift for users in timezones with positive UTC offsets (e.g., IST UTC+5:30).
+
+**Example of Bug:**
+
+- User in IST selects: Feb 15, 2026
+- JavaScript Date object: `new Date("2026-02-15T00:00:00+05:30")`
+- `toISOString()` result: `"2026-02-14T18:30:00.000Z"` (converted to UTC)
+- Split result: `"2026-02-14"` ❌ Wrong date! (one day backwards)
+
+**Frontend Changes (Applied via GitHub PR - 2026-02-12):**
+
+1. **`lib/utils/dateTime.ts`** (Updated)
+   - **Added:** `dateToISOLocal()` helper function
+   - **Purpose:** Extracts date components directly from Date object using local timezone
+   - **Implementation:** Manual extraction of year, month, day without timezone conversion
+   - **Benefits:** Prevents UTC conversion issues across all timezones
+
+2. **`components/search/DateFilter.tsx`** (Updated)
+   - **Removed:** `toISOString().split('T')[0]` pattern in Android date handling
+   - **Removed:** `toISOString().split('T')[0]` pattern in iOS date handling
+   - **Added:** Import and use of `dateToISOLocal()` helper
+   - **Fixed:** Both `handleDateChange()` and `handleIOSDone()` functions
+   - **Result:** Selected date now matches filtered date exactly
+
+**How It Works Now:**
+
+### Date Extraction Logic
+
+**Before (Broken):**
+
+```typescript
+const dateString = selectedDate.toISOString().split("T")[0];
+// User in IST selects Feb 15 → Result: "2026-02-14" ❌
+```
+
+**After (Fixed):**
+
+```typescript
+const dateString = dateToISOLocal(selectedDate);
+// User in IST selects Feb 15 → Result: "2026-02-15" ✅
+
+// Helper implementation:
+export const dateToISOLocal = (date: Date): string => {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+};
+```
+
+### Data Flow (Fixed)
+
+```
+1. User selects date in DatePicker
+   ↓
+2. dateToISOLocal() extracts local components
+   → year: 2026, month: 02, day: 15
+   ↓
+3. Format as string: "2026-02-15"
+   ↓
+4. Store in searchStore.filters.departureDate
+   ↓
+5. Search query: WHERE departure_date = '2026-02-15'
+   ↓
+6. Database returns trips with matching date
+   ✅ Correct results!
+```
+
+**Testing:**
+
+- ✅ Test 1: Date picker displays correct selected date - PASSED
+- ✅ Test 2: Filter display shows correct date (no offset) - PASSED
+- ✅ Test 3: Network request sends correct date parameter - PASSED
+- ✅ Test 4: Search returns trips matching selected date - PASSED
+- ✅ Test 5: Works correctly on both Android and iOS - PASSED
+- ✅ Test 6: Date persists when navigating away and back - PASSED
+- ✅ Test 7: Works across different timezones - PASSED
+- ✅ Test 8: No console errors or warnings - PASSED
+
+**Acceptance Criteria:**
+
+- ✅ Selecting departure date shows trips for exact selected date
+- ✅ No day offset in filter results
+- ✅ Date picker displays correct selected date
+- ✅ Filter persists when navigating away and back
+- ✅ Works consistently across all timezones
+- ✅ Applied to both Android and iOS platforms
+
+**Frontend Changes:**
+
+- `lib/utils/dateTime.ts` - Added `dateToISOLocal()` helper function
+- `components/search/DateFilter.tsx` - Updated date handling to use local extraction
+
+**Type Updates:**
+
+- None required - helper function uses standard Date and string types
+
+**Database Objects Touched:**
+
+- None - frontend-only changes
+
+**Related Issues:**
+
+- Related to: Issue #6 (date/time validation) - ensures consistent date handling
+- Pattern improvement: Can be applied to other date selection components if needed
+
+**Technical Details:**
+
+### Timezone Offset Impact
+
+| Timezone     | UTC Offset | Date Selected | Old Result (Bug) | New Result (Fix) |
+| ------------ | ---------- | ------------- | ---------------- | ---------------- |
+| IST (India)  | +5:30      | Feb 15, 2026  | Feb 14, 2026 ❌  | Feb 15, 2026 ✅  |
+| JST (Japan)  | +9:00      | Feb 15, 2026  | Feb 14, 2026 ❌  | Feb 15, 2026 ✅  |
+| PST (US)     | -8:00      | Feb 15, 2026  | Feb 15, 2026 ✓   | Feb 15, 2026 ✅  |
+| UTC (London) | +0:00      | Feb 15, 2026  | Feb 15, 2026 ✓   | Feb 15, 2026 ✅  |
+
+Only positive UTC offset timezones were affected by the bug. The fix ensures consistency across all timezones.
+
+### Why toISOString() Was Wrong
+
+```typescript
+// JavaScript Date internally stores time in UTC
+const date = new Date("2026-02-15"); // Parsed as midnight local time
+// In IST: 2026-02-15T00:00:00+05:30
+
+date.toISOString(); // Converts to UTC
+// Result: "2026-02-14T18:30:00.000Z"
+// ↑ Notice the date changed to 14th!
+
+// Correct approach: Extract local components directly
+date.getFullYear(); // 2026 (local)
+date.getMonth() + 1; // 2 (local)
+date.getDate(); // 15 (local) ✓
+```
+
+**Benefits:**
+
+✅ **Timezone-safe** - Works correctly for all UTC offsets  
+✅ **Consistent** - Selected date = filtered date = displayed date  
+✅ **User experience** - No confusion about "wrong" dates appearing  
+✅ **Reusable** - `dateToISOLocal()` can be used throughout the app  
+✅ **Database compatible** - String format matches PostgreSQL DATE type  
+✅ **Future-proof** - Prevents similar issues in other components
+
+---
+
 ### Issue #14 - Remove notes from trip edit modals ✅
 
 **Type:** Frontend Cleanup
