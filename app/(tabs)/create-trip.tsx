@@ -8,6 +8,7 @@ import TimePickerInput from "@/components/forms/TimePickerInput";
 import TransportModeSelector from "@/components/forms/TransportModeSelector";
 import ModeSwitcher from "@/components/shared/ModeSwitcher";
 import { dateToISO, dateToTimeString } from "@/lib/utils/dateTime";
+import { uploadFile } from "@/lib/utils/fileUpload";
 import { haptics } from "@/lib/utils/haptics";
 import {
   PackageCategory,
@@ -23,6 +24,7 @@ import { useThemeColors } from "@/styles/theme";
 import { Ionicons } from "@expo/vector-icons";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { router } from "expo-router";
+import { useState } from "react";
 import { Controller, useForm } from "react-hook-form";
 import {
   ActivityIndicator,
@@ -75,6 +77,7 @@ export default function CreateTripScreen() {
   const colors = useThemeColors();
   const user = useAuthStore((state) => state.user);
   const { createTrip, loading } = useTripStore();
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const {
     control,
@@ -98,7 +101,6 @@ export default function CreateTripScreen() {
       allowed_categories: [],
       pnr_number: "",
       ticket_file_url: "",
-      // REMOVED: notes (Issue #7)
     },
   });
 
@@ -139,8 +141,32 @@ export default function CreateTripScreen() {
   const onSubmit = async (data: TripFormData) => {
     try {
       haptics.light();
+      setIsSubmitting(true);
 
-      await createTrip(data, user.id);
+      // Upload ticket file if selected (local URI → Supabase URL)
+      let ticketUrl = data.ticket_file_url;
+      if (ticketUrl && ticketUrl.startsWith("file://")) {
+        try {
+          ticketUrl = await uploadFile(ticketUrl, "tickets");
+        } catch (uploadError: any) {
+          haptics.error();
+          Alert.alert(
+            "Upload Failed",
+            uploadError.message ||
+              "Failed to upload ticket file. Please try again.",
+          );
+          setIsSubmitting(false);
+          return;
+        }
+      }
+
+      // Prepare trip data with uploaded URL
+      const tripData = {
+        ...data,
+        ticket_file_url: ticketUrl,
+      };
+
+      await createTrip(tripData, user.id);
 
       reset({
         source: "",
@@ -154,7 +180,6 @@ export default function CreateTripScreen() {
         allowed_categories: [],
         pnr_number: "",
         ticket_file_url: "",
-        // REMOVED: notes (Issue #7)
       });
 
       haptics.success();
@@ -172,10 +197,12 @@ export default function CreateTripScreen() {
       haptics.error();
       const { title, message } = getErrorMessage(error);
       Alert.alert(title, message, [{ text: "OK", style: "default" }]);
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
-  const isFormDisabled = !isValid || loading;
+  const isFormDisabled = !isValid || loading || isSubmitting;
   const hasErrors = Object.keys(errors).length > 0;
 
   return (
@@ -507,7 +534,6 @@ export default function CreateTripScreen() {
                   label="Ticket File"
                   value={value}
                   onChange={onChange}
-                  userId={user.id}
                   error={errors.ticket_file_url?.message}
                 />
               )}
@@ -541,7 +567,7 @@ export default function CreateTripScreen() {
             onPress={handleSubmit(onSubmit)}
             disabled={isFormDisabled}
           >
-            {loading ? (
+            {loading || isSubmitting ? (
               <ActivityIndicator color={colors.text.inverse} />
             ) : (
               <>

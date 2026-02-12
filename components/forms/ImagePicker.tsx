@@ -1,9 +1,6 @@
-import { supabase } from "@/lib/supabase";
 import { BorderRadius, Spacing, Typography } from "@/styles";
 import { useThemeColors } from "@/styles/theme";
 import { Ionicons } from "@expo/vector-icons";
-import { decode } from "base64-arraybuffer";
-import * as FileSystem from "expo-file-system/legacy";
 import * as ExpoImagePicker from "expo-image-picker";
 import { useState } from "react";
 import {
@@ -18,12 +15,12 @@ import {
 } from "react-native";
 
 interface ImagePickerProps {
-  images: string[];
+  images: string[]; // Now stores local URIs (file://) until form submission
   onChange: (images: string[]) => void;
   maxImages?: number;
   exactCount?: number;
   error?: string;
-  disableCropping?: boolean; // NEW
+  disableCropping?: boolean;
 }
 
 export default function ImagePicker({
@@ -32,10 +29,10 @@ export default function ImagePicker({
   maxImages = 5,
   exactCount,
   error,
-  disableCropping = false, // NEW: Default false
+  disableCropping = false,
 }: ImagePickerProps) {
   const colors = useThemeColors();
-  const [uploading, setUploading] = useState(false);
+  const [isSelecting, setIsSelecting] = useState(false);
 
   const effectiveMax = exactCount || maxImages;
   const requiresExact = !!exactCount;
@@ -83,13 +80,15 @@ export default function ImagePicker({
     }
 
     const result = await ExpoImagePicker.launchCameraAsync({
-      allowsEditing: !disableCropping, // NEW: Respect disableCropping
+      allowsEditing: !disableCropping,
       aspect: [4, 3],
       quality: 0.7,
     });
 
     if (!result.canceled && result.assets[0]) {
-      await uploadImage(result.assets[0].uri);
+      // Store LOCAL URI only - no upload yet
+      const newUri = result.assets[0].uri;
+      onChange([...images, newUri]);
     }
   };
 
@@ -106,67 +105,23 @@ export default function ImagePicker({
 
     const remaining = effectiveMax - images.length;
 
+    setIsSelecting(true);
+
     const result = await ExpoImagePicker.launchImageLibraryAsync({
       mediaTypes: ExpoImagePicker.MediaTypeOptions.Images,
       allowsMultipleSelection: remaining > 1,
       selectionLimit: remaining,
-      allowsEditing: !disableCropping && remaining === 1, // NEW: Only allow editing if cropping enabled and single selection
+      allowsEditing: !disableCropping && remaining === 1,
       aspect: [4, 3],
       quality: 0.8,
     });
 
+    setIsSelecting(false);
+
     if (!result.canceled && result.assets.length > 0) {
-      // Upload all selected images
-      for (const asset of result.assets) {
-        await uploadImage(asset.uri);
-      }
-    }
-  };
-
-  const uploadImage = async (uri: string) => {
-    try {
-      setUploading(true);
-
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
-      if (!user) throw new Error("Not authenticated");
-
-      const base64 = await FileSystem.readAsStringAsync(uri, {
-        encoding: FileSystem.EncodingType.Base64,
-      });
-
-      const fileExt = uri.split(".").pop()?.toLowerCase() || "jpg";
-      const fileName = `${user.id}/${Date.now()}.${fileExt}`;
-      const contentType = fileExt === "png" ? "image/png" : "image/jpeg";
-
-      const { data, error } = await supabase.storage
-        .from("parcel-photos")
-        .upload(fileName, decode(base64), {
-          contentType,
-          upsert: false,
-        });
-
-      if (error) {
-        console.error("Supabase storage error:", error);
-        throw error;
-      }
-
-      const {
-        data: { publicUrl },
-      } = supabase.storage.from("parcel-photos").getPublicUrl(data.path);
-
-      console.log("Upload successful:", publicUrl);
-
-      onChange([...images, publicUrl]);
-    } catch (error: any) {
-      console.error("Upload error:", error);
-      Alert.alert(
-        "Upload Failed",
-        error.message || "Failed to upload image. Please try again.",
-      );
-    } finally {
-      setUploading(false);
+      // Store LOCAL URIs only - no upload yet
+      const newUris = result.assets.map((asset) => asset.uri);
+      onChange([...images, ...newUris]);
     }
   };
 
@@ -270,9 +225,9 @@ export default function ImagePicker({
               },
             ]}
             onPress={showImageSourceOptions}
-            disabled={uploading}
+            disabled={isSelecting}
           >
-            {uploading ? (
+            {isSelecting ? (
               <ActivityIndicator color={colors.primary} />
             ) : (
               <>

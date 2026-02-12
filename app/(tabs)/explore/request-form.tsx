@@ -3,6 +3,7 @@ import TextInput from "@/components/forms/TextInput";
 import { CATEGORY_CONFIG } from "@/lib/constants/categories";
 import { getSizeCapacityLabel } from "@/lib/constants/parcel";
 import { formatDate } from "@/lib/utils/dateTime";
+import { uploadFile } from "@/lib/utils/fileUpload";
 import { haptics } from "@/lib/utils/haptics";
 import { RequestFormData, requestSchema } from "@/lib/validations/request";
 import { useAuthStore } from "@/stores/authStore";
@@ -13,7 +14,7 @@ import { useThemeColors } from "@/styles/theme";
 import { Ionicons } from "@expo/vector-icons";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { router, useLocalSearchParams } from "expo-router";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { Controller, useForm } from "react-hook-form";
 import {
   ActivityIndicator,
@@ -34,6 +35,7 @@ export default function RequestFormScreen() {
   const { user } = useAuthStore();
   const { currentTrip, loading: tripLoading, getTripById } = useTripStore();
   const { createRequest, loading: requestLoading } = useRequestStore();
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const {
     control,
@@ -62,11 +64,47 @@ export default function RequestFormScreen() {
   const onSubmit = async (data: RequestFormData) => {
     try {
       haptics.light();
+      setIsSubmitting(true);
+
+      // Upload parcel photos if selected (local URIs → Supabase URLs)
+      let photoUrls = data.parcel_photos;
+
+      // Check if we have local URIs that need uploading
+      const hasLocalFiles = photoUrls.some((uri) => uri.startsWith("file://"));
+
+      if (hasLocalFiles) {
+        try {
+          // Upload all photos in parallel
+          photoUrls = await Promise.all(
+            photoUrls.map((uri) => {
+              if (uri.startsWith("file://")) {
+                return uploadFile(uri, "parcel-photos");
+              }
+              return uri; // Already a public URL
+            }),
+          );
+        } catch (uploadError: any) {
+          haptics.error();
+          Alert.alert(
+            "Upload Failed",
+            uploadError.message ||
+              "Failed to upload parcel photos. Please try again.",
+          );
+          setIsSubmitting(false);
+          return;
+        }
+      }
+
+      // Prepare request data with uploaded URLs
+      const requestData = {
+        ...data,
+        parcel_photos: photoUrls,
+      };
 
       await createRequest(
         {
           trip_id: tripId,
-          ...data,
+          ...requestData,
         },
         user!.id,
       );
@@ -87,6 +125,8 @@ export default function RequestFormScreen() {
       console.error("Request creation error:", error);
       haptics.error();
       Alert.alert("Error", error.message || "Failed to send request");
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -111,7 +151,7 @@ export default function RequestFormScreen() {
     );
   }
 
-  const isFormDisabled = !isValid || requestLoading;
+  const isFormDisabled = !isValid || requestLoading || isSubmitting;
 
   return (
     <SafeAreaView
@@ -479,7 +519,7 @@ export default function RequestFormScreen() {
             onPress={handleSubmit(onSubmit)}
             disabled={isFormDisabled}
           >
-            {requestLoading ? (
+            {requestLoading || isSubmitting ? (
               <ActivityIndicator color={colors.text.inverse} />
             ) : (
               <>
