@@ -29,9 +29,10 @@ type CancellationVerificationResult = {
   message: string;
 };
 
-// Extended type with trip information
+// UPDATED: Extended type with trip information including id and arrival fields
 export interface ParcelRequest extends DbParcelRequest {
   trip?: {
+    id: string; // ADDED
     source: string;
     destination: string;
     departure_date: string;
@@ -39,7 +40,7 @@ export interface ParcelRequest extends DbParcelRequest {
     arrival_date: string;
     arrival_time: string;
     transport_mode: string;
-    parcel_size_capacity: string; // NEW: Added for display
+    parcel_size_capacity: string;
   } | null;
   sender?: {
     full_name: string;
@@ -47,7 +48,7 @@ export interface ParcelRequest extends DbParcelRequest {
   } | null;
 }
 
-// UPDATED: Form data for creating request (removed size and sender_notes)
+// Form data for creating request (removed size and sender_notes)
 export interface CreateRequestData {
   trip_id: string;
   item_description: string;
@@ -55,8 +56,6 @@ export interface CreateRequestData {
   parcel_photos: string[];
   delivery_contact_name: string;
   delivery_contact_phone: string;
-  // REMOVED: size (comes from trip now)
-  // REMOVED: sender_notes
 }
 
 interface RequestState {
@@ -74,8 +73,8 @@ interface RequestState {
   getIncomingRequests: (travellerId: string) => Promise<void>;
   getAcceptedRequests: (travellerId: string) => Promise<void>;
   getRequestById: (requestId: string) => Promise<ParcelRequest | null>;
-  acceptRequest: (requestId: string) => Promise<void>; // UPDATED: Removed travellerNotes param
-  rejectRequest: (requestId: string, reason?: string) => Promise<void>; // UPDATED: Now uses proper rejection
+  acceptRequest: (requestId: string) => Promise<void>;
+  rejectRequest: (requestId: string, reason?: string) => Promise<void>;
   cancelRequest: (requestId: string, reason?: string) => Promise<void>;
   updateRequestStatus: (
     requestId: string,
@@ -88,30 +87,26 @@ interface RequestState {
   getPickupOtp: (requestId: string) => Promise<string | null>;
   getDeliveryOtp: (requestId: string) => Promise<string | null>;
 
-  // NEW: Regenerate OTP methods
+  // Regenerate OTP methods
   regeneratePickupOtp: (requestId: string) => Promise<string>;
   regenerateDeliveryOtp: (requestId: string) => Promise<string>;
 
-  // UPDATED: Update receiver details (now allowed until delivered)
+  // Update receiver details
   updateReceiverDetails: (
     requestId: string,
     delivery_contact_name: string,
     delivery_contact_phone: string,
   ) => Promise<void>;
 
-  // NEW: Generate cancellation OTP for trip cancellation after pickup
+  // Cancellation OTP
   generateCancellationOtp: (requestId: string) => Promise<string>;
-
-  // UPDATED: Takes tripId (not requestId) to match backend function
   verifyCancellationOtpAndCancel: (
     tripId: string,
     otp: string,
   ) => Promise<boolean>;
 
-  // NEW: Check if request details can be edited
+  // Request details editing
   canEditRequestDetails: (requestId: string) => Promise<boolean>;
-
-  // NEW: Update request details (description, photos, category)
   updateRequestDetails: (
     requestId: string,
     item_description: string,
@@ -132,13 +127,12 @@ export const useRequestStore = create<RequestState>((set, get) => ({
   error: null,
 
   // ============================================================================
-  // UPDATED: Create new parcel request with server-side validation
+  // Create new parcel request with server-side validation
   // ============================================================================
   createRequest: async (data: CreateRequestData, senderId: string) => {
     try {
       set({ loading: true, error: null });
 
-      // UPDATED: Removed p_size and p_sender_notes
       const rpcParams = {
         p_trip_id: data.trip_id,
         p_item_description: data.item_description,
@@ -156,13 +150,23 @@ export const useRequestStore = create<RequestState>((set, get) => ({
 
       if (rpcError) throw rpcError;
 
-      // UPDATED: Fetch the created request with trip details (including parcel_size_capacity)
+      // UPDATED: Fetch the created request with complete trip details
       const { data: request, error: fetchError } = await supabase
         .from("parcel_requests")
         .select(
           `
           *,
-          trip:trips(source, destination, departure_date, departure_time, arrival_date, arrival_time, transport_mode, parcel_size_capacity)
+          trip:trips(
+            id,
+            source,
+            destination,
+            departure_date,
+            departure_time,
+            arrival_date,
+            arrival_time,
+            transport_mode,
+            parcel_size_capacity
+          )
         `,
         )
         .eq("id", requestId)
@@ -184,18 +188,27 @@ export const useRequestStore = create<RequestState>((set, get) => ({
     }
   },
 
-  // Get sender's own requests
+  // UPDATED: Get sender's own requests
   getMyRequests: async (senderId: string) => {
     try {
       set({ loading: true, error: null });
 
-      // UPDATED: Added parcel_size_capacity to trip selection
       const { data: requests, error } = await supabase
         .from("parcel_requests")
         .select(
           `
           *,
-          trip:trips(source, destination, departure_date, departure_time, arrival_date, arrival_time, transport_mode, parcel_size_capacity)
+          trip:trips(
+            id,
+            source,
+            destination,
+            departure_date,
+            departure_time,
+            arrival_date,
+            arrival_time,
+            transport_mode,
+            parcel_size_capacity
+          )
         `,
         )
         .eq("sender_id", senderId)
@@ -212,18 +225,27 @@ export const useRequestStore = create<RequestState>((set, get) => ({
     }
   },
 
-  // Get traveller's incoming requests
+  // UPDATED: Get traveller's incoming requests
   getIncomingRequests: async (travellerId: string) => {
     try {
       set({ loading: true, error: null });
 
-      // UPDATED: Added parcel_size_capacity to trip selection
       const { data: requests, error } = await supabase
         .from("parcel_requests")
         .select(
           `
           *,
-          trip:trips!inner(source, destination, departure_date, departure_time, arrival_date, arrival_time, transport_mode, parcel_size_capacity),
+          trip:trips!inner(
+            id,
+            source,
+            destination,
+            departure_date,
+            departure_time,
+            arrival_date,
+            arrival_time,
+            transport_mode,
+            parcel_size_capacity
+          ),
           sender:profiles!parcel_requests_sender_id_fkey(full_name, phone)
         `,
         )
@@ -246,18 +268,27 @@ export const useRequestStore = create<RequestState>((set, get) => ({
     }
   },
 
-  // Get traveller's accepted requests (active deliveries)
+  // UPDATED: Get traveller's accepted requests (active deliveries)
   getAcceptedRequests: async (travellerId: string) => {
     try {
       set({ loading: true, error: null });
 
-      // UPDATED: Added parcel_size_capacity to trip selection
       const { data: requests, error } = await supabase
         .from("parcel_requests")
         .select(
           `
           *,
-          trip:trips!inner(source, destination, departure_date, departure_time, arrival_date, arrival_time, transport_mode, parcel_size_capacity),
+          trip:trips!inner(
+            id,
+            source,
+            destination,
+            departure_date,
+            departure_time,
+            arrival_date,
+            arrival_time,
+            transport_mode,
+            parcel_size_capacity
+          ),
           sender:profiles!parcel_requests_sender_id_fkey(full_name, phone)
         `,
         )
@@ -281,18 +312,27 @@ export const useRequestStore = create<RequestState>((set, get) => ({
     }
   },
 
-  // Get single request by ID
+  // UPDATED: Get single request by ID
   getRequestById: async (requestId: string) => {
     try {
       set({ loading: true, error: null });
 
-      // UPDATED: Added parcel_size_capacity to trip selection
       const { data: request, error } = await supabase
         .from("parcel_requests")
         .select(
           `
           *,
-          trip:trips(source, destination, departure_date, departure_time, arrival_date, arrival_time, transport_mode, parcel_size_capacity),
+          trip:trips(
+            id,
+            source,
+            destination,
+            departure_date,
+            departure_time,
+            arrival_date,
+            arrival_time,
+            transport_mode,
+            parcel_size_capacity
+          ),
           sender:profiles!parcel_requests_sender_id_fkey(full_name, phone)
         `,
         )
@@ -314,13 +354,12 @@ export const useRequestStore = create<RequestState>((set, get) => ({
   },
 
   // ============================================================================
-  // UPDATED: Accept request with atomic slot decrement + trip refresh
+  // Accept request with atomic slot decrement + trip refresh
   // ============================================================================
   acceptRequest: async (requestId: string) => {
     try {
       set({ loading: true, error: null });
 
-      // UPDATED: Removed travellerNotes parameter
       const rpcParams = {
         p_request_id: requestId,
       };
@@ -367,13 +406,12 @@ export const useRequestStore = create<RequestState>((set, get) => ({
   },
 
   // ============================================================================
-  // UPDATED: Reject request with proper rejection (not cancellation)
+  // Reject request with proper rejection (not cancellation)
   // ============================================================================
   rejectRequest: async (requestId: string, reason?: string) => {
     try {
       set({ loading: true, error: null });
 
-      // UPDATED: Use new reject_request function instead of cancel_request_with_validation
       const rpcParams: any = {
         p_request_id: requestId,
       };
@@ -509,9 +547,7 @@ export const useRequestStore = create<RequestState>((set, get) => ({
   // OTP VERIFICATION METHODS
   // ============================================================================
 
-  // ============================================================================
-  // Verify pickup OTP (now returns JSON directly from DB)
-  // ============================================================================
+  // Verify pickup OTP
   verifyPickupOtp: async (requestId: string, otp: string) => {
     try {
       set({ loading: true, error: null });
@@ -561,9 +597,7 @@ export const useRequestStore = create<RequestState>((set, get) => ({
     }
   },
 
-  // ============================================================================
-  // Verify delivery OTP (now returns JSON directly from DB)
-  // ============================================================================
+  // Verify delivery OTP
   verifyDeliveryOtp: async (requestId: string, otp: string) => {
     try {
       set({ loading: true, error: null });
@@ -613,7 +647,7 @@ export const useRequestStore = create<RequestState>((set, get) => ({
     }
   },
 
-  // Get pickup OTP for display (sender needs to see it)
+  // Get pickup OTP for display
   getPickupOtp: async (requestId: string) => {
     try {
       const { data, error } = await supabase
@@ -630,7 +664,7 @@ export const useRequestStore = create<RequestState>((set, get) => ({
     }
   },
 
-  // Get delivery OTP for display (receiver needs to see it)
+  // Get delivery OTP for display
   getDeliveryOtp: async (requestId: string) => {
     try {
       const { data, error } = await supabase
@@ -647,9 +681,7 @@ export const useRequestStore = create<RequestState>((set, get) => ({
     }
   },
 
-  // ============================================================================
-  // NEW: Regenerate pickup OTP (when expired or failed)
-  // ============================================================================
+  // Regenerate pickup OTP
   regeneratePickupOtp: async (requestId: string) => {
     try {
       set({ loading: true, error: null });
@@ -661,7 +693,6 @@ export const useRequestStore = create<RequestState>((set, get) => ({
 
       if (error) throw error;
 
-      // Refresh request to get updated status (should be 'accepted' again if was 'failed')
       await get().getRequestById(requestId);
 
       set({ loading: false });
@@ -676,9 +707,7 @@ export const useRequestStore = create<RequestState>((set, get) => ({
     }
   },
 
-  // ============================================================================
-  // NEW: Regenerate delivery OTP (when expired or failed)
-  // ============================================================================
+  // Regenerate delivery OTP
   regenerateDeliveryOtp: async (requestId: string) => {
     try {
       set({ loading: true, error: null });
@@ -690,7 +719,6 @@ export const useRequestStore = create<RequestState>((set, get) => ({
 
       if (error) throw error;
 
-      // Refresh request to get updated status (should be 'picked_up' again if was 'failed')
       await get().getRequestById(requestId);
 
       set({ loading: false });
@@ -705,9 +733,7 @@ export const useRequestStore = create<RequestState>((set, get) => ({
     }
   },
 
-  // ============================================================================
-  // UPDATED: Update receiver details (now allowed until delivered)
-  // ============================================================================
+  // Update receiver details
   updateReceiverDetails: async (
     requestId: string,
     delivery_contact_name: string,
@@ -716,7 +742,6 @@ export const useRequestStore = create<RequestState>((set, get) => ({
     try {
       set({ loading: true, error: null });
 
-      // UPDATED: Check current status - now allowed until delivered
       const { data: request, error: fetchError } = await supabase
         .from("parcel_requests")
         .select("status")
@@ -725,7 +750,6 @@ export const useRequestStore = create<RequestState>((set, get) => ({
 
       if (fetchError) throw fetchError;
 
-      // UPDATED: Can edit until delivered (not just pending)
       if (request.status === "delivered") {
         throw new Error("Cannot edit receiver details after delivery");
       }
@@ -741,7 +765,6 @@ export const useRequestStore = create<RequestState>((set, get) => ({
 
       if (error) throw error;
 
-      // Update local state
       set((state) => ({
         myRequests: state.myRequests.map((req) =>
           req.id === requestId
@@ -760,9 +783,7 @@ export const useRequestStore = create<RequestState>((set, get) => ({
     }
   },
 
-  // ============================================================================
-  // NEW: Generate cancellation OTP for trip cancellation after pickup
-  // ============================================================================
+  // Generate cancellation OTP
   generateCancellationOtp: async (requestId: string) => {
     try {
       set({ loading: true, error: null });
@@ -786,7 +807,7 @@ export const useRequestStore = create<RequestState>((set, get) => ({
     }
   },
 
-  // Add method to check if details can be edited
+  // Check if request details can be edited
   canEditRequestDetails: async (requestId: string): Promise<boolean> => {
     try {
       const { data, error } = await supabase.rpc("can_edit_request_details", {
@@ -805,7 +826,7 @@ export const useRequestStore = create<RequestState>((set, get) => ({
     }
   },
 
-  // Add method to update request details (description, photos, category)
+  // Update request details
   updateRequestDetails: async (
     requestId: string,
     item_description: string,
@@ -827,7 +848,6 @@ export const useRequestStore = create<RequestState>((set, get) => ({
 
       if (error) throw error;
 
-      // Refresh request to get updated data
       await get().getRequestById(requestId);
 
       set({ loading: false });
@@ -840,9 +860,7 @@ export const useRequestStore = create<RequestState>((set, get) => ({
     }
   },
 
-  // ============================================================================
-  // NEW: Verify cancellation OTP and cancel trip + request
-  // ============================================================================
+  // Verify cancellation OTP and cancel trip
   verifyCancellationOtpAndCancel: async (
     tripId: string,
     otp: string,
@@ -850,7 +868,6 @@ export const useRequestStore = create<RequestState>((set, get) => ({
     try {
       set({ loading: true, error: null });
 
-      // Use the EXISTING RPC function from Migration 5
       const { data, error } = await supabase.rpc(
         "verify_cancellation_otp_and_cancel_trip",
         {
@@ -861,10 +878,8 @@ export const useRequestStore = create<RequestState>((set, get) => ({
 
       if (error) throw error;
 
-      // FIXED: Cast data to the correct type
       const result = data as unknown as CancellationVerificationResult;
 
-      // Check if cancellation was successful
       if (result && result.status === "cancelled") {
         set({ loading: false });
         logger.info("Cancellation OTP verified and trip cancelled", {
