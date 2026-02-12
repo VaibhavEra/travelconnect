@@ -32,7 +32,7 @@ const initialFilters: SearchFilters = {
   transportMode: "all",
 };
 
-// UPDATED: Helper to normalize trip from database
+// Helper to normalize trip from database
 const normalizeTrip = (dbTrip: any): Trip => {
   return {
     id: dbTrip.id,
@@ -45,15 +45,13 @@ const normalizeTrip = (dbTrip: any): Trip => {
     arrival_date: dbTrip.arrival_date,
     arrival_time: dbTrip.arrival_time,
     parcel_size_capacity:
-      dbTrip.parcel_size_capacity as Trip["parcel_size_capacity"], // NEW
+      dbTrip.parcel_size_capacity as Trip["parcel_size_capacity"],
     allowed_categories: dbTrip.allowed_categories ?? [],
     pnr_number: dbTrip.pnr_number,
     ticket_file_url: dbTrip.ticket_file_url,
-    notes: dbTrip.notes,
     status: (dbTrip.status as Trip["status"]) ?? "upcoming",
     created_at: dbTrip.created_at ?? new Date().toISOString(),
     updated_at: dbTrip.updated_at ?? new Date().toISOString(),
-    // REMOVED: total_slots, available_slots
   };
 };
 
