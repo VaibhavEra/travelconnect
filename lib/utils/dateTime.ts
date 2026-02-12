@@ -216,6 +216,20 @@ export const dateToISO = (date: Date): string => {
 };
 
 /**
+ * Converts a Date object to ISO date string using LOCAL timezone (YYYY-MM-DD)
+ * Prevents timezone shift issues when converting dates
+ * Use this instead of dateToISO when you want to preserve the local date
+ * @param date - Date object
+ * @returns ISO date string in local timezone
+ */
+export const dateToISOLocal = (date: Date): string => {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+};
+
+/**
  * Formats a Date object to time string (HH:MM)
  * Useful for form inputs and API calls
  * @param date - Date object

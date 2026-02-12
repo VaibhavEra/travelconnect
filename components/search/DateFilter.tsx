@@ -1,4 +1,4 @@
-import { formatDateLong } from "@/lib/utils/dateTime";
+import { dateToISOLocal, formatDateLong } from "@/lib/utils/dateTime";
 import { haptics } from "@/lib/utils/haptics";
 import { useSearchStore } from "@/stores/searchStore";
 import { BorderRadius, Overlays, Spacing, Typography } from "@/styles";
@@ -38,7 +38,8 @@ export default function DateFilter() {
       setShowPicker(false);
 
       if (event.type === "set" && selectedDate) {
-        const dateString = selectedDate.toISOString().split("T")[0];
+        // Use local date extraction to prevent timezone shift
+        const dateString = dateToISOLocal(selectedDate);
         setFilters({ departureDate: dateString });
         haptics.selection();
       }
@@ -51,7 +52,8 @@ export default function DateFilter() {
 
   const handleIOSDone = () => {
     if (tempDate) {
-      const dateString = tempDate.toISOString().split("T")[0];
+      // Use local date extraction to prevent timezone shift
+      const dateString = dateToISOLocal(tempDate);
       setFilters({ departureDate: dateString });
       haptics.selection();
     }
