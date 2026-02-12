@@ -1,6 +1,7 @@
 import FilterChip from "@/components/shared/FilterChip";
 import ModeSwitcher from "@/components/shared/ModeSwitcher";
 import TripCard from "@/components/trip/TripCard";
+import { TRIP_FILTERS, TripFilterKey } from "@/lib/constants/filters";
 import { haptics } from "@/lib/utils/haptics";
 import { useAuthStore } from "@/stores/authStore";
 import { useTripStore } from "@/stores/tripStore";
@@ -27,32 +28,11 @@ import Animated, {
 } from "react-native-reanimated";
 import { SafeAreaView } from "react-native-safe-area-context";
 
-type TripFilter =
-  | "all"
-  | "upcoming"
-  | "locked"
-  | "in_progress"
-  | "completed"
-  | "cancelled";
-
-const FILTER_CONFIG: Array<{
-  key: TripFilter;
-  label: string;
-  icon: keyof typeof Ionicons.glyphMap;
-}> = [
-  { key: "all", label: "All", icon: "apps" },
-  { key: "upcoming", label: "Upcoming", icon: "time" },
-  { key: "locked", label: "Locked", icon: "lock-closed" },
-  { key: "in_progress", label: "In Progress", icon: "bicycle" },
-  { key: "completed", label: "Completed", icon: "checkmark-done" },
-  { key: "cancelled", label: "Cancelled", icon: "close-circle" },
-];
-
 export default function MyTripsScreen() {
   const colors = useThemeColors();
   const { user } = useAuthStore();
   const { trips, loading, getMyTrips } = useTripStore();
-  const [filter, setFilter] = useState<TripFilter>("all");
+  const [filter, setFilter] = useState<TripFilterKey>("all");
   const [refreshing, setRefreshing] = useState(false);
 
   const scrollY = useSharedValue(0);
@@ -91,7 +71,7 @@ export default function MyTripsScreen() {
     return trips.filter((trip) => trip.status === filter);
   };
 
-  const getFilterCount = (filterType: TripFilter) => {
+  const getFilterCount = (filterType: TripFilterKey) => {
     if (filterType === "all") return trips.length;
     return trips.filter((trip) => trip.status === filterType).length;
   };
@@ -207,7 +187,7 @@ export default function MyTripsScreen() {
             showsHorizontalScrollIndicator={false}
             contentContainerStyle={styles.filtersContainer}
           >
-            {FILTER_CONFIG.map((filterConfig) => {
+            {TRIP_FILTERS.map((filterConfig) => {
               const count = getFilterCount(filterConfig.key);
               const isActive = filter === filterConfig.key;
 
