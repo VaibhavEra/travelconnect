@@ -1,4 +1,3 @@
-import { uploadTicketFile } from "@/lib/utils/fileUpload";
 import { haptics } from "@/lib/utils/haptics";
 import { BorderRadius, Spacing, Typography } from "@/styles";
 import { useThemeColors } from "@/styles/theme";
@@ -7,6 +6,7 @@ import * as DocumentPicker from "expo-document-picker";
 import { useState } from "react";
 import {
   ActivityIndicator,
+  Alert,
   Image,
   Pressable,
   StyleSheet,
@@ -16,9 +16,8 @@ import {
 
 interface FileUploadButtonProps {
   label: string;
-  value: string | null;
-  onChange: (url: string) => void;
-  userId: string;
+  value: string | null; // Now stores local URI (file://) until form submission
+  onChange: (uri: string) => void;
   error?: string;
 }
 
@@ -26,17 +25,14 @@ export default function FileUploadButton({
   label,
   value,
   onChange,
-  userId,
   error,
 }: FileUploadButtonProps) {
   const colors = useThemeColors();
-  const [uploading, setUploading] = useState(false);
-  const [uploadError, setUploadError] = useState<string | null>(null);
+  const [isSelecting, setIsSelecting] = useState(false);
 
   const handleUpload = async () => {
     try {
-      setUploading(true);
-      setUploadError(null);
+      setIsSelecting(true);
       haptics.light();
 
       const result = await DocumentPicker.getDocumentAsync({
@@ -45,32 +41,28 @@ export default function FileUploadButton({
       });
 
       if (result.canceled) {
-        setUploading(false);
+        setIsSelecting(false);
         return;
       }
 
       const file = result.assets[0];
 
-      const uploadResult = await uploadTicketFile(
-        file.uri,
-        file.mimeType || "image/jpeg",
-        file.name,
-        file.size || 0,
-        userId,
-      );
-
-      if ("error" in uploadResult) {
-        setUploadError(uploadResult.error);
-        haptics.error();
-      } else {
-        onChange(uploadResult.url);
-        haptics.success();
+      // Validate file size (5MB max)
+      const maxSize = 5 * 1024 * 1024; // 5MB in bytes
+      if (file.size && file.size > maxSize) {
+        Alert.alert("File Too Large", "Maximum file size is 5MB");
+        setIsSelecting(false);
+        return;
       }
+
+      // Store LOCAL URI only - no upload yet
+      onChange(file.uri);
+      haptics.success();
     } catch (err: any) {
-      setUploadError(err.message || "Failed to upload file");
+      Alert.alert("Error", err.message || "Failed to select file");
       haptics.error();
     } finally {
-      setUploading(false);
+      setIsSelecting(false);
     }
   };
 
@@ -83,7 +75,10 @@ export default function FileUploadButton({
     value &&
     (value.endsWith(".jpg") ||
       value.endsWith(".jpeg") ||
-      value.endsWith(".png"));
+      value.endsWith(".png") ||
+      value.endsWith(".JPG") ||
+      value.endsWith(".JPEG") ||
+      value.endsWith(".PNG"));
 
   return (
     <View style={styles.container}>
@@ -109,7 +104,7 @@ export default function FileUploadButton({
             >
               <Ionicons name="document-text" size={48} color={colors.primary} />
               <Text style={[styles.pdfText, { color: colors.primary }]}>
-                Ticket Uploaded
+                Ticket Selected
               </Text>
             </View>
           )}
@@ -134,15 +129,15 @@ export default function FileUploadButton({
             },
           ]}
           onPress={handleUpload}
-          disabled={uploading}
+          disabled={isSelecting}
         >
-          {uploading ? (
+          {isSelecting ? (
             <ActivityIndicator color={colors.primary} />
           ) : (
             <>
               <Ionicons name="cloud-upload" size={32} color={colors.primary} />
               <Text style={[styles.uploadText, { color: colors.primary }]}>
-                Upload Ticket
+                Select Ticket
               </Text>
               <Text
                 style={[styles.uploadSubtext, { color: colors.text.tertiary }]}
@@ -154,10 +149,8 @@ export default function FileUploadButton({
         </Pressable>
       )}
 
-      {(error || uploadError) && (
-        <Text style={[styles.error, { color: colors.error }]}>
-          {error || uploadError}
-        </Text>
+      {error && (
+        <Text style={[styles.error, { color: colors.error }]}>{error}</Text>
       )}
     </View>
   );
