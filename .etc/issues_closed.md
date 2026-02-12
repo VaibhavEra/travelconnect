@@ -538,6 +538,113 @@ My-trips tab was missing the **expired** filter, preventing users from viewing t
 
 ---
 
+### Issue #17 - Add rejected and expired filters to my-requests tab ✅
+
+**Type:** Frontend Enhancement - Filter Configuration  
+**Priority:** MEDIUM  
+**Time:** 1 hour  
+**Date:** 2026-02-12
+
+**Problem:**
+
+The My Requests tab was missing dedicated filters for **rejected** and
+**expired** requests. Rejected requests were implicitly grouped inside
+the "Cancelled" filter, and expired requests had no direct filter at
+all. This made it hard for senders to quickly see which requests were
+rejected by travellers or expired due to trip status changes.
+
+**Frontend Changes (Applied via GitHub PR - 2026-02-12):**
+
+1. **`lib/constants/filters.ts`** (Updated)
+   - **Extended:** `REQUEST_FILTERS` to cover all request statuses from
+     the `request_status` enum
+   - **Added filters:**
+     - `rejected` – label "Rejected", icon `close-circle`
+     - `picked_up` – label "Picked Up", icon `cube`
+     - `delivered` – label "Delivered", icon `checkmark-done`
+     - `cancelled` – label "Cancelled", icon `close`
+     - `expired` – label "Expired", icon `hourglass`
+   - **Result:** REQUEST_FILTERS now includes:
+     `all, pending, accepted, rejected, picked_up, delivered, cancelled, expired`
+
+2. **`app/(tabs)/my-requests/index.tsx`** (Refactored)
+   - **Removed:** Local `StatusFilter` union type
+   - **Removed:** Local `FILTER_CONFIG` array and custom grouping logic
+     (e.g. "in_transit" alias for `picked_up`, "completed" alias for `delivered`,
+     "cancelled" including `rejected`/`failed`)
+   - **Added:** Import of `REQUEST_FILTERS` and `RequestFilterKey` from
+     `lib/constants/filters`
+   - **Updated:** State to use `RequestFilterKey` (`filter` state default "all")
+   - **Simplified:** Filtering logic to 1:1 status matching:
+     - If filter is `"all"` → show all requests
+     - Otherwise → `request.status === filter`
+   - **Updated:** `getFilterCount()` to mirror the same simple status
+     comparison per filter
+   - **Kept:** Stats cards, but now backed by the simplified counting logic
+
+**How It Works Now:**
+
+### Filter Bar
+
+The My Requests tab now exposes a dedicated filter for each status:
+
+```
+[All] [Pending] [Accepted] [Rejected] [Picked Up] [Delivered] [Cancelled] [Expired]
+```
+
+Each chip shows a count based on the number of matching requests.
+
+### Status Styling
+
+No changes were required to `RequestCard`. It already uses
+`REQUEST_STATUS_CONFIG`, which defines:
+
+- **Rejected:** label "Rejected", icon `close-circle`, `colorKey: "error"`
+- **Expired:** label "Expired", icon `alert-circle`, `colorKey: "error"`
+
+So rejected and expired requests automatically render with the correct
+badge color and icon once the filters expose them.
+
+**Testing:**
+
+- ✅ Filter bar shows all 8 filters in the My Requests tab
+- ✅ "Rejected" filter shows only `status === "rejected"` requests
+- ✅ "Expired" filter shows only `status === "expired"` requests
+- ✅ Filter counts match the number of requests per status
+- ✅ Empty state messages update correctly per active filter
+- ✅ Rejected and expired badges render with error color and correct icons
+- ✅ Filter selection persists while navigating within the tab
+- ✅ No TypeScript errors, no console warnings
+
+**Acceptance Criteria:**
+
+- ✅ Rejected and expired filters available on My Requests tab
+- ✅ Each filter accurately reflects the underlying request status
+- ✅ Appropriate styling for rejected/expired requests via status badges
+- ✅ Filter state behaves consistently with My Trips filter behavior
+
+**Frontend Changes:**
+
+- `lib/constants/filters.ts` – REQUEST_FILTERS expanded to all statuses
+- `app/(tabs)/my-requests/index.tsx` – refactored to use shared filters and
+  simplified logic
+
+**Type Updates:**
+
+- None – reused existing `RequestFilterKey` from filters.ts
+
+**Database Objects Touched:**
+
+- None – frontend-only change
+
+**Related Issues:**
+
+- Depends on: Issue #3 (Request expiry logic and status transitions) ✅
+- Follows pattern from: Issue #10 (centralized trip filter configuration) ✅
+- Complements: Issue #13 (UI consistency across cards)
+
+---
+
 ### Issue #6 - Fix create-trip form date/time validation ✅
 
 **Type:** Frontend Validation - Bug Fix  
@@ -1089,6 +1196,85 @@ All cards now match the **AvailableTripCard** reference design:
 - Related to: Issue #16 (global design consistency)
 - Improves: User experience and visual consistency
 - Pattern: Establishes chip styling standard for future components
+
+---
+
+### Issue #16 - Add bottom border to Explore and My Requests headers ✅
+
+**Type:** Frontend UI - Visual Consistency  
+**Priority:** LOW  
+**Time:** 20–30 minutes  
+**Date:** 2026-02-12
+
+**Problem:**
+
+The header in `create-trip.tsx` already had a bottom border, but other
+tab screens did not, leading to inconsistent header visuals across the
+app. Explore and My Requests tabs in particular felt visually disconnected
+from their content because there was no subtle divider between the header
+and the scrollable area.
+
+**Frontend Changes (Applied via GitHub PR - 2026-02-12):**
+
+1. **`app/(tabs)/explore/index.tsx`** (Updated)
+   - **Updated:** `header` style in `StyleSheet.create()`
+   - **Added:** `borderBottomWidth: 1` to match `create-trip` and `my-trips`
+   - **Kept:** Existing padding, alignment, and layout unchanged
+   - **Relies on:** `colors.border.light` passed inline in JSX for border color
+     (same pattern as other tabs)
+
+2. **`app/(tabs)/my-requests/index.tsx`** (Updated)
+   - **Updated:** `header` style in `StyleSheet.create()`
+   - **Added:** `borderBottomWidth: 1` to provide the same visual separator
+   - **Kept:** Existing padding, alignment, and layout unchanged
+   - **Relies on:** `colors.border.light` passed inline in JSX for border color
+
+**How It Works Now:**
+
+All primary tab headers (Create Trip, My Trips, Explore, My Requests,
+Requests) share the same visual pattern:
+
+- Row layout with title, subtitle, and ModeSwitcher
+- Consistent horizontal/vertical padding
+- A 1px bottom border acting as a separator from the content
+- Border color driven by theme (`colors.border.light`), adapting to
+  light/dark mode
+
+This creates a consistent **tab header baseline** across the app so users
+always see a clear division between header and content.
+
+**Testing:**
+
+- ✅ Explore tab shows bottom border under header
+- ✅ My Requests tab shows bottom border under header
+- ✅ Headers now visually match Create Trip, My Trips, and Requests
+- ✅ Works correctly in both light and dark mode (border visible but subtle)
+- ✅ No layout shifts or padding changes
+- ✅ No TypeScript errors or console warnings
+
+**Acceptance Criteria:**
+
+- ✅ All tab headers have a bottom border
+- ✅ Border color consistent across tabs
+- ✅ Padding and spacing preserved
+- ✅ Works in both light and dark mode
+
+**Frontend Changes:**
+
+- `app/(tabs)/explore/index.tsx` – header style updated
+- `app/(tabs)/my-requests/index.tsx` – header style updated
+
+**Type Updates:**
+
+- None required
+
+**Database Objects Touched:**
+
+- None – purely UI change
+
+**Related Issues:**
+
+- Related to: Issue #13 (card styling harmonization / UI consistency)
 
 ---
 
