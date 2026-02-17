@@ -32,7 +32,7 @@ type CancellationVerificationResult = {
 // UPDATED: Extended type with trip information including id and arrival fields
 export interface ParcelRequest extends DbParcelRequest {
   trip?: {
-    id: string; // ADDED
+    id: string;
     source: string;
     destination: string;
     departure_date: string;
@@ -41,6 +41,13 @@ export interface ParcelRequest extends DbParcelRequest {
     arrival_time: string;
     transport_mode: string;
     parcel_size_capacity: string;
+    pnr_number: string; // ADD THIS
+    ticket_file_url: string; // ADD THIS
+    traveller?: {
+      // ADD THIS
+      full_name: string;
+      phone: string;
+    };
   } | null;
   sender?: {
     full_name: string;
@@ -166,7 +173,10 @@ export const useRequestStore = create<RequestState>((set, get) => ({
             arrival_date,
             arrival_time,
             transport_mode,
-            parcel_size_capacity
+            parcel_size_capacity,
+            pnr_number,
+            ticket_file_url,
+            traveller:profiles!trips_traveller_id_fkey(full_name, phone)
           )
         `,
         )
@@ -208,7 +218,10 @@ export const useRequestStore = create<RequestState>((set, get) => ({
             arrival_date,
             arrival_time,
             transport_mode,
-            parcel_size_capacity
+            parcel_size_capacity,
+            pnr_number,
+            ticket_file_url,
+            traveller:profiles!trips_traveller_id_fkey(full_name, phone)
           )
         `,
         )
@@ -332,7 +345,10 @@ export const useRequestStore = create<RequestState>((set, get) => ({
             arrival_date,
             arrival_time,
             transport_mode,
-            parcel_size_capacity
+            parcel_size_capacity,
+            pnr_number,
+            ticket_file_url,
+            traveller:profiles!trips_traveller_id_fkey(full_name, phone)
           ),
           sender:profiles!parcel_requests_sender_id_fkey(full_name, phone)
         `,
