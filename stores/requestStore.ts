@@ -107,6 +107,7 @@ interface RequestState {
 
   // Request details editing
   canEditRequestDetails: (requestId: string) => Promise<boolean>;
+  canEditReceiverDetails: (requestId: string) => Promise<boolean>;
   updateRequestDetails: (
     requestId: string,
     item_description: string,
@@ -822,6 +823,25 @@ export const useRequestStore = create<RequestState>((set, get) => ({
       return data ?? false;
     } catch (error) {
       logger.error("canEditRequestDetails error", error);
+      return false;
+    }
+  },
+
+  // Check if receiver details can be edited
+  canEditReceiverDetails: async (requestId: string): Promise<boolean> => {
+    try {
+      const { data, error } = await supabase.rpc("can_edit_receiver_details", {
+        p_request_id: requestId,
+      });
+
+      if (error) {
+        logger.error("Check receiver edit permission failed", error);
+        return false;
+      }
+
+      return data ?? false;
+    } catch (error) {
+      logger.error("canEditReceiverDetails error", error);
       return false;
     }
   },
