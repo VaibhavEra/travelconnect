@@ -1121,6 +1121,192 @@ Parts 3 & 4 will add:
 
 ---
 
+### Issue #20 - Implement OTP brute force protection UI ✅
+
+**Type:** Bug Fix + Frontend Enhancement - Backend Redesign
+**Priority:** HIGH
+**Time:** 3-4 hours
+**Date:** 2026-02-18
+
+**Problem:**
+
+Backend had full OTP brute force protection fields in `parcel_requests`
+(`failed_pickup_attempts`, `pickup_blocked_until`, `failed_delivery_attempts`,
+`delivery_blocked_until`) but two things were wrong:
+
+1. The attempt counters **never actually persisted** in the database — so the
+   3-attempt block never triggered even though the logic was written.
+2. The frontend had **no visibility** into attempt state, block state, or
+   remaining attempts.
+
+**Root Cause:**
+
+Both `verify_pickup_otp` and `verify_delivery_otp` used this pattern:
+
+```sql
+UPDATE parcel_requests SET failed_delivery_attempts = ... WHERE id = ...;
+RAISE EXCEPTION 'Invalid delivery OTP';
+```
+
+In PostgreSQL PL/pgSQL, `RAISE EXCEPTION` aborts the **entire transaction**,
+rolling back any `UPDATE`s that preceded it in the same block. The counter
+incremented in memory but was always rolled back before committing. The expiry
+path had the same bug — `UPDATE status = 'failed'` was also always rolled back.
+
+A `BEGIN...EXCEPTION` sub-block was attempted but also failed — the sub-block's
+savepoint merges back into the outer transaction which is still aborted by the
+outer `RAISE`.
+
+**Backend Changes (Applied via Supabase SQL Editor - 2026-02-18):**
+
+1. **`verify_pickup_otp()` function** (Redesigned — no signature change)
+   - **Removed:** `RAISE EXCEPTION` for OTP validation failures
+   - **Added:** Structured JSON return shape for all failure paths
+   - **Blocked path:** Returns `{ success: false, error: 'blocked', failed_attempts, blocked_until }` without raising
+   - **Expired path:** Runs `UPDATE status = 'failed'` then returns `{ success: false, error: 'expired', ... }` — UPDATE now commits
+   - **Wrong OTP path:** Uses `RETURNING` clause to capture post-increment values, then returns `{ success: false, error: 'invalid_otp', failed_attempts, blocked_until }`
+   - **Success path:** Unchanged — generates delivery OTP, transitions to `picked_up`, returns `{ success: true, status: 'picked_up', delivery_otp, delivery_otp_expiry }`
+   - **`RAISE` preserved for:** request not found, wrong status (programmer errors)
+   - **`SECURITY DEFINER` preserved**
+
+2. **`verify_delivery_otp()` function** (Redesigned — no signature change)
+   - Same restructuring as `verify_pickup_otp`, mirrored for delivery
+   - **Success path:** Transitions to `delivered`, completes trip, returns `{ success: true, status: 'delivered', delivered_at }`
+
+**Key technical detail — `RETURNING` clause used to capture post-UPDATE values:**
+
+```sql
+UPDATE parcel_requests
+SET
+  failed_delivery_attempts = COALESCE(failed_delivery_attempts, 0) + 1,
+  delivery_blocked_until = CASE
+    WHEN COALESCE(failed_delivery_attempts, 0) + 1 >= 3
+    THEN NOW() + INTERVAL '15 minutes'
+    ELSE NULL
+  END,
+  updated_at = NOW()
+WHERE id = p_request_id
+RETURNING failed_delivery_attempts, delivery_blocked_until
+  INTO v_request.failed_delivery_attempts, v_request.delivery_blocked_until;
+```
+
+This ensures the JSON response reflects state **after** the increment, not before.
+
+**Frontend Changes (Applied via GitHub PR - 2026-02-18):**
+
+1. **`stores/requestStore.ts`** (Updated)
+   - **Updated** `PickupOtpVerificationResult` type to structured shape:
+     `{ success: boolean, error?: string, failed_attempts?: number, blocked_until?: string | null }`
+   - **Updated** `DeliveryOtpVerificationResult` type: same shape
+   - **Updated `verifyPickupOtp()`:**
+     - Now reads `data.success` instead of catching a Supabase thrown error
+     - On failure: calls `getRequestById()` to refresh `currentRequest` (so modal
+       immediately reflects new `failed_attempts` and `blocked_until`), then throws
+       `new Error(result.error)` with a clean error code string
+     - On success: same path as before
+     - Known error codes (`invalid_otp`, `blocked`, `expired`) not logged —
+       only unexpected errors are logged via `logger.error`
+   - **Updated `verifyDeliveryOtp()`:** same pattern as above
+
+2. **`components/modals/VerifyOtpModal.tsx`** (Updated — `handleVerify` catch block only)
+   - **Replaced** brittle substring matching on human-readable error messages:
+
+     | Before                                           | After                    |
+     | ------------------------------------------------ | ------------------------ |
+     | `error.message?.includes('temporarily blocked')` | `code === 'blocked'`     |
+     | `error.message?.includes('expired')`             | `code === 'expired'`     |
+     | `error.message?.includes('Invalid')`             | `code === 'invalid_otp'` |
+
+   - **Removed** stray `console.error` call — store handles logging
+   - All other component logic (block countdown timer, expiry countdown,
+     attempts remaining display, input disabled state) **unchanged**
+
+3. **`app/(tabs)/requests/index.tsx`** (Updated)
+   - **Added state:** `selectedFailedAttempts: number | null`
+   - **Added state:** `selectedBlockedUntil: string | null`
+   - **Updated `handleMarkPickup()`:** now sets `selectedFailedAttempts` from
+     `request.failed_pickup_attempts` and `selectedBlockedUntil` from
+     `request.pickup_blocked_until` before opening modal
+   - **Updated `handleMarkDelivery()`:** same for delivery fields
+   - **Updated `<VerifyOtpModal>`:** now receives `failedAttempts` and `blockedUntil`
+     props so block state and attempts remaining are visible **immediately on open**,
+     not just after the first failed attempt in the session
+   - **Removed** stray `console.error` from `handleVerifyOtp` — re-throws
+     so `VerifyOtpModal` catch block handles display
+
+**How It Works Now:**
+
+```
+Traveller opens delivery OTP modal
+  → modal shows current failed_attempts and blocked_until from store
+
+Traveller enters wrong OTP
+  → verifyDeliveryOtp RPC called
+  → Backend: increments counter, sets blocked_until if attempt ≥ 3,
+    returns { success: false, error: 'invalid_otp', failed_attempts: N }
+  → Store: getRequestById() called, currentRequest refreshed with new counts
+  → Store: throws Error('invalid_otp')
+  → Modal catch block: shows "Invalid OTP. Please check and try again."
+  → Modal body: attempts remaining counter decrements
+
+3rd wrong attempt
+  → Backend returns { success: false, error: 'invalid_otp',
+    failed_attempts: 3, blocked_until: NOW() + 15 min }
+  → Store refreshes currentRequest — blocked_until now set
+  → Modal: blockedUntil prop updates via parent re-render
+  → Modal useEffect: isBlocked = true, countdown starts
+  → Input disabled, button shows "Blocked", red ban banner visible
+
+Attempt while blocked
+  → Backend returns { success: false, error: 'blocked', ... }
+  → Modal shows countdown error immediately
+```
+
+**Testing:**
+
+- ✅ Test 1: Wrong OTP → `failed_delivery_attempts` increments in DB - PASSED
+- ✅ Test 2: Table check after attempt → count correct - PASSED
+- ✅ Test 3: 2nd wrong OTP → count increments again - PASSED
+- ✅ Test 4: 3rd wrong OTP → `delivery_blocked_until` set to ~15 min - PASSED
+- ✅ Test 5: Attempt while blocked → `error: 'blocked'` returned - PASSED
+- ✅ Test 6: Reset + correct OTP → status = delivered, trip completed - PASSED
+- ✅ Test 7: Terminal clean — no console errors on wrong OTP - PASSED
+- ✅ Test 8: Attempts remaining counter decrements in modal - PASSED
+- ✅ Test 9: Block banner with countdown appears on 3rd failure - PASSED
+
+**Acceptance Criteria:**
+
+- ✅ Failed attempts counter displayed
+- ✅ Remaining attempts shown
+- ✅ Countdown timer when blocked
+- ✅ OTP input disabled when blocked
+- ✅ Clear error messages
+- ✅ Works for both pickup and delivery OTP
+
+**Frontend Changes:**
+
+- `stores/requestStore.ts` — Updated result types, `verifyPickupOtp()`, `verifyDeliveryOtp()` methods
+- `components/modals/VerifyOtpModal.tsx` — `handleVerify` catch block (error code matching)
+- `app/(tabs)/requests/index.tsx` — Pass brute force props to modal on open
+
+**Type Updates:**
+
+- None required — `failed_pickup_attempts`, `pickup_blocked_until`,
+  `failed_delivery_attempts`, `delivery_blocked_until` already exist in
+  `DbParcelRequest` from generated types. No new columns added.
+
+**Database Objects Touched:**
+
+1. Function: `verify_pickup_otp(...)` — redesigned body, same signature
+2. Function: `verify_delivery_otp(...)` — redesigned body, same signature
+
+**Related Issues:**
+
+- Related to: Issue #42 (OTP regeneration) ✅ Resolved
+- Related to: Issue #19 (request details UI — OTP display sections) ✅ Resolved
+
+---
+
 ### Issue #42 - Add OTP regeneration and traveller visibility (Parts 3 & 4 of Issue #19) ✅
 
 **Type**: Frontend Enhancement - OTP Management + Traveller Info  
