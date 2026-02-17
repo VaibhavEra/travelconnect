@@ -1,5 +1,9 @@
 import TextInput from "@/components/forms/TextInput";
 import { haptics } from "@/lib/utils/haptics";
+import {
+  RequestEditReceiverFormData,
+  requestEditReceiverSchema,
+} from "@/lib/validations/request-edit";
 import { ParcelRequest, useRequestStore } from "@/stores/requestStore";
 import { BorderRadius, Spacing, Typography } from "@/styles";
 import { useThemeColors } from "@/styles/theme";
@@ -19,19 +23,6 @@ import {
   Text,
   View,
 } from "react-native";
-import { z } from "zod";
-
-const receiverSchema = z.object({
-  delivery_contact_name: z
-    .string()
-    .min(2, "Name must be at least 2 characters")
-    .max(100, "Name is too long"),
-  delivery_contact_phone: z
-    .string()
-    .regex(/^[0-9]{10}$/, "Phone number must be 10 digits"),
-});
-
-type ReceiverFormData = z.infer<typeof receiverSchema>;
 
 interface EditReceiverDetailsModalProps {
   visible: boolean;
@@ -54,8 +45,8 @@ export default function EditReceiverDetailsModal({
     handleSubmit,
     formState: { errors, isValid, isDirty, isSubmitting },
     reset,
-  } = useForm<ReceiverFormData>({
-    resolver: zodResolver(receiverSchema),
+  } = useForm<RequestEditReceiverFormData>({
+    resolver: zodResolver(requestEditReceiverSchema),
     mode: "onChange",
     defaultValues: {
       delivery_contact_name: request.delivery_contact_name,
@@ -73,7 +64,7 @@ export default function EditReceiverDetailsModal({
     }
   }, [visible, request, reset]);
 
-  const onSubmit = async (data: ReceiverFormData) => {
+  const onSubmit = async (data: RequestEditReceiverFormData) => {
     try {
       haptics.light();
 
