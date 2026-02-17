@@ -838,6 +838,291 @@ The `user_can_view_trip()` function is marked `STABLE`, allowing PostgreSQL to:
 
 ---
 
+---
+
+### Issue #19 - Request details UI improvements (Parts 1 & 2) ✅
+
+**Type**: Frontend Enhancement - Component Extraction + Permission System  
+**Priority**: HIGH  
+**Time**: 4-5 hours  
+**Date**: 2026-02-17
+
+**Problem:**
+
+Request details screen had incomplete data display and non-functional edit buttons. Senders couldn't see trip cities, routes, or schedules, and edit functionality wasn't properly gated by permissions.
+
+**Issues Identified:**
+
+1. **Incomplete Data Display:**
+   - Only departure information visible (no cities, arrival times)
+   - Trip route not shown (source/destination missing)
+   - Transport mode and parcel capacity hidden
+   - Senders couldn't see complete journey information
+
+2. **Non-Functional Edit Buttons:**
+   - Edit buttons existed but didn't do anything
+   - No permission checking (frontend or backend)
+   - No validation when editing request details
+   - No way to edit receiver contact information
+
+**Solution Implemented:**
+
+#### Part 1: Complete Data Display
+
+**Backend Data Fetching (stores/requestStore.ts):**
+
+- Updated `ParcelRequest` interface to include:
+  - `trip.id` (UUID)
+  - `trip.arrival_date` (string)
+  - `trip.arrival_time` (string)
+- Updated 5 query methods to fetch complete trip data:
+  - `createRequest()` - Added id, arrival_date, arrival_time
+  - `getMyRequests()` - Added id, arrival_date, arrival_time
+  - `getIncomingRequests()` - Added id, arrival_date, arrival_time
+  - `getAcceptedRequests()` - Added id, arrival_date, arrival_time
+  - `getRequestById()` - Added id, arrival_date, arrival_time
+
+**UI Implementation (app/my-requests/[id].tsx):**
+
+- Added vertical route layout showing source/destination cities
+- Display departure and arrival dates/times
+- Show transport mode with icon
+- Display parcel size capacity badge
+- Added status banner with colored background
+- Improved visual hierarchy with card-based sections
+- Show rejection/cancellation reasons when applicable
+
+#### Part 2: Edit Functionality
+
+**Component Extraction:**
+
+1. **`components/request/CancelRequestModal.tsx`** (New, 200 lines)
+   - Extracted from inline implementation
+   - Accepts `requestStatus` prop instead of `tripDepartureDate`
+   - Removed 24h restriction logic (backend validates)
+   - Conditional rendering based on status (pending/accepted)
+   - User-friendly warning messages
+
+2. **`components/request/EditRequestDetailsModal.tsx`** (New, 350 lines)
+   - Edit item description, category, and parcel photos
+   - Validate against trip's allowed categories
+   - Photo gallery with add/remove functionality
+   - Backend permission check (pending status only)
+   - Form validation using react-hook-form + Zod
+
+3. **`components/request/EditReceiverDetailsModal.tsx`** (New, 250 lines)
+   - Edit delivery contact name and phone
+   - Allow edits until delivered status
+   - Backend validation via `can_edit_receiver_details` RPC
+   - Phone number formatting and validation
+
+**Validation Layer:**
+
+4. **`lib/validations/request-edit.ts`** (New, 50 lines)
+   - `requestDetailsEditSchema` - item description, category, photos
+   - `receiverDetailsEditSchema` - contact name and phone
+   - Shared validation rules match backend RPC constraints
+
+**Store Updates:**
+
+5. **`stores/requestStore.ts`** (Updated)
+   - Added `canEditRequestDetails()` method
+     - Calls backend RPC `can_edit_request_details(request_id)`
+     - Returns boolean based on status (pending only)
+   - Added `canEditReceiverDetails()` method
+     - Calls backend RPC `can_edit_receiver_details(request_id)`
+     - Returns boolean based on status (before delivery)
+   - Added `updateReceiverDetails()` method
+     - Calls backend RPC `update_receiver_details(request_id, name, phone)`
+     - Updates delivery contact information
+
+**Request Details Screen Refactor:**
+
+6. **`app/my-requests/[id].tsx`** (Major Refactor, ~180 lines removed)
+   - Removed inline cancel modal implementation
+   - Removed unused imports (`useAuthStore`, `user` variable)
+   - Added permission state management (`canEditDetails`, `canEditReceiver`)
+   - Added `useEffect` hook to check permissions dynamically
+   - Conditional edit buttons per section
+   - Improved error handling and user feedback
+   - Proper TypeScript types throughout
+
+**How It Works Now:**
+
+#### Request Details Screen Layout
+
+```
+┌─────────────────────────────────────┐
+│ Header (Back + Status Badge)        │
+└─────────────────────────────────────┘
+
+┌─────────────────────────────────────┐
+│ TRIP ROUTE                          │
+│ From: Jaipur → To: Delhi            │
+│ Depart: Feb 15, 10:00 AM            │
+│ Arrive: Feb 15, 12:30 PM            │
+│ Transport: Flight                   │
+│ Accepts: Medium Parcels             │
+└─────────────────────────────────────┘
+
+┌─────────────────────────────────────┐
+│ PARCEL DETAILS [Edit Icon]          │ ← Conditional
+│ Category: Documents                 │
+│ Description: Important papers       │
+│ Photos: [3 images]                  │
+└─────────────────────────────────────┘
+
+┌─────────────────────────────────────┐
+│ RECEIVER DETAILS [Edit Icon]        │ ← Conditional
+│ Name: John Doe                      │
+│ Phone: +91 98765 43210              │
+└─────────────────────────────────────┘
+
+┌─────────────────────────────────────┐
+│ [Cancel Request Button]             │ ← If pending/accepted
+└─────────────────────────────────────┘
+```
+
+#### Permission Logic
+
+| Request Status | canEditDetails | canEditReceiver | What Can Be Edited |
+| -------------- | -------------- | --------------- | ------------------ |
+| **pending**    | ✓ true         | ✓ true          | Details + Receiver |
+| **accepted**   | ❌ false       | ✓ true          | Receiver only      |
+| **picked_up**  | ❌ false       | ✓ true          | Receiver only      |
+| **delivered**  | ❌ false       | ❌ false        | Nothing            |
+| **cancelled**  | ❌ false       | ❌ false        | Nothing            |
+| **rejected**   | ❌ false       | ❌ false        | Nothing            |
+| **expired**    | ❌ false       | ❌ false        | Nothing            |
+
+**Backend Functions Used:**
+
+- `can_edit_request_details(request_id UUID)` - Returns boolean
+- `can_edit_receiver_details(request_id UUID)` - Returns boolean
+- `update_request_details(request_id UUID, category TEXT, description TEXT, photos TEXT[])` - Updates and validates
+- `update_receiver_details(request_id UUID, name TEXT, phone TEXT)` - Updates contact info
+
+**Testing:**
+
+- ✅ Test 1: Request details screen displays cities and route - PASSED
+- ✅ Test 2: Departure and arrival dates/times shown - PASSED
+- ✅ Test 3: Transport icon displays correctly - PASSED
+- ✅ Test 4: Parcel size capacity badge shown - PASSED
+- ✅ Test 5: Edit buttons appear based on permissions - PASSED
+- ✅ Test 6: Edit details modal validates and saves - PASSED
+- ✅ Test 7: Edit receiver modal validates and saves - PASSED
+- ✅ Test 8: Cancel button works for pending/accepted only - PASSED
+- ✅ Test 9: Rejection/cancellation reasons display - PASSED
+- ✅ Test 10: TypeScript compiles without errors - PASSED
+- ✅ Test 11: No unused variables or imports - PASSED
+
+**Acceptance Criteria:**
+
+- ✅ Request details screen shows complete trip information
+- ✅ Cities, dates, times visible to sender
+- ✅ Transport mode and parcel capacity displayed
+- ✅ Edit buttons work with proper permission checks
+- ✅ Edit details modal saves successfully (pending only)
+- ✅ Edit receiver modal saves successfully (before delivery)
+- ✅ Cancel button properly restricted by status
+- ✅ Rejection/cancellation reasons display correctly
+- ✅ Clean component architecture (extracted modals)
+- ✅ Type-safe implementation throughout
+- ✅ Consistent styling with other cards (status banner, layout)
+
+**Frontend Changes:**
+
+**New Components:**
+
+- `components/request/CancelRequestModal.tsx` (200 lines)
+- `components/request/EditRequestDetailsModal.tsx` (350 lines)
+- `components/request/EditReceiverDetailsModal.tsx` (250 lines)
+
+**New Files:**
+
+- `lib/validations/request-edit.ts` (50 lines)
+
+**Updated Files:**
+
+- `app/my-requests/[id].tsx` (major refactor, ~180 lines removed)
+- `stores/requestStore.ts` (+3 methods: canEditRequestDetails, canEditReceiverDetails, updateReceiverDetails)
+- `types/database.types.ts` (regenerated for new RPC functions)
+
+**Type Updates:**
+
+```typescript
+// Updated ParcelRequest interface
+interface ParcelRequest {
+  // ... existing fields
+  trip?: {
+    id: string;
+    source: string;
+    destination: string;
+    departure_date: string;
+    departure_time: string;
+    arrival_date: string; // ← Added
+    arrival_time: string; // ← Added
+    transport_mode: string;
+    parcel_size_capacity: string;
+    // ...
+  } | null;
+}
+```
+
+**Database Objects Touched:**
+
+**Functions (Already existed, created in Issue #18 backend work):**
+
+1. `can_edit_request_details(request_id UUID)` - Permission check
+2. `can_edit_receiver_details(request_id UUID)` - Permission check
+3. `update_request_details(...)` - Update with validation
+4. `update_receiver_details(...)` - Update contact info
+
+**No new database objects created** - this issue used existing backend infrastructure.
+
+**Related Issues:**
+
+- Depends on: Issue #18 (RLS policies, data fetching) ✅ Resolved
+- Closes: Issue #19 Parts 1 & 2
+- Remaining work: Issue #42 (Parts 3 & 4 - Traveller info + OTP)
+- Pattern from: TripCard design (consistent UI)
+
+**Benefits:**
+
+✅ **Complete Information** - Senders see all trip and request details  
+✅ **Proper Permissions** - Backend-validated edit gates  
+✅ **Better UX** - Card-based layout, clear sections, intuitive editing  
+✅ **Maintainable** - Extracted components, shared validation  
+✅ **Type Safe** - Complete TypeScript coverage  
+✅ **Consistent Design** - Matches TripCard styling patterns  
+✅ **Security** - Backend permission checks prevent unauthorized edits  
+✅ **User Feedback** - Clear error messages, success confirmations
+
+**Code Quality Improvements:**
+
+- Removed ~180 lines from main screen (extracted to modals)
+- Eliminated unused imports and variables
+- Centralized validation logic
+- Improved error handling
+- Better separation of concerns
+- Reusable modal components
+
+**Split Decision:**
+
+This issue was **split after Parts 1 & 2 were completed** due to scope size:
+
+- ✅ **Parts 1 & 2** (Cities display + Edit buttons) - **CLOSED in this issue**
+- 🔗 **Parts 3 & 4** (Traveller info + OTP regeneration) - **Moved to Issue #42**
+
+Parts 3 & 4 will add:
+
+- Display traveller contact info after acceptance
+- Show ticket file and PNR number
+- OTP display sections (pickup and delivery)
+- OTP regeneration buttons when expired
+
+---
+
 ### Issue #6 - Fix create-trip form date/time validation ✅
 
 **Type:** Frontend Validation - Bug Fix  
