@@ -12,6 +12,8 @@ interface VerifyOtpModalProps {
   type: "pickup" | "delivery";
   userName: string;
   otpExpiry?: string;
+  failedAttempts?: number | null;
+  blockedUntil?: string | null;
 }
 
 const OTP_CONFIG = {
@@ -43,6 +45,8 @@ export default function VerifyOtpModal({
   type,
   userName,
   otpExpiry,
+  failedAttempts,
+  blockedUntil,
 }: VerifyOtpModalProps) {
   const colors = useThemeColors();
   const [otp, setOtp] = useState("");
@@ -52,11 +56,19 @@ export default function VerifyOtpModal({
   const [isExpiringSoon, setIsExpiringSoon] = useState(false);
   const [isExpired, setIsExpired] = useState(false);
 
+  // Brute force block state
+  const [isBlocked, setIsBlocked] = useState(false);
+  const [blockSecondsRemaining, setBlockSecondsRemaining] = useState(0);
+
   const config = OTP_CONFIG[type];
   const iconColor =
     config.iconColor === "primary" ? colors.primary : colors.success;
 
-  // Calculate time remaining
+  const MAX_ATTEMPTS = 3;
+  const attempts = failedAttempts ?? 0;
+  const remainingAttempts = MAX_ATTEMPTS - attempts;
+
+  // Calculate time remaining for OTP expiry
   useEffect(() => {
     if (!otpExpiry) return;
 
@@ -92,14 +104,52 @@ export default function VerifyOtpModal({
     };
 
     updateTimer();
-    const interval = setInterval(updateTimer, 60000); // Update every minute
+    const interval = setInterval(updateTimer, 60000);
 
     return () => clearInterval(interval);
   }, [otpExpiry, type]);
 
+  // Block countdown timer — updates every second while blocked
+  useEffect(() => {
+    if (!blockedUntil) {
+      setIsBlocked(false);
+      setBlockSecondsRemaining(0);
+      return;
+    }
+
+    const updateBlockTimer = () => {
+      const now = new Date().getTime();
+      const unblockAt = new Date(blockedUntil).getTime();
+      const diff = unblockAt - now;
+
+      if (diff <= 0) {
+        setIsBlocked(false);
+        setBlockSecondsRemaining(0);
+        return;
+      }
+
+      setIsBlocked(true);
+      setBlockSecondsRemaining(Math.ceil(diff / 1000));
+    };
+
+    updateBlockTimer();
+    const interval = setInterval(updateBlockTimer, 1000);
+
+    return () => clearInterval(interval);
+  }, [blockedUntil]);
+
   const handleVerify = async () => {
     if (otp.length !== 6) {
       setError("Please enter a 6-digit OTP");
+      return;
+    }
+
+    if (isBlocked) {
+      const mins = Math.floor(blockSecondsRemaining / 60);
+      const secs = blockSecondsRemaining % 60;
+      setError(
+        `Too many failed attempts. Try again in ${mins}:${secs.toString().padStart(2, "0")}`,
+      );
       return;
     }
 
@@ -125,15 +175,24 @@ export default function VerifyOtpModal({
         setError("Invalid or expired OTP. Please try again.");
       }
     } catch (error: any) {
-      console.error(`Verify ${type} OTP failed:`, error);
+      // UPDATED: exact error code matching instead of substring matching
+      const code = error.message;
 
-      if (error.message?.includes("expired")) {
+      if (code === "blocked") {
+        const mins = Math.floor(blockSecondsRemaining / 60);
+        const secs = blockSecondsRemaining % 60;
+        setError(
+          blockSecondsRemaining > 0
+            ? `Too many failed attempts. Try again in ${mins}:${secs.toString().padStart(2, "0")}`
+            : "Too many failed attempts. Please wait before trying again.",
+        );
+      } else if (code === "expired") {
         setError(
           type === "pickup"
             ? "This OTP has expired. Please contact the sender."
             : "This OTP has expired. Please contact support.",
         );
-      } else if (error.message?.includes("Invalid")) {
+      } else if (code === "invalid_otp") {
         setError("Invalid OTP. Please check and try again.");
       } else {
         setError(error.message || "Failed to verify OTP. Please try again.");
@@ -169,6 +228,12 @@ export default function VerifyOtpModal({
     return "checkmark-circle";
   };
 
+  const formatBlockTime = () => {
+    const mins = Math.floor(blockSecondsRemaining / 60);
+    const secs = blockSecondsRemaining % 60;
+    return `${mins}:${secs.toString().padStart(2, "0")}`;
+  };
+
   return (
     <BaseModal
       visible={visible}
@@ -190,14 +255,38 @@ export default function VerifyOtpModal({
             variant={type === "pickup" ? "primary" : "success"}
             onPress={handleVerify}
             loading={loading}
-            disabled={otp.length !== 6 || isExpired}
+            disabled={otp.length !== 6 || isExpired || isBlocked}
           >
-            {isExpired ? "OTP Expired" : config.buttonText}
+            {isExpired
+              ? "OTP Expired"
+              : isBlocked
+                ? "Blocked"
+                : config.buttonText}
           </ModalButton>
         </>
       }
     >
       <View>
+        {/* Block warning — shown when user is temporarily blocked */}
+        {isBlocked && (
+          <View
+            style={[
+              styles.statusBox,
+              { backgroundColor: withOpacity(colors.error, "subtle") },
+            ]}
+          >
+            <Ionicons name="ban" size={16} color={colors.error} />
+            <View style={styles.statusBoxContent}>
+              <Text style={[styles.statusBoxTitle, { color: colors.error }]}>
+                Too many failed attempts
+              </Text>
+              <Text style={[styles.statusBoxSub, { color: colors.error }]}>
+                Try again in {formatBlockTime()}
+              </Text>
+            </View>
+          </View>
+        )}
+
         {/* OTP Expiry Info */}
         {otpExpiry && timeRemaining && (
           <View
@@ -223,8 +312,13 @@ export default function VerifyOtpModal({
             styles.input,
             {
               backgroundColor: colors.background.secondary,
-              borderColor: error ? colors.error : colors.border.default,
-              color: colors.text.primary,
+              borderColor: error
+                ? colors.error
+                : isBlocked
+                  ? colors.error + "50"
+                  : colors.border.default,
+              color: isBlocked ? colors.text.tertiary : colors.text.primary,
+              opacity: isBlocked ? 0.5 : 1,
             },
           ]}
           placeholder="000000"
@@ -236,12 +330,20 @@ export default function VerifyOtpModal({
           }}
           keyboardType="number-pad"
           maxLength={6}
-          editable={!loading && !isExpired}
+          editable={!loading && !isExpired && !isBlocked}
           autoFocus
         />
+
+        {/* Error message */}
         {error ? (
           <Text style={[styles.errorText, { color: colors.error }]}>
             {error}
+          </Text>
+        ) : isBlocked ? null : attempts > 0 && remainingAttempts > 0 ? (
+          // Attempts remaining warning — only shown when not blocked and has failures
+          <Text style={[styles.attemptsText, { color: colors.warning }]}>
+            {remainingAttempts} attempt{remainingAttempts !== 1 ? "s" : ""}{" "}
+            remaining
           </Text>
         ) : (
           <Text style={[styles.hint, { color: colors.text.tertiary }]}>
@@ -254,6 +356,25 @@ export default function VerifyOtpModal({
 }
 
 const styles = StyleSheet.create({
+  statusBox: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: Spacing.sm,
+    padding: Spacing.md,
+    borderRadius: BorderRadius.md,
+    marginBottom: Spacing.md,
+  },
+  statusBoxContent: {
+    flex: 1,
+  },
+  statusBoxTitle: {
+    fontSize: Typography.sizes.sm,
+    fontWeight: Typography.weights.semibold,
+  },
+  statusBoxSub: {
+    fontSize: Typography.sizes.xs,
+    marginTop: 2,
+  },
   expiryBox: {
     flexDirection: "row",
     alignItems: "center",
@@ -290,5 +411,11 @@ const styles = StyleSheet.create({
     fontSize: Typography.sizes.xs,
     marginTop: Spacing.xs,
     textAlign: "center",
+  },
+  attemptsText: {
+    fontSize: Typography.sizes.xs,
+    marginTop: Spacing.xs,
+    textAlign: "center",
+    fontWeight: Typography.weights.medium,
   },
 });

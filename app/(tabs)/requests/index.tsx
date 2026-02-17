@@ -61,6 +61,13 @@ export default function RequestsScreen() {
   const [selectedRequestId, setSelectedRequestId] = useState<string>("");
   const [selectedUserName, setSelectedUserName] = useState<string>("");
   const [otpExpiry, setOtpExpiry] = useState<string>("");
+  // UPDATED: Track failed attempts and block state for the selected request
+  const [selectedFailedAttempts, setSelectedFailedAttempts] = useState<
+    number | null
+  >(null);
+  const [selectedBlockedUntil, setSelectedBlockedUntil] = useState<
+    string | null
+  >(null);
 
   // Animated header for scroll
   const scrollY = useSharedValue(0);
@@ -140,6 +147,9 @@ export default function RequestsScreen() {
       setSelectedRequestId(requestId);
       setSelectedUserName(request.sender?.full_name || "Sender");
       setOtpExpiry(request.pickup_otp_expiry || "");
+      // UPDATED: Pass failed attempts and block state
+      setSelectedFailedAttempts(request.failed_pickup_attempts ?? null);
+      setSelectedBlockedUntil(request.pickup_blocked_until ?? null);
       setOtpType("pickup");
       setOtpModalVisible(true);
     }
@@ -151,6 +161,9 @@ export default function RequestsScreen() {
       setSelectedRequestId(requestId);
       setSelectedUserName(request.delivery_contact_name);
       setOtpExpiry(request.delivery_otp_expiry || "");
+      // UPDATED: Pass failed attempts and block state
+      setSelectedFailedAttempts(request.failed_delivery_attempts ?? null);
+      setSelectedBlockedUntil(request.delivery_blocked_until ?? null);
       setOtpType("delivery");
       setOtpModalVisible(true);
     }
@@ -164,7 +177,7 @@ export default function RequestsScreen() {
           : await verifyDeliveryOtp(selectedRequestId, otp);
 
       if (isValid && user) {
-        setOtpModalVisible(false); // Close modal on success
+        setOtpModalVisible(false);
         Alert.alert(
           "Success",
           otpType === "pickup"
@@ -175,7 +188,8 @@ export default function RequestsScreen() {
       }
       return isValid;
     } catch (error) {
-      console.error(`Verify ${otpType} failed:`, error);
+      // UPDATED: Re-throw so VerifyOtpModal catch block handles the error display.
+      // Store already handles logging — no console.error needed here.
       throw error;
     }
   };
@@ -684,6 +698,7 @@ export default function RequestsScreen() {
       </ScrollView>
 
       {/* Unified OTP Verification Modal */}
+      {/* UPDATED: Pass failedAttempts and blockedUntil so modal shows block state correctly */}
       <VerifyOtpModal
         visible={otpModalVisible}
         onClose={() => setOtpModalVisible(false)}
@@ -691,6 +706,8 @@ export default function RequestsScreen() {
         type={otpType}
         userName={selectedUserName}
         otpExpiry={otpExpiry}
+        failedAttempts={selectedFailedAttempts}
+        blockedUntil={selectedBlockedUntil}
       />
     </SafeAreaView>
   );

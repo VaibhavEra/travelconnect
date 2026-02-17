@@ -7,18 +7,24 @@ import { create } from "zustand";
 // Type for parcel request from database
 type DbParcelRequest = Database["public"]["Tables"]["parcel_requests"]["Row"];
 
-// NEW: Type definitions for RPC function returns
+// UPDATED: Structured result types matching new backend response shape
 type PickupOtpVerificationResult = {
-  request_id: string;
-  status: string;
-  delivery_otp: string;
-  delivery_otp_expiry: string;
+  success: boolean;
+  error?: string;
+  failed_attempts?: number;
+  blocked_until?: string | null;
+  status?: string;
+  delivery_otp?: string;
+  delivery_otp_expiry?: string;
 };
 
 type DeliveryOtpVerificationResult = {
-  request_id: string;
-  status: string;
-  delivered_at: string;
+  success: boolean;
+  error?: string;
+  failed_attempts?: number;
+  blocked_until?: string | null;
+  status?: string;
+  delivered_at?: string;
 };
 
 // Add type definition for the RPC return at the top of the file
@@ -41,10 +47,9 @@ export interface ParcelRequest extends DbParcelRequest {
     arrival_time: string;
     transport_mode: string;
     parcel_size_capacity: string;
-    pnr_number: string; // ADD THIS
-    ticket_file_url: string; // ADD THIS
+    pnr_number: string;
+    ticket_file_url: string;
     traveller?: {
-      // ADD THIS
       full_name: string;
       phone: string;
     };
@@ -582,35 +587,41 @@ export const useRequestStore = create<RequestState>((set, get) => ({
 
       const result = data as unknown as PickupOtpVerificationResult;
 
+      // UPDATED: Backend now returns structured result instead of raising
+      if (!result.success) {
+        try {
+          await get().getRequestById(requestId);
+        } catch {
+          // ignore refresh errors
+        }
+        set({ loading: false });
+        throw new Error(result.error || "invalid_otp");
+      }
+
       logger.info("Pickup verified, delivery OTP generated", {
         requestId,
         deliveryOtp: result.delivery_otp,
       });
 
-      if (result.status === "picked_up") {
-        if (get().currentRequest?.id === requestId) {
-          await get().getRequestById(requestId);
-        }
-
-        set((state) => ({
-          acceptedRequests: state.acceptedRequests.map((req) =>
-            req.id === requestId
-              ? { ...req, status: "picked_up" as const }
-              : req,
-          ),
-          loading: false,
-        }));
-
-        return true;
-      } else {
-        set({ loading: false });
-        return false;
+      if (get().currentRequest?.id === requestId) {
+        await get().getRequestById(requestId);
       }
+
+      set((state) => ({
+        acceptedRequests: state.acceptedRequests.map((req) =>
+          req.id === requestId ? { ...req, status: "picked_up" as const } : req,
+        ),
+        loading: false,
+      }));
+
+      return true;
     } catch (error: any) {
-      const errorMessage = parseSupabaseError(error);
-      logger.error("Verify pickup OTP failed", error);
-      set({ loading: false, error: errorMessage });
-      throw new Error(errorMessage);
+      const knownErrors = ["invalid_otp", "blocked", "expired"];
+      if (!knownErrors.includes(error.message)) {
+        logger.error("Verify pickup OTP failed", error);
+      }
+      set({ loading: false, error: error.message });
+      throw error;
     }
   },
 
@@ -632,35 +643,41 @@ export const useRequestStore = create<RequestState>((set, get) => ({
 
       const result = data as unknown as DeliveryOtpVerificationResult;
 
+      // UPDATED: Backend now returns structured result instead of raising
+      if (!result.success) {
+        try {
+          await get().getRequestById(requestId);
+        } catch {
+          // ignore refresh errors
+        }
+        set({ loading: false });
+        throw new Error(result.error || "invalid_otp");
+      }
+
       logger.info("Delivery verified", {
         requestId,
         deliveredAt: result.delivered_at,
       });
 
-      if (result.status === "delivered") {
-        if (get().currentRequest?.id === requestId) {
-          await get().getRequestById(requestId);
-        }
-
-        set((state) => ({
-          acceptedRequests: state.acceptedRequests.map((req) =>
-            req.id === requestId
-              ? { ...req, status: "delivered" as const }
-              : req,
-          ),
-          loading: false,
-        }));
-
-        return true;
-      } else {
-        set({ loading: false });
-        return false;
+      if (get().currentRequest?.id === requestId) {
+        await get().getRequestById(requestId);
       }
+
+      set((state) => ({
+        acceptedRequests: state.acceptedRequests.map((req) =>
+          req.id === requestId ? { ...req, status: "delivered" as const } : req,
+        ),
+        loading: false,
+      }));
+
+      return true;
     } catch (error: any) {
-      const errorMessage = parseSupabaseError(error);
-      logger.error("Verify delivery OTP failed", error);
-      set({ loading: false, error: errorMessage });
-      throw new Error(errorMessage);
+      const knownErrors = ["invalid_otp", "blocked", "expired"];
+      if (!knownErrors.includes(error.message)) {
+        logger.error("Verify delivery OTP failed", error);
+      }
+      set({ loading: false, error: error.message });
+      throw error;
     }
   },
 
