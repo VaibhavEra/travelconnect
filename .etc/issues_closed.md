@@ -838,8 +838,6 @@ The `user_can_view_trip()` function is marked `STABLE`, allowing PostgreSQL to:
 
 ---
 
----
-
 ### Issue #19 - Request details UI improvements (Parts 1 & 2) ✅
 
 **Type**: Frontend Enhancement - Component Extraction + Permission System  
@@ -1083,7 +1081,7 @@ interface ParcelRequest {
 **Related Issues:**
 
 - Depends on: Issue #18 (RLS policies, data fetching) ✅ Resolved
-- Closes: Issue #19 Parts 1 & 2
+- Closes: Issue #19 Parts 1 & 2 (completed in PR #43)
 - Remaining work: Issue #42 (Parts 3 & 4 - Traveller info + OTP)
 - Pattern from: TripCard design (consistent UI)
 
@@ -1111,7 +1109,7 @@ interface ParcelRequest {
 
 This issue was **split after Parts 1 & 2 were completed** due to scope size:
 
-- ✅ **Parts 1 & 2** (Cities display + Edit buttons) - **CLOSED in this issue**
+- ✅ **Parts 1 & 2** (Cities display + Edit buttons) - **CLOSED in PR #43**
 - 🔗 **Parts 3 & 4** (Traveller info + OTP regeneration) - **Moved to Issue #42**
 
 Parts 3 & 4 will add:
@@ -1120,6 +1118,272 @@ Parts 3 & 4 will add:
 - Show ticket file and PNR number
 - OTP display sections (pickup and delivery)
 - OTP regeneration buttons when expired
+
+---
+
+### Issue #42 - Add OTP regeneration and traveller visibility (Parts 3 & 4 of Issue #19) ✅
+
+**Type**: Frontend Enhancement - OTP Management + Traveller Info  
+**Priority**: HIGH  
+**Time**: 3-4 hours  
+**Date**: 2026-02-17
+
+**Context:**
+
+This issue completes the remaining work from **Issue #19**, which was split after Parts 1 & 2 were merged in **PR #43**.
+
+**Original Issue #19 Breakdown:**
+
+- ✅ **Part 1**: Display departure/arrival cities in request details (**Closed in PR #43**)
+- ✅ **Part 2**: Fix edit buttons with proper validation (**Closed in PR #43**)
+- ✅ **Part 3 & 4**: Traveller info visibility + OTP regeneration (**This issue - Merged**)
+
+**Problem Statement:**
+
+In the request details page (`my-requests/[id].tsx`):
+
+1. ❌ After acceptance, sender cannot see traveller contact information
+2. ❌ Sender cannot access ticket URL or PNR
+3. ❌ No way to regenerate expired OTPs (pickup and delivery)
+
+**Current State Before This PR:**
+
+- ✅ Route and cities displayed correctly (from PR #43)
+- ✅ Edit buttons working with backend validation (from PR #43)
+- ❌ Traveller info hidden (should show after acceptance)
+- ❌ Ticket URL not accessible to sender
+- ❌ No way to regenerate expired OTPs
+
+**Solution Implementation:**
+
+#### Store Updates (`stores/requestStore.ts`)
+
+Extended the data model to support traveller visibility and OTP management:
+
+- ✅ Extended `ParcelRequest` interface to include:
+  - `trip.pnr_number` (string)
+  - `trip.ticket_file_url` (string)
+  - `trip.traveller` (nested profile with full_name, phone)
+- ✅ Updated all request fetch queries to include nested traveller JOIN via RLS policies:
+  - `createRequest` - includes traveller data
+  - `getMyRequests` - includes traveller data
+  - `getRequestById` - includes traveller data with sender profile
+- ✅ Added `regeneratePickupOtp(requestId: string): Promise<string>` method
+- ✅ Added `regenerateDeliveryOtp(requestId: string): Promise<string>` method
+
+#### Sender Detail Screen (`app/my-requests/[id].tsx`)
+
+Implemented complete post-acceptance information display and OTP management:
+
+#### **1. Traveller Information Card**
+
+- Shows name, phone, and call button
+- Visible only when status is `accepted`, `picked_up`, or `delivered`
+- Integrated with device phone dialer via `tel:` link
+
+#### **2. Trip Details Enhancement**
+
+- PNR number display
+- "View Ticket" button to open ticket file
+- Both visible only after acceptance for security
+
+#### **3. Pickup OTP Card** (status = `accepted`)
+
+- Large, readable OTP code display
+- Countdown timer showing time remaining (e.g., "2h 30m remaining")
+- Helper text: "Share this OTP with the traveller only when they arrive for pickup"
+- **Regenerate button** with loading state
+
+#### **4. Delivery OTP Card** (status = `picked_up`)
+
+- Large, readable OTP code display
+- Countdown timer showing time remaining
+- Helper text: "Share this OTP with the receiver to confirm parcel delivery"
+- **Regenerate button** with loading state
+
+#### **5. OTP Regeneration Flow**
+
+- Loading indicators during regeneration (prevents double-clicks)
+- Success alerts with haptic feedback
+- Error handling with user-friendly messages
+- Automatic data refresh after successful regeneration
+
+#### **6. Integration with Existing Features**
+
+- Maintained all existing cancel/edit workflows
+- Preserved conditional rendering logic
+- Integrated `formatCountdown` utility for expiry display
+
+**Technical Details:**
+
+#### OTP Lifecycle
+
+- **Pickup OTP**:
+  - 24-hour expiry from acceptance
+  - Generated automatically by `accept_request_atomic` RPC
+  - Regenerable via `regenerate_pickup_otp` RPC
+- **Delivery OTP**:
+  - 72-hour expiry from trip arrival time
+  - Generated automatically on pickup via `verify_pickup_otp` RPC
+  - Recalculated if trip arrival changes
+  - Regenerable via `regenerate_delivery_otp` RPC
+- Backend RPC functions handle all expiry enforcement and status transitions
+- No frontend expiry logic - display only
+
+#### Security & Data Access
+
+- Nested JOIN for traveller info uses existing RLS policies:
+  ```sql
+  traveller:profiles!trips_traveller_id_fkey(full_name, phone)
+  ```
+- Sender can only view their own requests (enforced by RLS)
+- PNR and ticket visible only post-acceptance for security
+- Traveller phone number revealed only after commitment (acceptance)
+
+#### UI/UX Improvements
+
+- Human-readable countdown timers (e.g., "15m remaining", "2h 30m remaining")
+- Regenerate buttons with loading indicators prevent double-clicks
+- Call button for direct traveller contact with single tap
+- Conditional rendering based on request status ensures clean UI
+- Consistent styling with existing components
+
+#### Data Flow
+
+```
+Accept Request (Traveller)
+  ↓
+Backend: Generate Pickup OTP (24h expiry)
+  ↓
+Sender Screen: Show Traveller Info + Pickup OTP
+  ↓
+Pickup Verified (Traveller enters OTP)
+  ↓
+Backend: Generate Delivery OTP (72h from arrival)
+  ↓
+Sender Screen: Show Delivery OTP
+  ↓
+Delivery Verified (Receiver enters OTP)
+  ↓
+Request Status: Delivered ✅
+```
+
+**Testing Checklist:**
+
+- ✅ **Acceptance Flow**
+  - ✅ Accept request → verify traveller info card appears
+  - ✅ Verify PNR and ticket link show after acceptance
+  - ✅ Confirm traveller info NOT visible when status = 'pending'
+
+- ✅ **Pickup OTP**
+  - ✅ Pickup OTP displays with countdown when status = 'accepted'
+  - ✅ Countdown shows correct time remaining
+  - ✅ Click regenerate → new OTP generated
+  - ✅ Loading state prevents double-clicks
+  - ✅ Success alert displayed
+
+- ✅ **Delivery OTP**
+  - ✅ After pickup → delivery OTP appears with countdown
+  - ✅ Countdown shows correct time remaining
+  - ✅ Click regenerate → new OTP generated
+  - ✅ Loading state prevents double-clicks
+  - ✅ Success alert displayed
+
+- ✅ **Integration Testing**
+  - ✅ Existing cancel flow works unchanged
+  - ✅ Existing edit flows work unchanged
+  - ✅ Call button opens phone dialer
+  - ✅ Ticket button opens file viewer
+
+- ✅ **Error Handling**
+  - ✅ Network errors show user-friendly alerts
+  - ✅ Invalid request ID handled gracefully
+  - ✅ RPC errors surface with proper messages
+
+**Backend Dependencies:**
+
+All required RPC functions already exist in the database:
+
+- ✅ `regenerate_pickup_otp(p_request_id uuid): text`
+- ✅ `regenerate_delivery_otp(p_request_id uuid): text`
+- ✅ `verify_pickup_otp(p_request_id uuid, p_otp text): json`
+- ✅ `verify_delivery_otp(p_request_id uuid, p_otp text): json`
+- ✅ `accept_request_atomic(p_request_id uuid): json`
+
+**Database Schema (No Changes):**
+
+This issue uses existing schema - no migrations required:
+
+```sql
+-- parcel_requests table (existing columns used)
+pickup_otp character varying(6)
+pickup_otp_expiry timestamp with time zone
+delivery_otp character varying(6)
+delivery_otp_expiry timestamp with time zone
+
+-- trips table (existing columns used)
+pnr_number text
+ticket_file_url text
+traveller_id uuid (references profiles)
+```
+
+**Acceptance Criteria:**
+
+- ✅ Traveller info card with call button (visible post-acceptance)
+- ✅ PNR and ticket access (visible post-acceptance)
+- ✅ Pickup OTP with countdown and regenerate (status = accepted)
+- ✅ Delivery OTP with countdown and regenerate (status = picked_up)
+- ✅ Loading states during regeneration
+- ✅ Success/error alerts with proper messaging
+- ✅ All existing flows (cancel, edit) work unchanged
+- ✅ Type-safe implementation throughout
+
+**Frontend Changes:**
+
+**Updated Files:**
+
+- `stores/requestStore.ts` (+2 methods: regeneratePickupOtp, regenerateDeliveryOtp)
+- `app/my-requests/[id].tsx` (add traveller card, OTP cards with regenerate buttons)
+
+**Type Updates:**
+
+```typescript
+// Extended ParcelRequest interface
+interface ParcelRequest {
+  // ... existing fields
+  trip?: {
+    // ... existing fields
+    pnr_number: string; // ← Added
+    ticket_file_url: string; // ← Added
+    traveller?: {
+      // ← Added nested profile
+      id: string;
+      full_name: string;
+      phone: string;
+    } | null;
+  } | null;
+}
+```
+
+**Breaking Changes:**
+
+None - this is purely additive functionality that enhances the existing sender experience.
+
+**Related Issues & PRs:**
+
+- **Original Issue**: #19 (Request details page improvements)
+- **Previous PR**: #43 (Parts 1 & 2 - Cities + Edit buttons) ✅ **Merged**
+- **This Issue**: #42 (Parts 3 & 4 - Traveller info + OTP regeneration) ✅ **Merged**
+
+**Benefits:**
+
+✅ **Complete Lifecycle Visibility** - Senders track entire journey  
+✅ **Direct Communication** - Call button for traveller contact  
+✅ **OTP Management** - Regenerate expired codes on demand  
+✅ **Enhanced Security** - Traveller info revealed only after commitment  
+✅ **Better UX** - Countdown timers, loading states, clear feedback  
+✅ **Type Safety** - Full TypeScript coverage  
+✅ **Maintainable** - Clean separation of concerns
 
 ---
 
