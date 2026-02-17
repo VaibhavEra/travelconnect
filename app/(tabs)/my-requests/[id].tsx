@@ -7,7 +7,7 @@ import { CATEGORY_CONFIG } from "@/lib/constants/categories";
 import { getSizeCapacityLabel } from "@/lib/constants/parcel";
 import { REQUEST_STATUS_CONFIG, RequestStatus } from "@/lib/constants/status";
 import { TRANSPORT_ICONS } from "@/lib/constants/transport";
-import { formatDate, formatTime } from "@/lib/utils/dateTime";
+import { formatCountdown, formatDate, formatTime } from "@/lib/utils/dateTime";
 import { haptics } from "@/lib/utils/haptics";
 import { useRequestStore } from "@/stores/requestStore";
 import { BorderRadius, Spacing, Typography } from "@/styles";
@@ -37,10 +37,15 @@ export default function RequestDetailsScreen() {
     cancelRequest,
     canEditRequestDetails,
     canEditReceiverDetails,
+    regeneratePickupOtp,
+    regenerateDeliveryOtp,
   } = useRequestStore();
+
   const [showCancelModal, setShowCancelModal] = useState(false);
   const [showEditDetailsModal, setShowEditDetailsModal] = useState(false);
   const [showEditReceiverModal, setShowEditReceiverModal] = useState(false);
+  const [regeneratingPickup, setRegeneratingPickup] = useState(false);
+  const [regeneratingDelivery, setRegeneratingDelivery] = useState(false);
 
   // Permission states
   const [canEditDetails, setCanEditDetails] = useState(false);
@@ -93,6 +98,41 @@ export default function RequestDetailsScreen() {
     });
   };
 
+  const handleCallTraveller = (phone: string) => {
+    haptics.light();
+    Linking.openURL(`tel:${phone}`);
+  };
+
+  const handleRegeneratePickupOtp = async () => {
+    try {
+      setRegeneratingPickup(true);
+      haptics.light();
+      await regeneratePickupOtp(id);
+      haptics.success();
+      Alert.alert("Success", "Pickup OTP regenerated successfully");
+    } catch (error: any) {
+      haptics.error();
+      Alert.alert("Error", error.message || "Failed to regenerate OTP");
+    } finally {
+      setRegeneratingPickup(false);
+    }
+  };
+
+  const handleRegenerateDeliveryOtp = async () => {
+    try {
+      setRegeneratingDelivery(true);
+      haptics.light();
+      await regenerateDeliveryOtp(id);
+      haptics.success();
+      Alert.alert("Success", "Delivery OTP regenerated successfully");
+    } catch (error: any) {
+      haptics.error();
+      Alert.alert("Error", error.message || "Failed to regenerate OTP");
+    } finally {
+      setRegeneratingDelivery(false);
+    }
+  };
+
   const handleEditDetailsSuccess = async () => {
     await getRequestById(id);
     setShowEditDetailsModal(false);
@@ -129,14 +169,9 @@ export default function RequestDetailsScreen() {
   const isAccepted =
     status === "accepted" || status === "picked_up" || status === "delivered";
 
-  // Get trip data
+  // Trip / traveller data
   const tripData = currentRequest.trip as any;
   const travellerInfo = tripData?.traveller || null;
-
-  // Get allowed categories for edit modal
-  const allowedCategories = tripData?.allowed_categories || [];
-
-  // Get transport icon and capacity label
   const transportMode = tripData?.transport_mode || "";
   const transportIcon =
     TRANSPORT_ICONS[transportMode as keyof typeof TRANSPORT_ICONS] ||
@@ -144,6 +179,15 @@ export default function RequestDetailsScreen() {
   const sizeCapacityLabel = getSizeCapacityLabel(
     tripData?.parcel_size_capacity || "",
   );
+
+  const pickupExpiryText =
+    currentRequest.pickup_otp_expiry != null
+      ? formatCountdown(currentRequest.pickup_otp_expiry).text
+      : null;
+  const deliveryExpiryText =
+    currentRequest.delivery_otp_expiry != null
+      ? formatCountdown(currentRequest.delivery_otp_expiry).text
+      : null;
 
   return (
     <SafeAreaView
@@ -316,6 +360,51 @@ export default function RequestDetailsScreen() {
                 Accepts: {sizeCapacityLabel}
               </Text>
             </View>
+
+            {/* Trip extra info: only after acceptance */}
+            {isAccepted && (
+              <>
+                <View style={styles.detailRow}>
+                  <Text
+                    style={[
+                      styles.detailLabel,
+                      { color: colors.text.secondary },
+                    ]}
+                  >
+                    PNR
+                  </Text>
+                  <Text
+                    style={[styles.detailValue, { color: colors.text.primary }]}
+                  >
+                    {tripData?.pnr_number}
+                  </Text>
+                </View>
+
+                {tripData?.ticket_file_url && (
+                  <Pressable
+                    style={[
+                      styles.ticketButton,
+                      { backgroundColor: colors.primary + "10" },
+                    ]}
+                    onPress={() => handleOpenTicket(tripData.ticket_file_url)}
+                  >
+                    <Ionicons
+                      name="document-text"
+                      size={18}
+                      color={colors.primary}
+                    />
+                    <Text
+                      style={[
+                        styles.ticketButtonText,
+                        { color: colors.primary },
+                      ]}
+                    >
+                      View Ticket
+                    </Text>
+                  </Pressable>
+                )}
+              </>
+            )}
           </View>
         )}
 
@@ -480,22 +569,42 @@ export default function RequestDetailsScreen() {
               { backgroundColor: colors.background.secondary },
             ]}
           >
-            <View style={styles.cardHeader}>
-              <View
-                style={[
-                  styles.cardIconContainer,
-                  { backgroundColor: colors.primary + "15" },
-                ]}
-              >
-                <Ionicons
-                  name="person-circle"
-                  size={20}
-                  color={colors.primary}
-                />
+            <View style={styles.cardHeaderRow}>
+              <View style={styles.cardHeader}>
+                <View
+                  style={[
+                    styles.cardIconContainer,
+                    { backgroundColor: colors.primary + "15" },
+                  ]}
+                >
+                  <Ionicons
+                    name="person-circle"
+                    size={20}
+                    color={colors.primary}
+                  />
+                </View>
+                <Text
+                  style={[styles.cardTitle, { color: colors.text.primary }]}
+                >
+                  Traveller Information
+                </Text>
               </View>
-              <Text style={[styles.cardTitle, { color: colors.text.primary }]}>
-                Traveller Information
-              </Text>
+              {travellerInfo.phone && (
+                <Pressable
+                  onPress={() => handleCallTraveller(travellerInfo.phone)}
+                  style={[
+                    styles.callButton,
+                    { backgroundColor: colors.primary + "15" },
+                  ]}
+                >
+                  <Ionicons name="call" size={18} color={colors.primary} />
+                  <Text
+                    style={[styles.callButtonText, { color: colors.primary }]}
+                  >
+                    Call
+                  </Text>
+                </Pressable>
+              )}
             </View>
 
             <View style={styles.detailRow}>
@@ -523,6 +632,141 @@ export default function RequestDetailsScreen() {
                 {travellerInfo.phone}
               </Text>
             </View>
+          </View>
+        )}
+
+        {/* Pickup OTP Card */}
+        {status === "accepted" && currentRequest.pickup_otp && (
+          <View
+            style={[
+              styles.card,
+              { backgroundColor: colors.background.secondary },
+            ]}
+          >
+            <View style={styles.cardHeader}>
+              <View
+                style={[
+                  styles.cardIconContainer,
+                  { backgroundColor: colors.primary + "15" },
+                ]}
+              >
+                <Ionicons name="keypad" size={20} color={colors.primary} />
+              </View>
+              <Text style={[styles.cardTitle, { color: colors.text.primary }]}>
+                Pickup OTP
+              </Text>
+            </View>
+
+            <View style={styles.otpRow}>
+              <Text style={[styles.otpCode, { color: colors.text.primary }]}>
+                {currentRequest.pickup_otp}
+              </Text>
+              {pickupExpiryText && (
+                <Text
+                  style={[
+                    styles.otpExpiryText,
+                    { color: colors.text.secondary },
+                  ]}
+                >
+                  {pickupExpiryText}
+                </Text>
+              )}
+            </View>
+
+            <Text style={[styles.helperText, { color: colors.text.secondary }]}>
+              Share this OTP with the traveller only when they arrive for
+              pickup.
+            </Text>
+
+            <Pressable
+              style={[
+                styles.regenerateButton,
+                { backgroundColor: colors.primary + "10" },
+                regeneratingPickup && styles.regenerateButtonDisabled,
+              ]}
+              onPress={handleRegeneratePickupOtp}
+              disabled={regeneratingPickup}
+            >
+              {regeneratingPickup ? (
+                <ActivityIndicator size="small" color={colors.primary} />
+              ) : (
+                <Ionicons name="refresh" size={18} color={colors.primary} />
+              )}
+              <Text
+                style={[styles.regenerateButtonText, { color: colors.primary }]}
+              >
+                {regeneratingPickup ? "Regenerating..." : "Regenerate OTP"}
+              </Text>
+            </Pressable>
+          </View>
+        )}
+
+        {/* Delivery OTP Card */}
+        {status === "picked_up" && currentRequest.delivery_otp && (
+          <View
+            style={[
+              styles.card,
+              { backgroundColor: colors.background.secondary },
+            ]}
+          >
+            <View style={styles.cardHeader}>
+              <View
+                style={[
+                  styles.cardIconContainer,
+                  { backgroundColor: colors.success + "15" },
+                ]}
+              >
+                <Ionicons
+                  name="checkmark-done"
+                  size={20}
+                  color={colors.success}
+                />
+              </View>
+              <Text style={[styles.cardTitle, { color: colors.text.primary }]}>
+                Delivery OTP
+              </Text>
+            </View>
+
+            <View style={styles.otpRow}>
+              <Text style={[styles.otpCode, { color: colors.text.primary }]}>
+                {currentRequest.delivery_otp}
+              </Text>
+              {deliveryExpiryText && (
+                <Text
+                  style={[
+                    styles.otpExpiryText,
+                    { color: colors.text.secondary },
+                  ]}
+                >
+                  {deliveryExpiryText}
+                </Text>
+              )}
+            </View>
+
+            <Text style={[styles.helperText, { color: colors.text.secondary }]}>
+              Share this OTP with the receiver to confirm parcel delivery.
+            </Text>
+
+            <Pressable
+              style={[
+                styles.regenerateButton,
+                { backgroundColor: colors.success + "10" },
+                regeneratingDelivery && styles.regenerateButtonDisabled,
+              ]}
+              onPress={handleRegenerateDeliveryOtp}
+              disabled={regeneratingDelivery}
+            >
+              {regeneratingDelivery ? (
+                <ActivityIndicator size="small" color={colors.success} />
+              ) : (
+                <Ionicons name="refresh" size={18} color={colors.success} />
+              )}
+              <Text
+                style={[styles.regenerateButtonText, { color: colors.success }]}
+              >
+                {regeneratingDelivery ? "Regenerating..." : "Regenerate OTP"}
+              </Text>
+            </Pressable>
           </View>
         )}
 
@@ -602,7 +846,7 @@ export default function RequestDetailsScreen() {
         visible={showEditDetailsModal}
         onClose={() => setShowEditDetailsModal(false)}
         request={currentRequest}
-        allowedCategories={allowedCategories}
+        allowedCategories={tripData?.allowed_categories || []}
         onSuccess={handleEditDetailsSuccess}
       />
 
@@ -812,6 +1056,64 @@ const styles = StyleSheet.create({
   },
   cancelButtonText: {
     fontSize: Typography.sizes.md,
+    fontWeight: Typography.weights.semibold,
+  },
+  ticketButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: Spacing.xs,
+    alignSelf: "flex-start",
+    paddingHorizontal: Spacing.md,
+    paddingVertical: Spacing.sm,
+    borderRadius: BorderRadius.md,
+  },
+  ticketButtonText: {
+    fontSize: Typography.sizes.sm,
+    fontWeight: Typography.weights.semibold,
+  },
+  callButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: Spacing.xs,
+    paddingHorizontal: Spacing.sm,
+    paddingVertical: Spacing.xs,
+    borderRadius: BorderRadius.md,
+  },
+  callButtonText: {
+    fontSize: Typography.sizes.sm,
+    fontWeight: Typography.weights.semibold,
+  },
+  otpRow: {
+    flexDirection: "row",
+    alignItems: "baseline",
+    justifyContent: "space-between",
+    gap: Spacing.sm,
+  },
+  otpCode: {
+    fontSize: Typography.sizes.xl,
+    fontWeight: Typography.weights.bold,
+    letterSpacing: 4,
+  },
+  otpExpiryText: {
+    fontSize: Typography.sizes.sm,
+  },
+  helperText: {
+    fontSize: Typography.sizes.sm,
+  },
+  regenerateButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: Spacing.xs,
+    paddingVertical: Spacing.sm,
+    borderRadius: BorderRadius.md,
+    marginTop: Spacing.xs,
+  },
+  regenerateButtonDisabled: {
+    opacity: 0.6,
+  },
+  regenerateButtonText: {
+    fontSize: Typography.sizes.sm,
     fontWeight: Typography.weights.semibold,
   },
 });
