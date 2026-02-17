@@ -66,7 +66,6 @@ export default function IncomingRequestDetailsScreen() {
     Linking.openURL(`tel:${phone}`);
   };
 
-  // UPDATED: No notes parameter
   const handleAccept = async () => {
     try {
       await acceptRequest(id);
@@ -171,7 +170,6 @@ export default function IncomingRequestDetailsScreen() {
   const categoryConfig =
     CATEGORY_CONFIG[request.category as keyof typeof CATEGORY_CONFIG];
 
-  // UPDATED: Get trip capacity instead of request size
   const capacityLabel = request.trip?.parcel_size_capacity
     ? getSizeCapacityLabel(request.trip.parcel_size_capacity)
     : "Unknown";
@@ -306,7 +304,7 @@ export default function IncomingRequestDetailsScreen() {
               </View>
             </View>
 
-            {/* UPDATED: Show Trip Capacity instead of Size */}
+            {/* Trip Capacity */}
             <View style={styles.detailItem}>
               <Text
                 style={[styles.detailLabel, { color: colors.text.tertiary }]}
@@ -596,8 +594,6 @@ export default function IncomingRequestDetailsScreen() {
           </Animated.View>
         )}
 
-        {/* REMOVED: traveller_notes display - No longer exists in capacity-based system */}
-
         <View style={{ height: Spacing.xxxl * 2 }} />
       </ScrollView>
 
@@ -743,6 +739,8 @@ export default function IncomingRequestDetailsScreen() {
         type="pickup"
         userName={request.sender?.full_name || "Sender"}
         otpExpiry={request.pickup_otp_expiry ?? undefined}
+        failedAttempts={request.failed_pickup_attempts}
+        blockedUntil={request.pickup_blocked_until}
       />
       <VerifyOtpModal
         visible={deliveryOtpModalVisible}
@@ -751,6 +749,8 @@ export default function IncomingRequestDetailsScreen() {
         type="delivery"
         userName={request.delivery_contact_name}
         otpExpiry={request.delivery_otp_expiry ?? undefined}
+        failedAttempts={request.failed_delivery_attempts}
+        blockedUntil={request.delivery_blocked_until}
       />
     </SafeAreaView>
   );
