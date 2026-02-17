@@ -2,6 +2,10 @@ import ImagePicker from "@/components/forms/ImagePicker";
 import TextInput from "@/components/forms/TextInput";
 import { CATEGORY_CONFIG } from "@/lib/constants/categories";
 import { haptics } from "@/lib/utils/haptics";
+import {
+  RequestEditDetailsFormData,
+  requestEditDetailsSchema,
+} from "@/lib/validations/request-edit";
 import { ParcelRequest, useRequestStore } from "@/stores/requestStore";
 import { BorderRadius, Spacing, Typography } from "@/styles";
 import { useThemeColors } from "@/styles/theme";
@@ -21,19 +25,6 @@ import {
   Text,
   View,
 } from "react-native";
-import { z } from "zod";
-
-// Schema for request details only
-const requestDetailsSchema = z.object({
-  item_description: z
-    .string()
-    .min(10, "Description must be at least 10 characters")
-    .max(500, "Description is too long"),
-  category: z.string().min(1, "Please select a category"),
-  parcel_photos: z.array(z.string()).length(2, "Exactly 2 photos are required"),
-});
-
-type RequestDetailsFormData = z.infer<typeof requestDetailsSchema>;
 
 interface EditRequestDetailsModalProps {
   visible: boolean;
@@ -60,8 +51,8 @@ export default function EditRequestDetailsModal({
     setValue,
     watch,
     reset,
-  } = useForm<RequestDetailsFormData>({
-    resolver: zodResolver(requestDetailsSchema),
+  } = useForm<RequestEditDetailsFormData>({
+    resolver: zodResolver(requestEditDetailsSchema),
     mode: "onChange",
     defaultValues: {
       item_description: request.item_description,
@@ -81,7 +72,7 @@ export default function EditRequestDetailsModal({
     }
   }, [visible, request, reset]);
 
-  const onSubmit = async (data: RequestDetailsFormData) => {
+  const onSubmit = async (data: RequestEditDetailsFormData) => {
     try {
       haptics.light();
 

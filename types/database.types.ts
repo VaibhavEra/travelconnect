@@ -12,6 +12,31 @@ export type Database = {
   __InternalSupabase: {
     PostgrestVersion: "14.1"
   }
+  graphql_public: {
+    Tables: {
+      [_ in never]: never
+    }
+    Views: {
+      [_ in never]: never
+    }
+    Functions: {
+      graphql: {
+        Args: {
+          extensions?: Json
+          operationName?: string
+          query?: string
+          variables?: Json
+        }
+        Returns: Json
+      }
+    }
+    Enums: {
+      [_ in never]: never
+    }
+    CompositeTypes: {
+      [_ in never]: never
+    }
+  }
   public: {
     Tables: {
       failed_login_attempts: {
@@ -247,6 +272,10 @@ export type Database = {
     }
     Functions: {
       accept_request_atomic: { Args: { p_request_id: string }; Returns: Json }
+      can_edit_receiver_details: {
+        Args: { p_request_id: string }
+        Returns: boolean
+      }
       can_edit_request_details: {
         Args: { p_request_id: string }
         Returns: boolean
@@ -339,6 +368,7 @@ export type Database = {
         }
         Returns: Json
       }
+      user_can_view_trip: { Args: { trip_id: string }; Returns: boolean }
       validate_trip_dates: {
         Args: {
           p_arrival_date: string
@@ -512,6 +542,9 @@ export type CompositeTypes<
     : never
 
 export const Constants = {
+  graphql_public: {
+    Enums: {},
+  },
   public: {
     Enums: {
       cancellation_source: ["sender", "traveller"],
