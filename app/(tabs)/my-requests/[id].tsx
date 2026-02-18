@@ -184,9 +184,16 @@ export default function RequestDetailsScreen() {
     currentRequest.pickup_otp_expiry != null
       ? formatCountdown(currentRequest.pickup_otp_expiry).text
       : null;
+
   const deliveryExpiryText =
     currentRequest.delivery_otp_expiry != null
       ? formatCountdown(currentRequest.delivery_otp_expiry).text
+      : null;
+
+  // FIX (Issue #25): Expiry text for cancellation OTP card
+  const cancellationExpiryText =
+    currentRequest.cancellation_otp_expiry != null
+      ? formatCountdown(currentRequest.cancellation_otp_expiry).text
       : null;
 
   return (
@@ -769,6 +776,91 @@ export default function RequestDetailsScreen() {
             </Pressable>
           </View>
         )}
+
+        {/* FIX (Issue #25): Cancellation OTP Card — shown to sender when
+            traveller has generated a cancellation OTP for a picked_up request */}
+        {status === "picked_up" &&
+          currentRequest.cancellation_otp != null &&
+          currentRequest.cancellation_otp_expiry != null &&
+          new Date(currentRequest.cancellation_otp_expiry) > new Date() && (
+            <View
+              style={[
+                styles.card,
+                {
+                  backgroundColor: colors.error + "10",
+                  borderWidth: 1,
+                  borderColor: colors.error + "30",
+                },
+              ]}
+            >
+              {/* Card Header */}
+              <View style={styles.cardHeader}>
+                <View
+                  style={[
+                    styles.cardIconContainer,
+                    { backgroundColor: colors.error + "15" },
+                  ]}
+                >
+                  <Ionicons name="warning" size={20} color={colors.error} />
+                </View>
+                <Text style={[styles.cardTitle, { color: colors.error }]}>
+                  Cancellation OTP
+                </Text>
+              </View>
+
+              {/* OTP Code + Expiry */}
+              <View style={styles.otpRow}>
+                <Text style={[styles.otpCode, { color: colors.text.primary }]}>
+                  {currentRequest.cancellation_otp}
+                </Text>
+                {cancellationExpiryText && (
+                  <Text
+                    style={[
+                      styles.otpExpiryText,
+                      { color: colors.text.secondary },
+                    ]}
+                  >
+                    {cancellationExpiryText}
+                  </Text>
+                )}
+              </View>
+
+              {/* Helper text */}
+              <Text
+                style={[styles.helperText, { color: colors.text.secondary }]}
+              >
+                The traveller has requested to cancel this trip. Share this OTP
+                with them only if you agree to the cancellation.
+              </Text>
+
+              {/* Warning notice */}
+              <View
+                style={[
+                  styles.regenerateButton,
+                  {
+                    backgroundColor: colors.warning + "10",
+                    borderWidth: 1,
+                    borderColor: colors.warning + "30",
+                  },
+                ]}
+              >
+                <Ionicons
+                  name="alert-circle"
+                  size={16}
+                  color={colors.warning}
+                />
+                <Text
+                  style={[
+                    styles.regenerateButtonText,
+                    { color: colors.warning, flex: 1 },
+                  ]}
+                >
+                  Sharing this OTP will cancel your request and the trip. This
+                  cannot be undone.
+                </Text>
+              </View>
+            </View>
+          )}
 
         {/* Rejection Reason (if rejected or cancelled) */}
         {(status === "rejected" || status === "cancelled") &&
