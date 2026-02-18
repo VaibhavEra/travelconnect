@@ -11,9 +11,8 @@ import { StyleSheet, Text, View } from "react-native";
 interface AcceptRequestModalProps {
   visible: boolean;
   onClose: () => void;
-  onAccept: () => Promise<void>; // UPDATED: No notes parameter
+  onAccept: () => Promise<void>;
   senderName: string;
-  // NEW: Add request data for verification display
   category: string;
   tripCapacity: string;
 }
@@ -29,14 +28,16 @@ export default function AcceptRequestModal({
   const colors = useThemeColors();
   const [loading, setLoading] = useState(false);
 
-  // UPDATED: Removed notes state
-
   const handleAccept = async () => {
     try {
       setLoading(true);
-      await onAccept(); // UPDATED: No notes parameter
-      onClose();
+      await onAccept();
+      // onAccept() handles success (Alert + router.back) in the parent.
+      // Only close modal here — parent's Alert fires, then user taps OK → router.back().
+      // We do NOT call onClose() here; the parent navigates away which unmounts the modal.
     } catch (error) {
+      // onAccept() in parent catches internally and shows Alert, so this
+      // catch block is a safety net for unexpected throws only.
       console.error("Accept request failed:", error);
     } finally {
       setLoading(false);
@@ -52,9 +53,7 @@ export default function AcceptRequestModal({
   // Get category label
   const categoryConfig =
     CATEGORY_CONFIG[category as keyof typeof CATEGORY_CONFIG];
-  const categoryLabel = categoryConfig?.label || category;
-
-  // Get capacity label
+  const categoryLabel = categoryConfig?.label ?? category;
   const capacityLabel = getSizeCapacityLabel(tripCapacity);
 
   return (
@@ -86,7 +85,7 @@ export default function AcceptRequestModal({
         </>
       }
     >
-      {/* NEW: Verification Information */}
+      {/* Verification Information */}
       <View style={styles.verificationSection}>
         <Text style={[styles.sectionTitle, { color: colors.text.primary }]}>
           Verification Details
@@ -132,7 +131,7 @@ export default function AcceptRequestModal({
           <View style={styles.verificationRow}>
             <View style={styles.verificationLabelContainer}>
               <Ionicons
-                name={categoryConfig?.icon || "cube"}
+                name={categoryConfig?.icon ?? "cube"}
                 size={16}
                 color={colors.text.tertiary}
               />
