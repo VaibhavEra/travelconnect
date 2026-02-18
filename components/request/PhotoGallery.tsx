@@ -1,25 +1,27 @@
 import { BorderRadius, Overlays, Spacing } from "@/styles";
 import { useThemeColors } from "@/styles/theme";
 import { Ionicons } from "@expo/vector-icons";
-import { useState } from "react";
+import { useRef, useState } from "react";
 import {
   Dimensions,
   Image,
   Modal,
+  Platform,
   Pressable,
-  ScrollView,
   StyleSheet,
   Text,
   View,
 } from "react-native";
+import PagerView from "react-native-pager-view";
+import { SafeAreaView } from "react-native-safe-area-context";
 
 const { width: SCREEN_WIDTH } = Dimensions.get("window");
 const IMAGE_WIDTH = SCREEN_WIDTH - Spacing.lg * 2;
 
 interface PhotoGalleryProps {
   photos: string[];
-  mode?: "inline" | "thumbnail"; // NEW: Display mode
-  thumbnailSize?: number; // NEW: Size for thumbnail mode
+  mode?: "inline" | "thumbnail";
+  thumbnailSize?: number;
 }
 
 export default function PhotoGallery({
@@ -30,203 +32,50 @@ export default function PhotoGallery({
   const colors = useThemeColors();
   const [currentIndex, setCurrentIndex] = useState(0);
   const [modalVisible, setModalVisible] = useState(false);
+  const [modalIndex, setModalIndex] = useState(0);
+  const modalPagerRef = useRef<PagerView>(null);
 
-  const handleScroll = (event: any) => {
-    const scrollPosition = event.nativeEvent.contentOffset.x;
-    const index =
-      mode === "inline"
-        ? Math.round(scrollPosition / IMAGE_WIDTH)
-        : Math.round(scrollPosition / SCREEN_WIDTH);
-    setCurrentIndex(index);
+  const openModal = (index: number) => {
+    setModalIndex(index);
+    setModalVisible(true);
+  };
+
+  const closeModal = () => {
+    setModalVisible(false);
   };
 
   if (!photos || photos.length === 0) {
     return null;
   }
 
-  // Thumbnail mode - small clickable previews
-  if (mode === "thumbnail") {
-    return (
-      <>
-        <View style={styles.thumbnailContainer}>
-          {photos.map((photo, index) => (
-            <Pressable
-              key={index}
-              onPress={() => {
-                setCurrentIndex(index);
-                setModalVisible(true);
-              }}
-              style={[
-                styles.thumbnail,
-                { width: thumbnailSize, height: thumbnailSize },
-              ]}
-            >
-              <Image source={{ uri: photo }} style={styles.thumbnailImage} />
-              {photos.length > 1 && (
-                <View
-                  style={[
-                    styles.thumbnailBadge,
-                    { backgroundColor: colors.background.overlay },
-                  ]}
-                >
-                  <Ionicons
-                    name="images-outline"
-                    size={12}
-                    color={colors.text.inverse}
-                  />
-                  <Text
-                    style={[
-                      styles.thumbnailBadgeText,
-                      { color: colors.text.inverse },
-                    ]}
-                  >
-                    {index + 1}/{photos.length}
-                  </Text>
-                </View>
-              )}
-            </Pressable>
-          ))}
-        </View>
-
-        {/* Full Screen Modal */}
-        <Modal
-          visible={modalVisible}
-          transparent={true}
-          animationType="fade"
-          onRequestClose={() => setModalVisible(false)}
-        >
-          <View
-            style={[styles.modalContainer, { backgroundColor: Overlays.heavy }]}
-          >
-            <Pressable
-              style={styles.closeButton}
-              onPress={() => setModalVisible(false)}
-            >
-              <Ionicons name="close" size={32} color={colors.text.inverse} />
-            </Pressable>
-
-            <ScrollView
-              horizontal
-              pagingEnabled
-              showsHorizontalScrollIndicator={false}
-              style={styles.modalScroll}
-              onScroll={handleScroll}
-              scrollEventThrottle={16}
-              contentOffset={{ x: currentIndex * SCREEN_WIDTH, y: 0 }}
-            >
-              {photos.map((photo, index) => (
-                <View key={index} style={styles.modalImageContainer}>
-                  <Image
-                    source={{ uri: photo }}
-                    style={styles.modalImage}
-                    resizeMode="contain"
-                  />
-                </View>
-              ))}
-            </ScrollView>
-
-            <View
-              style={[
-                styles.modalPagination,
-                { backgroundColor: colors.background.overlay },
-              ]}
-            >
-              <Ionicons
-                name="images-outline"
-                size={20}
-                color={colors.text.inverse}
-              />
-              <Text
-                style={[
-                  styles.modalPaginationText,
-                  { color: colors.text.inverse },
-                ]}
-              >
-                {currentIndex + 1} / {photos.length}
-              </Text>
-            </View>
-          </View>
-        </Modal>
-      </>
-    );
-  }
-
-  // Inline mode - original behavior
-  return (
-    <>
-      <View style={styles.container}>
-        <ScrollView
-          horizontal
-          pagingEnabled
-          showsHorizontalScrollIndicator={false}
-          onScroll={handleScroll}
-          scrollEventThrottle={16}
-        >
-          {photos.map((photo, index) => (
-            <Pressable
-              key={index}
-              onPress={() => setModalVisible(true)}
-              style={styles.imageContainer}
-            >
-              <Image source={{ uri: photo }} style={styles.image} />
-            </Pressable>
-          ))}
-        </ScrollView>
-
-        {photos.length > 1 && (
-          <View
-            style={[
-              styles.pagination,
-              { backgroundColor: colors.background.overlay },
-            ]}
-          >
-            <Text
-              style={[styles.paginationText, { color: colors.text.inverse }]}
-            >
-              {currentIndex + 1} / {photos.length}
-            </Text>
-          </View>
-        )}
-
-        <Pressable
-          style={[
-            styles.expandButton,
-            { backgroundColor: colors.background.overlay },
-          ]}
-          onPress={() => setModalVisible(true)}
-        >
-          <Ionicons
-            name="expand-outline"
-            size={20}
-            color={colors.text.inverse}
-          />
-        </Pressable>
-      </View>
-
-      {/* Full Screen Modal */}
-      <Modal
-        visible={modalVisible}
-        transparent={true}
-        animationType="fade"
-        onRequestClose={() => setModalVisible(false)}
-      >
-        <View
-          style={[styles.modalContainer, { backgroundColor: Overlays.heavy }]}
-        >
+  // ─── Full Screen Modal (shared by both modes) ─────────────────────────────
+  const FullScreenModal = () => (
+    <Modal
+      visible={modalVisible}
+      transparent={true}
+      animationType="fade"
+      onRequestClose={closeModal}
+      statusBarTranslucent // Android: modal covers status bar
+    >
+      <View style={[styles.modalOverlay, { backgroundColor: Overlays.heavy }]}>
+        <SafeAreaView style={styles.modalSafeArea} edges={["top", "bottom"]}>
+          {/* Close Button — safe area aware, no hardcoded top */}
           <Pressable
             style={styles.closeButton}
-            onPress={() => setModalVisible(false)}
+            onPress={closeModal}
+            hitSlop={12}
           >
-            <Ionicons name="close" size={32} color={colors.text.inverse} />
+            <View style={styles.closeButtonInner}>
+              <Ionicons name="close" size={24} color="#FFFFFF" />
+            </View>
           </Pressable>
 
-          <ScrollView
-            horizontal
-            pagingEnabled
-            showsHorizontalScrollIndicator={false}
-            style={styles.modalScroll}
-            onScroll={handleScroll}
-            scrollEventThrottle={16}
+          {/* PagerView for smooth iOS swiping */}
+          <PagerView
+            ref={modalPagerRef}
+            style={styles.pager}
+            initialPage={modalIndex}
+            onPageSelected={(e) => setModalIndex(e.nativeEvent.position)}
           >
             {photos.map((photo, index) => (
               <View key={index} style={styles.modalImageContainer}>
@@ -237,42 +86,113 @@ export default function PhotoGallery({
                 />
               </View>
             ))}
-          </ScrollView>
+          </PagerView>
 
-          <View
-            style={[
-              styles.modalPagination,
-              { backgroundColor: colors.background.overlay },
-            ]}
-          >
-            <Ionicons
-              name="images-outline"
-              size={20}
-              color={colors.text.inverse}
-            />
-            <Text
+          {/* Photo Counter — always white on dark bg, visible in any theme */}
+          {photos.length > 1 && (
+            <View style={styles.modalPagination}>
+              <Ionicons name="images-outline" size={16} color="#FFFFFF" />
+              <Text style={styles.modalPaginationText}>
+                {modalIndex + 1} / {photos.length}
+              </Text>
+            </View>
+          )}
+        </SafeAreaView>
+      </View>
+    </Modal>
+  );
+
+  // ─── Thumbnail Mode ────────────────────────────────────────────────────────
+  if (mode === "thumbnail") {
+    return (
+      <>
+        <View style={styles.thumbnailContainer}>
+          {photos.map((photo, index) => (
+            <Pressable
+              key={index}
+              onPress={() => openModal(index)}
               style={[
-                styles.modalPaginationText,
-                { color: colors.text.inverse },
+                styles.thumbnail,
+                { width: thumbnailSize, height: thumbnailSize },
               ]}
             >
+              <Image source={{ uri: photo }} style={styles.thumbnailImage} />
+              {photos.length > 1 && (
+                <View style={styles.thumbnailBadge}>
+                  <Ionicons name="images-outline" size={10} color="#FFFFFF" />
+                  <Text style={styles.thumbnailBadgeText}>
+                    {index + 1}/{photos.length}
+                  </Text>
+                </View>
+              )}
+            </Pressable>
+          ))}
+        </View>
+        <FullScreenModal />
+      </>
+    );
+  }
+
+  // ─── Inline Mode ──────────────────────────────────────────────────────────
+  return (
+    <>
+      <View style={styles.container}>
+        {/* Use PagerView for inline mode too — consistent swiping */}
+        <PagerView
+          style={styles.inlinePager}
+          initialPage={0}
+          onPageSelected={(e) => setCurrentIndex(e.nativeEvent.position)}
+        >
+          {photos.map((photo, index) => (
+            <Pressable
+              key={index}
+              onPress={() => openModal(index)} // opens at correct index
+              style={styles.imageContainer}
+            >
+              <Image
+                source={{ uri: photo }}
+                style={styles.image}
+                resizeMode="cover"
+              />
+            </Pressable>
+          ))}
+        </PagerView>
+
+        {photos.length > 1 && (
+          <View style={styles.pagination}>
+            <Text style={styles.paginationText}>
               {currentIndex + 1} / {photos.length}
             </Text>
           </View>
-        </View>
-      </Modal>
+        )}
+
+        <Pressable
+          style={styles.expandButton}
+          onPress={() => openModal(currentIndex)}
+          hitSlop={8}
+        >
+          <Ionicons name="expand-outline" size={18} color="#FFFFFF" />
+        </Pressable>
+      </View>
+
+      <FullScreenModal />
     </>
   );
 }
 
 const styles = StyleSheet.create({
+  // ─── Inline Mode ────────────────────────────────────────────────────────
   container: {
     position: "relative",
   },
-  imageContainer: {
+  inlinePager: {
     width: IMAGE_WIDTH,
     height: 250,
-    marginRight: Spacing.lg,
+    borderRadius: BorderRadius.lg,
+    overflow: "hidden",
+  },
+  imageContainer: {
+    flex: 1,
   },
   image: {
     width: "100%",
@@ -282,7 +202,8 @@ const styles = StyleSheet.create({
   pagination: {
     position: "absolute",
     bottom: Spacing.sm,
-    right: Spacing.lg + Spacing.sm,
+    right: Spacing.sm,
+    backgroundColor: "rgba(0, 0, 0, 0.6)", // always dark — readable in any theme
     paddingHorizontal: Spacing.sm,
     paddingVertical: 4,
     borderRadius: BorderRadius.sm,
@@ -290,15 +211,18 @@ const styles = StyleSheet.create({
   paginationText: {
     fontSize: 12,
     fontWeight: "600",
+    color: "#FFFFFF", // always white — no theme dependency
   },
   expandButton: {
     position: "absolute",
     top: Spacing.sm,
-    right: Spacing.lg + Spacing.sm,
+    right: Spacing.sm,
+    backgroundColor: "rgba(0, 0, 0, 0.6)",
     padding: Spacing.xs,
     borderRadius: BorderRadius.sm,
   },
-  // NEW: Thumbnail mode styles
+
+  // ─── Thumbnail Mode ──────────────────────────────────────────────────────
   thumbnailContainer: {
     flexDirection: "row",
     gap: Spacing.sm,
@@ -323,26 +247,37 @@ const styles = StyleSheet.create({
     paddingHorizontal: 6,
     paddingVertical: 2,
     borderRadius: BorderRadius.sm,
+    backgroundColor: "rgba(0, 0, 0, 0.6)", // hardcoded for guaranteed contrast
   },
   thumbnailBadgeText: {
     fontSize: 10,
     fontWeight: "600",
+    color: "#FFFFFF",
   },
-  modalContainer: {
+
+  // ─── Full Screen Modal ───────────────────────────────────────────────────
+  modalOverlay: {
+    flex: 1,
+  },
+  modalSafeArea: {
     flex: 1,
   },
   closeButton: {
     position: "absolute",
-    top: 50,
+    top: Platform.OS === "ios" ? 12 : 16, // relative to SafeAreaView, not screen
     right: Spacing.lg,
     zIndex: 10,
-    padding: Spacing.sm,
   },
-  modalScroll: {
+  closeButtonInner: {
+    backgroundColor: "rgba(0, 0, 0, 0.6)",
+    borderRadius: 20,
+    padding: 8,
+  },
+  pager: {
     flex: 1,
   },
   modalImageContainer: {
-    width: SCREEN_WIDTH,
+    flex: 1,
     justifyContent: "center",
     alignItems: "center",
   },
@@ -351,8 +286,6 @@ const styles = StyleSheet.create({
     height: "100%",
   },
   modalPagination: {
-    position: "absolute",
-    bottom: 50,
     alignSelf: "center",
     flexDirection: "row",
     alignItems: "center",
@@ -360,9 +293,12 @@ const styles = StyleSheet.create({
     paddingHorizontal: Spacing.md,
     paddingVertical: Spacing.sm,
     borderRadius: BorderRadius.md,
+    backgroundColor: "rgba(0, 0, 0, 0.6)",
+    marginBottom: Spacing.md, // sits just above safe area bottom edge
   },
   modalPaginationText: {
     fontSize: 16,
     fontWeight: "600",
+    color: "#FFFFFF",
   },
 });
