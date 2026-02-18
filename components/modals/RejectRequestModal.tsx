@@ -13,7 +13,6 @@ interface RejectRequestModalProps {
   senderName: string;
 }
 
-// UPDATED: Add common rejection reasons as per checklist
 const REJECTION_REASONS = [
   "Size exceeds capacity",
   "Category doesn't match description",
@@ -59,8 +58,8 @@ export default function RejectRequestModal({
       setReason("");
       setSelectedQuickReason(null);
       onClose();
-    } catch (error) {
-      console.error("Reject request failed:", error);
+    } catch (err) {
+      console.error("Reject request failed:", err);
       setError("Failed to reject request. Please try again.");
     } finally {
       setLoading(false);
@@ -84,6 +83,7 @@ export default function RejectRequestModal({
       subtitle={`Reject parcel delivery from ${senderName}?`}
       icon={<Ionicons name="close-circle" size={48} color={colors.error} />}
       loading={loading}
+      scrollable
       actions={
         <>
           <ModalButton
@@ -100,7 +100,7 @@ export default function RejectRequestModal({
       }
     >
       <View>
-        {/* NEW: Quick Rejection Reasons */}
+        {/* Quick Rejection Reasons */}
         <Text style={[styles.label, { color: colors.text.primary }]}>
           Quick Reasons
         </Text>
