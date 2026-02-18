@@ -3112,6 +3112,158 @@ Trip status was incorrectly transitioning to `in_progress` when parcel was picke
 
 ---
 
+### Issue #24 - Fix modal keyboard behavior and state management ✅
+
+**Type:** Bug Fix - Frontend UX
+**Priority:** HIGH
+**Time:** 3-4 hours
+**Date:** 2026-02-18
+
+**Problem:**
+
+All modals built on `BaseModal` had two categories of bugs:
+
+1. **Keyboard avoidance missing:** No `KeyboardAvoidingView` in `BaseModal`,
+   causing action buttons to be hidden behind the soft keyboard on both iOS and
+   Android whenever a `TextInput` was focused. `CancelRequestModal` used a raw
+   `Modal` with the same omission.
+
+2. **State and lifecycle issues:**
+   - `AcceptRequestModal` called `onClose()` unconditionally after `onAccept()`
+     because the parent catches all errors internally — modal closed even on
+     failure.
+   - `VerifyOtpModal` and `CancellationOtpModal` retained stale `otp`/`error`
+     values across close/reopen cycles.
+   - Both OTP modals called `onClose()` on successful verification, racing with
+     the parent's own `setVisible(false)`.
+   - `CancellationOtpModal` used fragile substring matching
+     (`includes("Invalid")`) for error classification.
+
+**Root Cause:**
+
+`BaseModal` had no `KeyboardAvoidingView`. The OTP modal success path called
+`onClose()` directly, but parent components own the close lifecycle — they
+either call `setVisible(false)` or navigate away via `router.back()` on
+success. The redundant `onClose()` call raced with the parent's setState,
+causing a visibility flicker.
+
+**Frontend Changes (Applied via GitHub PR - 2026-02-18):**
+
+1. **`components/shared/BaseModal.tsx`** (Updated)
+   - **Added:** `KeyboardAvoidingView` as the direct child of `Modal` with
+     platform-specific behavior (`"padding"` on iOS, `"height"` on Android)
+   - **Added:** `Keyboard.dismiss()` on backdrop press to prevent a visual
+     flash when closing
+   - **Added:** `keyboardShouldPersistTaps="handled"` on the `ScrollView`
+     content path so button taps register while the keyboard is open
+
+2. **`components/modals/AcceptRequestModal.tsx`** (Updated)
+   - **Removed:** `onClose()` from inside the `try` block — parent navigates
+     away via `router.back()` on success, which unmounts the modal naturally
+
+3. **`components/modals/RejectRequestModal.tsx`** (Updated)
+   - **Added:** `scrollable` prop so BaseModal uses the `ScrollView` path with
+     KAV awareness for the multiline `TextInput`
+
+4. **`components/modals/VerifyOtpModal.tsx`** (Updated)
+   - **Added:** `scrollable` prop — `autoFocus` on the OTP input opens the
+     keyboard immediately on mount, hiding action buttons without it
+   - **Added:** `useEffect` on `visible` to reset `otp` and `error` state when
+     the modal reopens
+   - **Removed:** `onClose()` from the success path — parent owns visibility
+     on success
+
+5. **`components/modals/CancellationOtpModal.tsx`** (Updated)
+   - **Added:** `useEffect` on `visible` to reset all local state
+     (`otp`, `error`, `otpGenerated`) on reopen
+   - **Removed:** `onClose()` from the success path — parent navigates away
+     via `router.back()`, unmounting the modal naturally
+   - **Replaced:** Fragile substring error matching with exact code matching
+     (`=== "invalid_otp"`, `=== "expired"`) consistent with `VerifyOtpModal`
+
+6. **`components/modals/CancelRequestModal.tsx`** (Refactored)
+   - **Migrated:** From raw `Modal` with manual overlay/backdrop/header/layout
+     to `BaseModal` + `ModalButton` — inherits KAV behavior automatically
+   - **Added:** `scrollable` prop for the multiline `TextInput` reason field
+   - **Added:** `useEffect` to reset `reason` state on reopen
+   - **Fixed:** Moved `setLoading(false)` from `catch` block only to `finally`
+     to cover all exit paths
+   - **Removed:** ~60 lines of layout styles now handled by shared components
+
+**No Breaking Changes:**
+
+All prop interfaces are unchanged. No usage sites required updates. `BaseModal`
+consumers (`EditTripDatesModal`, `EditTripDetailsModal`) gain the keyboard fix
+automatically at zero cost.
+
+The parent `app/(tabs)/my-trips/[id].tsx` was verified to be fully compatible:
+
+- `handleVerifyCancellationOtp` returns `true` on success and calls
+  `router.back()`, which unmounts the entire screen (and the modal with it) —
+  removing `onClose()` from the modal's success path is correct.
+- `onClose` on the `CancellationOtpModal` call site calls both
+  `setShowCancellationOtpModal(false)` and `setCancellationOtpData(null)` for
+  user-initiated dismissals.
+
+**Commits (Atomic — one per file):**
+
+| Commit                                                                                | File                                         |
+| ------------------------------------------------------------------------------------- | -------------------------------------------- |
+| `fix(modals): add KeyboardAvoidingView to BaseModal`                                  | `components/shared/BaseModal.tsx`            |
+| `fix(modals): prevent AcceptRequestModal auto-closing on error`                       | `components/modals/AcceptRequestModal.tsx`   |
+| `fix(modals): add scrollable prop to RejectRequestModal`                              | `components/modals/RejectRequestModal.tsx`   |
+| `fix(modals): fix keyboard, stale state and close race in VerifyOtpModal`             | `components/modals/VerifyOtpModal.tsx`       |
+| `fix(modals): fix stale state, close race and error matching in CancellationOtpModal` | `components/modals/CancellationOtpModal.tsx` |
+| `refactor(modals): migrate CancelRequestModal to BaseModal`                           | `components/modals/CancelRequestModal.tsx`   |
+
+**Testing Checklist:**
+
+- ✅ Accept request — modal stays open on network error, closes on success
+- ✅ Reject request — keyboard doesn't hide buttons, error shows inline
+- ✅ Verify pickup OTP — autoFocus doesn't hide buttons, fresh state on reopen
+- ✅ Verify delivery OTP — same as above
+- ✅ Cancellation OTP — fresh state on reopen, exact error codes shown
+- ✅ Cancel request (pending) — keyboard doesn't hide confirm button
+- ✅ Cancel request (picked_up) — Cannot Cancel state renders correctly
+- ✅ All modals tested on both iOS and Android
+
+**Acceptance Criteria:**
+
+- ✅ Action buttons never hidden behind soft keyboard on any modal
+- ✅ `AcceptRequestModal` stays open on error, closes only on success
+- ✅ OTP modals show fresh state every time they reopen
+- ✅ No flicker on modal close after successful OTP verification
+- ✅ Error codes matched exactly — not by substring
+- ✅ `CancelRequestModal` consistent with `BaseModal` pattern
+- ✅ No usage sites required changes
+
+**Frontend Changes:**
+
+- `components/shared/BaseModal.tsx` — KAV, Keyboard.dismiss, keyboardShouldPersistTaps
+- `components/modals/AcceptRequestModal.tsx` — remove onClose() from try block
+- `components/modals/RejectRequestModal.tsx` — add scrollable prop
+- `components/modals/VerifyOtpModal.tsx` — scrollable prop, useEffect reset, remove onClose() from success
+- `components/modals/CancellationOtpModal.tsx` — useEffect reset, remove onClose() from success, fix error matching
+- `components/modals/CancelRequestModal.tsx` — migrate to BaseModal/ModalButton
+
+**Type Updates:**
+
+- None required — all prop interfaces unchanged
+
+**Database Objects Touched:**
+
+- None — frontend-only changes
+
+**Related Issues:**
+
+- Follows pattern from: Issue #20 (exact error code matching in VerifyOtpModal) ✅
+- Affects: All modals using BaseModal (EditTripDatesModal, EditTripDetailsModal
+  gain KAV fix automatically)
+
+Closes #24
+
+---
+
 ## Technical Implementation
 
 ### Files Changed
