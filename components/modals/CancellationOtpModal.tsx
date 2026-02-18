@@ -3,7 +3,7 @@ import { BaseModal, ModalButton } from "@/components/shared";
 import { BorderRadius, Spacing, Typography, withOpacity } from "@/styles";
 import { useThemeColors } from "@/styles/theme";
 import { Ionicons } from "@expo/vector-icons";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { StyleSheet, Text, TextInput, View } from "react-native";
 
 interface CancellationOtpModalProps {
@@ -27,6 +27,16 @@ export default function CancellationOtpModal({
   const [error, setError] = useState("");
   const [otpGenerated, setOtpGenerated] = useState(false);
 
+  // FIX: Reset all local state when modal opens to prevent stale data
+  // from a previous session leaking into a fresh open
+  useEffect(() => {
+    if (visible) {
+      setOtp("");
+      setError("");
+      setOtpGenerated(false);
+    }
+  }, [visible]);
+
   const handleVerify = async () => {
     if (otp.length !== 6) {
       setError("Please enter a 6-digit OTP");
@@ -42,17 +52,22 @@ export default function CancellationOtpModal({
       if (isValid) {
         setOtp("");
         setOtpGenerated(false);
-        onClose();
+        // FIX: onVerify returns boolean; parent controls modal visibility
+        // on success (sets cancellationOtpModalVisible(false) + Alert).
+        // Do NOT call onClose() here to avoid racing with parent setState.
       } else {
         setError("Invalid OTP. Please check with the sender and try again.");
       }
-    } catch (error: any) {
-      console.error("Verify cancellation OTP failed:", error);
-
-      if (error.message?.includes("Invalid")) {
+    } catch (err: any) {
+      console.error("Verify cancellation OTP failed:", err);
+      // FIX: use exact code matching instead of fragile substring matching
+      const code = err.message;
+      if (code === "invalid_otp") {
         setError("Invalid OTP. Please check and try again.");
+      } else if (code === "expired") {
+        setError("This OTP has expired. Please contact support.");
       } else {
-        setError(error.message || "Failed to verify OTP. Please try again.");
+        setError(err.message || "Failed to verify OTP. Please try again.");
       }
     } finally {
       setLoading(false);
@@ -76,6 +91,7 @@ export default function CancellationOtpModal({
       subtitle="Cancellation OTP has been sent to the sender"
       icon={<Ionicons name="warning" size={48} color={colors.warning} />}
       loading={loading}
+      scrollable
       actions={
         <>
           <ModalButton
