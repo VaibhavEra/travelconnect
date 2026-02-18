@@ -104,3 +104,56 @@ export const DELIVERY_FILTERS = [
 ] as const;
 
 export type DeliveryFilterKey = (typeof DELIVERY_FILTERS)[number]["key"];
+
+// ── Scoped filters for traveller Requests screen (Issue #21) ──────────────────
+
+export const INCOMING_REQUEST_FILTERS = [
+  { key: "all", label: "All", icon: "apps" as keyof typeof Ionicons.glyphMap },
+  {
+    key: "pending",
+    label: "Pending",
+    icon: "time" as keyof typeof Ionicons.glyphMap,
+  },
+  {
+    key: "rejected",
+    label: "Rejected",
+    icon: "close-circle" as keyof typeof Ionicons.glyphMap,
+  },
+] as const;
+
+export type IncomingRequestFilterKey =
+  (typeof INCOMING_REQUEST_FILTERS)[number]["key"];
+
+export const ACTIVE_REQUEST_FILTERS = [
+  { key: "all", label: "All", icon: "apps" as keyof typeof Ionicons.glyphMap },
+  {
+    key: "accepted",
+    label: "Accepted",
+    icon: "checkmark-circle" as keyof typeof Ionicons.glyphMap,
+  },
+  {
+    key: "picked_up",
+    label: "In Transit",
+    icon: "cube" as keyof typeof Ionicons.glyphMap,
+  },
+] as const;
+
+export type ActiveRequestFilterKey =
+  (typeof ACTIVE_REQUEST_FILTERS)[number]["key"];
+
+export const COMPLETED_REQUEST_FILTERS = [
+  { key: "all", label: "All", icon: "apps" as keyof typeof Ionicons.glyphMap },
+  {
+    key: "delivered",
+    label: "Delivered",
+    icon: "checkmark-done" as keyof typeof Ionicons.glyphMap,
+  },
+  {
+    key: "cancelled",
+    label: "Cancelled",
+    icon: "ban" as keyof typeof Ionicons.glyphMap,
+  },
+] as const;
+
+export type CompletedRequestFilterKey =
+  (typeof COMPLETED_REQUEST_FILTERS)[number]["key"];

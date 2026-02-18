@@ -3,6 +3,14 @@ import VerifyOtpModal from "@/components/modals/VerifyOtpModal";
 import IncomingRequestCard from "@/components/request/IncomingRequestCard";
 import FilterChip from "@/components/shared/FilterChip";
 import ModeSwitcher from "@/components/shared/ModeSwitcher";
+import {
+  ACTIVE_REQUEST_FILTERS,
+  ActiveRequestFilterKey,
+  COMPLETED_REQUEST_FILTERS,
+  CompletedRequestFilterKey,
+  INCOMING_REQUEST_FILTERS,
+  IncomingRequestFilterKey,
+} from "@/lib/constants/filters";
 import { haptics } from "@/lib/utils/haptics";
 import { useAuthStore } from "@/stores/authStore";
 import { useModeStore } from "@/stores/modeStore";
@@ -32,9 +40,7 @@ import Animated, {
 } from "react-native-reanimated";
 import { SafeAreaView } from "react-native-safe-area-context";
 
-type RequestFilter = "all" | "pending" | "accepted" | "rejected";
-type DeliveryFilter = "all" | "ready" | "transit" | "completed";
-type ViewMode = "incoming" | "accepted";
+type ViewMode = "incoming" | "active" | "completed";
 type OtpType = "pickup" | "delivery";
 
 export default function RequestsScreen() {
@@ -44,24 +50,30 @@ export default function RequestsScreen() {
   const {
     incomingRequests,
     acceptedRequests,
+    completedRequests,
     loading,
     getIncomingRequests,
     getAcceptedRequests,
+    getCompletedRequests,
     verifyPickupOtp,
     verifyDeliveryOtp,
   } = useRequestStore();
-  const [requestFilter, setRequestFilter] = useState<RequestFilter>("all");
-  const [deliveryFilter, setDeliveryFilter] = useState<DeliveryFilter>("all");
+
+  const [incomingFilter, setIncomingFilter] =
+    useState<IncomingRequestFilterKey>("all");
+  const [activeFilter, setActiveFilter] =
+    useState<ActiveRequestFilterKey>("all");
+  const [completedFilter, setCompletedFilter] =
+    useState<CompletedRequestFilterKey>("all");
   const [refreshing, setRefreshing] = useState(false);
   const [viewMode, setViewMode] = useState<ViewMode>("incoming");
 
-  // Unified OTP Modal states
+  // OTP Modal states
   const [otpModalVisible, setOtpModalVisible] = useState(false);
   const [otpType, setOtpType] = useState<OtpType>("pickup");
   const [selectedRequestId, setSelectedRequestId] = useState<string>("");
   const [selectedUserName, setSelectedUserName] = useState<string>("");
   const [otpExpiry, setOtpExpiry] = useState<string>("");
-  // UPDATED: Track failed attempts and block state for the selected request
   const [selectedFailedAttempts, setSelectedFailedAttempts] = useState<
     number | null
   >(null);
@@ -80,8 +92,10 @@ export default function RequestsScreen() {
       if (user && currentMode === "traveller") {
         if (viewMode === "incoming") {
           getIncomingRequests(user.id);
-        } else {
+        } else if (viewMode === "active") {
           getAcceptedRequests(user.id);
+        } else {
+          getCompletedRequests(user.id);
         }
       }
     }, [user, currentMode, viewMode]),
@@ -93,8 +107,10 @@ export default function RequestsScreen() {
     haptics.light();
     if (viewMode === "incoming") {
       await getIncomingRequests(user.id);
-    } else {
+    } else if (viewMode === "active") {
       await getAcceptedRequests(user.id);
+    } else {
+      await getCompletedRequests(user.id);
     }
     setRefreshing(false);
   };
@@ -103,43 +119,53 @@ export default function RequestsScreen() {
     scrollY.value = event.nativeEvent.contentOffset.y;
   };
 
-  // FIXED: Filter out accepted requests from incoming view
-  const filteredRequests = incomingRequests
-    .filter((request) => request.status !== "accepted") // Don't show accepted in incoming
-    .filter((request) => {
-      if (requestFilter === "all") return true;
-      return request.status === requestFilter;
-    });
+  // ── Filtered lists (direct 1:1 status matching, no aliases) ──────────────
 
-  const filteredDeliveries = acceptedRequests.filter((request) => {
-    if (deliveryFilter === "all") return true;
-    if (deliveryFilter === "ready") return request.status === "accepted";
-    if (deliveryFilter === "transit") return request.status === "picked_up";
-    if (deliveryFilter === "completed") return request.status === "delivered";
-    return true;
+  const filteredIncoming = incomingRequests.filter((r) => {
+    if (incomingFilter === "all") return true;
+    return r.status === incomingFilter;
   });
 
-  const getRequestFilterCount = (filterType: RequestFilter) => {
-    const filteredIncoming = incomingRequests.filter(
-      (r) => r.status !== "accepted",
-    );
-    if (filterType === "all") return filteredIncoming.length;
-    return filteredIncoming.filter((r) => r.status === filterType).length;
+  const filteredActive = acceptedRequests.filter((r) => {
+    if (activeFilter === "all") return true;
+    return r.status === activeFilter;
+  });
+
+  const filteredCompleted = completedRequests.filter((r) => {
+    if (completedFilter === "all") return true;
+    return r.status === completedFilter;
+  });
+
+  // ── Filter counts ─────────────────────────────────────────────────────────
+
+  const getIncomingFilterCount = (key: IncomingRequestFilterKey) => {
+    if (key === "all") return incomingRequests.length;
+    return incomingRequests.filter((r) => r.status === key).length;
   };
 
-  const getDeliveryFilterCount = (filterType: DeliveryFilter) => {
-    if (filterType === "all") return acceptedRequests.length;
-    if (filterType === "ready") {
-      return acceptedRequests.filter((r) => r.status === "accepted").length;
-    }
-    if (filterType === "transit") {
-      return acceptedRequests.filter((r) => r.status === "picked_up").length;
-    }
-    if (filterType === "completed") {
-      return acceptedRequests.filter((r) => r.status === "delivered").length;
-    }
-    return 0;
+  const getActiveFilterCount = (key: ActiveRequestFilterKey) => {
+    if (key === "all") return acceptedRequests.length;
+    return acceptedRequests.filter((r) => r.status === key).length;
   };
+
+  const getCompletedFilterCount = (key: CompletedRequestFilterKey) => {
+    if (key === "all") return completedRequests.length;
+    return completedRequests.filter((r) => r.status === key).length;
+  };
+
+  // ── Stats cards ───────────────────────────────────────────────────────────
+
+  const pendingCount = incomingRequests.filter(
+    (r) => r.status === "pending",
+  ).length;
+  const acceptedCount = acceptedRequests.filter(
+    (r) => r.status === "accepted",
+  ).length;
+  const inTransitCount = acceptedRequests.filter(
+    (r) => r.status === "picked_up",
+  ).length;
+
+  // ── OTP handlers ──────────────────────────────────────────────────────────
 
   const handleMarkPickup = (requestId: string) => {
     const request = acceptedRequests.find((r) => r.id === requestId);
@@ -147,7 +173,6 @@ export default function RequestsScreen() {
       setSelectedRequestId(requestId);
       setSelectedUserName(request.sender?.full_name || "Sender");
       setOtpExpiry(request.pickup_otp_expiry || "");
-      // UPDATED: Pass failed attempts and block state
       setSelectedFailedAttempts(request.failed_pickup_attempts ?? null);
       setSelectedBlockedUntil(request.pickup_blocked_until ?? null);
       setOtpType("pickup");
@@ -161,7 +186,6 @@ export default function RequestsScreen() {
       setSelectedRequestId(requestId);
       setSelectedUserName(request.delivery_contact_name);
       setOtpExpiry(request.delivery_otp_expiry || "");
-      // UPDATED: Pass failed attempts and block state
       setSelectedFailedAttempts(request.failed_delivery_attempts ?? null);
       setSelectedBlockedUntil(request.delivery_blocked_until ?? null);
       setOtpType("delivery");
@@ -188,26 +212,9 @@ export default function RequestsScreen() {
       }
       return isValid;
     } catch (error) {
-      // UPDATED: Re-throw so VerifyOtpModal catch block handles the error display.
-      // Store already handles logging — no console.error needed here.
       throw error;
     }
   };
-
-  const pendingCount = incomingRequests.filter(
-    (r) => r.status === "pending",
-  ).length;
-  const acceptedCount = acceptedRequests.filter(
-    (r) => r.status === "accepted",
-  ).length;
-  const inTransitCount = acceptedRequests.filter(
-    (r) => r.status === "picked_up",
-  ).length;
-
-  // FIXED: Calculate incoming count (excluding accepted)
-  const incomingCount = incomingRequests.filter(
-    (r) => r.status !== "accepted",
-  ).length;
 
   if (loading && !refreshing) {
     return (
@@ -233,18 +240,24 @@ export default function RequestsScreen() {
       style={[styles.container, { backgroundColor: colors.background.primary }]}
       edges={["top"]}
     >
-      {/* FIXED: Header with border */}
+      {/* Header */}
       <View style={[styles.header, { borderBottomColor: colors.border.light }]}>
         <View>
           <Text style={[styles.headerTitle, { color: colors.text.primary }]}>
-            {viewMode === "incoming" ? "Requests" : "Deliveries"}
+            {viewMode === "incoming"
+              ? "Requests"
+              : viewMode === "active"
+                ? "Deliveries"
+                : "Completed"}
           </Text>
           <Text
             style={[styles.headerSubtitle, { color: colors.text.secondary }]}
           >
             {viewMode === "incoming"
-              ? `${incomingCount} ${incomingCount === 1 ? "request" : "requests"}`
-              : `${acceptedRequests.length} active`}
+              ? `${incomingRequests.length} ${incomingRequests.length === 1 ? "request" : "requests"}`
+              : viewMode === "active"
+                ? `${acceptedRequests.length} active`
+                : `${completedRequests.length} completed`}
           </Text>
         </View>
         <ModeSwitcher />
@@ -265,8 +278,8 @@ export default function RequestsScreen() {
           />
         }
       >
-        {/* Stats Cards - Hide on scroll */}
-        {(incomingCount > 0 || acceptedRequests.length > 0) && (
+        {/* Stats Cards */}
+        {(incomingRequests.length > 0 || acceptedRequests.length > 0) && (
           <Animated.View style={[styles.statsContainer, headerOpacity]}>
             <View
               style={[
@@ -276,7 +289,7 @@ export default function RequestsScreen() {
             >
               <Ionicons name="mail" size={20} color={colors.primary} />
               <Text style={[styles.statNumber, { color: colors.primary }]}>
-                {incomingCount}
+                {incomingRequests.length}
               </Text>
               <Text style={[styles.statLabel, { color: colors.primary }]}>
                 Incoming
@@ -338,7 +351,7 @@ export default function RequestsScreen() {
           </Animated.View>
         )}
 
-        {/* View Switcher - Sticky on scroll */}
+        {/* 3-tab View Switcher */}
         <View style={styles.viewSwitcherWrapper}>
           <View
             style={[
@@ -346,186 +359,127 @@ export default function RequestsScreen() {
               { backgroundColor: colors.background.secondary },
             ]}
           >
-            <Pressable
-              style={[
-                styles.viewTab,
-                viewMode === "incoming" && {
-                  backgroundColor: colors.primary,
+            {(
+              [
+                {
+                  mode: "incoming" as ViewMode,
+                  icon: "mail" as const,
+                  label: "Incoming",
+                  badge: incomingRequests.length,
                 },
-              ]}
-              onPress={() => {
-                haptics.selection();
-                setViewMode("incoming");
-              }}
-            >
-              <Ionicons
-                name="mail"
-                size={16}
-                color={
-                  viewMode === "incoming"
-                    ? colors.text.inverse
-                    : colors.text.secondary
-                }
-              />
-              <Text
+                {
+                  mode: "active" as ViewMode,
+                  icon: "cube" as const,
+                  label: "Active",
+                  badge: acceptedRequests.length,
+                },
+                {
+                  mode: "completed" as ViewMode,
+                  icon: "checkmark-done" as const,
+                  label: "Completed",
+                  badge: completedRequests.length,
+                },
+              ] as const
+            ).map(({ mode, icon, label, badge }) => (
+              <Pressable
+                key={mode}
                 style={[
-                  styles.viewTabText,
-                  {
-                    color:
-                      viewMode === "incoming"
-                        ? colors.text.inverse
-                        : colors.text.secondary,
-                    fontWeight:
-                      viewMode === "incoming"
-                        ? Typography.weights.bold
-                        : Typography.weights.medium,
+                  styles.viewTab,
+                  viewMode === mode && {
+                    backgroundColor: colors.primary,
                   },
                 ]}
+                onPress={() => {
+                  haptics.selection();
+                  setViewMode(mode);
+                }}
               >
-                Incoming
-              </Text>
-              {incomingCount > 0 && (
-                <View
+                <Ionicons
+                  name={icon}
+                  size={16}
+                  color={
+                    viewMode === mode
+                      ? colors.text.inverse
+                      : colors.text.secondary
+                  }
+                />
+                <Text
                   style={[
-                    styles.viewBadge,
+                    styles.viewTabText,
                     {
-                      backgroundColor:
-                        viewMode === "incoming"
-                          ? colors.text.inverse + "20"
-                          : colors.primary + "15",
+                      color:
+                        viewMode === mode
+                          ? colors.text.inverse
+                          : colors.text.secondary,
+                      fontWeight:
+                        viewMode === mode
+                          ? Typography.weights.bold
+                          : Typography.weights.medium,
                     },
                   ]}
                 >
-                  <Text
+                  {label}
+                </Text>
+                {badge > 0 && (
+                  <View
                     style={[
-                      styles.viewBadgeText,
+                      styles.viewBadge,
                       {
-                        color:
-                          viewMode === "incoming"
-                            ? colors.text.inverse
-                            : colors.primary,
+                        backgroundColor:
+                          viewMode === mode
+                            ? colors.text.inverse + "20"
+                            : colors.primary + "15",
                       },
                     ]}
                   >
-                    {incomingCount}
-                  </Text>
-                </View>
-              )}
-            </Pressable>
-
-            <Pressable
-              style={[
-                styles.viewTab,
-                viewMode === "accepted" && {
-                  backgroundColor: colors.primary,
-                },
-              ]}
-              onPress={() => {
-                haptics.selection();
-                setViewMode("accepted");
-              }}
-            >
-              <Ionicons
-                name="cube"
-                size={16}
-                color={
-                  viewMode === "accepted"
-                    ? colors.text.inverse
-                    : colors.text.secondary
-                }
-              />
-              <Text
-                style={[
-                  styles.viewTabText,
-                  {
-                    color:
-                      viewMode === "accepted"
-                        ? colors.text.inverse
-                        : colors.text.secondary,
-                    fontWeight:
-                      viewMode === "accepted"
-                        ? Typography.weights.bold
-                        : Typography.weights.medium,
-                  },
-                ]}
-              >
-                Active
-              </Text>
-              {acceptedRequests.length > 0 && (
-                <View
-                  style={[
-                    styles.viewBadge,
-                    {
-                      backgroundColor:
-                        viewMode === "accepted"
-                          ? colors.text.inverse + "20"
-                          : colors.primary + "15",
-                    },
-                  ]}
-                >
-                  <Text
-                    style={[
-                      styles.viewBadgeText,
-                      {
-                        color:
-                          viewMode === "accepted"
-                            ? colors.text.inverse
-                            : colors.primary,
-                      },
-                    ]}
-                  >
-                    {acceptedRequests.length}
-                  </Text>
-                </View>
-              )}
-            </Pressable>
+                    <Text
+                      style={[
+                        styles.viewBadgeText,
+                        {
+                          color:
+                            viewMode === mode
+                              ? colors.text.inverse
+                              : colors.primary,
+                        },
+                      ]}
+                    >
+                      {badge}
+                    </Text>
+                  </View>
+                )}
+              </Pressable>
+            ))}
           </View>
         </View>
 
-        {viewMode === "incoming" ? (
+        {/* ── INCOMING TAB ─────────────────────────────────────────────────── */}
+        {viewMode === "incoming" && (
           <>
-            {/* Filters */}
             <View style={styles.filtersWrapper}>
               <ScrollView
                 horizontal
                 showsHorizontalScrollIndicator={false}
                 contentContainerStyle={styles.filtersContainer}
               >
-                <FilterChip
-                  label="All"
-                  icon="apps"
-                  count={getRequestFilterCount("all")}
-                  active={requestFilter === "all"}
-                  onPress={() => {
-                    haptics.selection();
-                    setRequestFilter("all");
-                  }}
-                />
-                <FilterChip
-                  label="Pending"
-                  icon="time"
-                  count={getRequestFilterCount("pending")}
-                  active={requestFilter === "pending"}
-                  onPress={() => {
-                    haptics.selection();
-                    setRequestFilter("pending");
-                  }}
-                />
-                <FilterChip
-                  label="Rejected"
-                  icon="close-circle"
-                  count={getRequestFilterCount("rejected")}
-                  active={requestFilter === "rejected"}
-                  onPress={() => {
-                    haptics.selection();
-                    setRequestFilter("rejected");
-                  }}
-                />
+                {INCOMING_REQUEST_FILTERS.map((f) => (
+                  <FilterChip
+                    key={f.key}
+                    label={f.label}
+                    icon={f.icon}
+                    count={getIncomingFilterCount(
+                      f.key as IncomingRequestFilterKey,
+                    )}
+                    active={incomingFilter === f.key}
+                    onPress={() => {
+                      haptics.selection();
+                      setIncomingFilter(f.key as IncomingRequestFilterKey);
+                    }}
+                  />
+                ))}
               </ScrollView>
             </View>
 
-            {/* Empty State or List */}
-            {filteredRequests.length === 0 ? (
+            {filteredIncoming.length === 0 ? (
               <Animated.View
                 entering={FadeIn}
                 layout={Layout.springify()}
@@ -539,7 +493,7 @@ export default function RequestsScreen() {
                 >
                   <Ionicons
                     name={
-                      requestFilter === "all"
+                      incomingFilter === "all"
                         ? "mail-outline"
                         : "search-outline"
                     }
@@ -550,16 +504,16 @@ export default function RequestsScreen() {
                 <Text
                   style={[styles.emptyTitle, { color: colors.text.primary }]}
                 >
-                  {requestFilter === "all"
+                  {incomingFilter === "all"
                     ? "No Requests Yet"
-                    : `No ${requestFilter} requests`}
+                    : `No ${incomingFilter} requests`}
                 </Text>
                 <Text
                   style={[styles.emptyText, { color: colors.text.secondary }]}
                 >
-                  {requestFilter === "all"
+                  {incomingFilter === "all"
                     ? "New parcel requests will appear here"
-                    : `You don't have any ${requestFilter} requests`}
+                    : `You don't have any ${incomingFilter} requests`}
                 </Text>
               </Animated.View>
             ) : (
@@ -568,7 +522,7 @@ export default function RequestsScreen() {
                 layout={Layout.springify()}
                 style={styles.requestsList}
               >
-                {filteredRequests.map((request, index) => (
+                {filteredIncoming.map((request, index) => (
                   <Animated.View
                     key={request.id}
                     entering={FadeInDown.delay(index * 50)}
@@ -580,60 +534,36 @@ export default function RequestsScreen() {
               </Animated.View>
             )}
           </>
-        ) : (
+        )}
+
+        {/* ── ACTIVE TAB ───────────────────────────────────────────────────── */}
+        {viewMode === "active" && (
           <>
-            {/* Delivery Filters */}
             <View style={styles.filtersWrapper}>
               <ScrollView
                 horizontal
                 showsHorizontalScrollIndicator={false}
                 contentContainerStyle={styles.filtersContainer}
               >
-                <FilterChip
-                  label="All"
-                  icon="apps"
-                  count={getDeliveryFilterCount("all")}
-                  active={deliveryFilter === "all"}
-                  onPress={() => {
-                    haptics.selection();
-                    setDeliveryFilter("all");
-                  }}
-                />
-                <FilterChip
-                  label="Ready"
-                  icon="checkmark-circle"
-                  count={getDeliveryFilterCount("ready")}
-                  active={deliveryFilter === "ready"}
-                  onPress={() => {
-                    haptics.selection();
-                    setDeliveryFilter("ready");
-                  }}
-                />
-                <FilterChip
-                  label="In Transit"
-                  icon="cube"
-                  count={getDeliveryFilterCount("transit")}
-                  active={deliveryFilter === "transit"}
-                  onPress={() => {
-                    haptics.selection();
-                    setDeliveryFilter("transit");
-                  }}
-                />
-                <FilterChip
-                  label="Completed"
-                  icon="checkmark-done"
-                  count={getDeliveryFilterCount("completed")}
-                  active={deliveryFilter === "completed"}
-                  onPress={() => {
-                    haptics.selection();
-                    setDeliveryFilter("completed");
-                  }}
-                />
+                {ACTIVE_REQUEST_FILTERS.map((f) => (
+                  <FilterChip
+                    key={f.key}
+                    label={f.label}
+                    icon={f.icon}
+                    count={getActiveFilterCount(
+                      f.key as ActiveRequestFilterKey,
+                    )}
+                    active={activeFilter === f.key}
+                    onPress={() => {
+                      haptics.selection();
+                      setActiveFilter(f.key as ActiveRequestFilterKey);
+                    }}
+                  />
+                ))}
               </ScrollView>
             </View>
 
-            {/* Empty State or List */}
-            {filteredDeliveries.length === 0 ? (
+            {filteredActive.length === 0 ? (
               <Animated.View
                 entering={FadeIn}
                 layout={Layout.springify()}
@@ -647,9 +577,7 @@ export default function RequestsScreen() {
                 >
                   <Ionicons
                     name={
-                      deliveryFilter === "all"
-                        ? "cube-outline"
-                        : "search-outline"
+                      activeFilter === "all" ? "cube-outline" : "search-outline"
                     }
                     size={64}
                     color={colors.text.tertiary}
@@ -658,16 +586,16 @@ export default function RequestsScreen() {
                 <Text
                   style={[styles.emptyTitle, { color: colors.text.primary }]}
                 >
-                  {deliveryFilter === "all"
+                  {activeFilter === "all"
                     ? "No Active Deliveries"
-                    : `No ${deliveryFilter} deliveries`}
+                    : `No ${activeFilter === "picked_up" ? "in transit" : activeFilter} deliveries`}
                 </Text>
                 <Text
                   style={[styles.emptyText, { color: colors.text.secondary }]}
                 >
-                  {deliveryFilter === "all"
+                  {activeFilter === "all"
                     ? "Accepted requests will appear here"
-                    : `No ${deliveryFilter} deliveries at the moment`}
+                    : `No ${activeFilter === "picked_up" ? "in transit" : activeFilter} deliveries at the moment`}
                 </Text>
               </Animated.View>
             ) : (
@@ -676,7 +604,7 @@ export default function RequestsScreen() {
                 layout={Layout.springify()}
                 style={styles.deliveriesList}
               >
-                {filteredDeliveries.map((request, index) => (
+                {filteredActive.map((request, index) => (
                   <Animated.View
                     key={request.id}
                     entering={FadeInDown.delay(index * 50)}
@@ -694,11 +622,94 @@ export default function RequestsScreen() {
           </>
         )}
 
+        {/* ── COMPLETED TAB ────────────────────────────────────────────────── */}
+        {viewMode === "completed" && (
+          <>
+            <View style={styles.filtersWrapper}>
+              <ScrollView
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                contentContainerStyle={styles.filtersContainer}
+              >
+                {COMPLETED_REQUEST_FILTERS.map((f) => (
+                  <FilterChip
+                    key={f.key}
+                    label={f.label}
+                    icon={f.icon}
+                    count={getCompletedFilterCount(
+                      f.key as CompletedRequestFilterKey,
+                    )}
+                    active={completedFilter === f.key}
+                    onPress={() => {
+                      haptics.selection();
+                      setCompletedFilter(f.key as CompletedRequestFilterKey);
+                    }}
+                  />
+                ))}
+              </ScrollView>
+            </View>
+
+            {filteredCompleted.length === 0 ? (
+              <Animated.View
+                entering={FadeIn}
+                layout={Layout.springify()}
+                style={styles.emptyState}
+              >
+                <View
+                  style={[
+                    styles.emptyIconContainer,
+                    { backgroundColor: colors.background.secondary },
+                  ]}
+                >
+                  <Ionicons
+                    name={
+                      completedFilter === "all"
+                        ? "checkmark-done-circle-outline"
+                        : "search-outline"
+                    }
+                    size={64}
+                    color={colors.text.tertiary}
+                  />
+                </View>
+                <Text
+                  style={[styles.emptyTitle, { color: colors.text.primary }]}
+                >
+                  {completedFilter === "all"
+                    ? "No Completed Deliveries"
+                    : `No ${completedFilter} deliveries`}
+                </Text>
+                <Text
+                  style={[styles.emptyText, { color: colors.text.secondary }]}
+                >
+                  {completedFilter === "all"
+                    ? "Delivered and cancelled requests will appear here"
+                    : `You don't have any ${completedFilter} deliveries`}
+                </Text>
+              </Animated.View>
+            ) : (
+              <Animated.View
+                entering={FadeIn}
+                layout={Layout.springify()}
+                style={styles.deliveriesList}
+              >
+                {filteredCompleted.map((request, index) => (
+                  <Animated.View
+                    key={request.id}
+                    entering={FadeInDown.delay(index * 50)}
+                    layout={Layout.springify()}
+                  >
+                    <DeliveryCard request={request} />
+                  </Animated.View>
+                ))}
+              </Animated.View>
+            )}
+          </>
+        )}
+
         <View style={{ height: Spacing.xxxl }} />
       </ScrollView>
 
-      {/* Unified OTP Verification Modal */}
-      {/* UPDATED: Pass failedAttempts and blockedUntil so modal shows block state correctly */}
+      {/* OTP Verification Modal */}
       <VerifyOtpModal
         visible={otpModalVisible}
         onClose={() => setOtpModalVisible(false)}
@@ -732,7 +743,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     paddingHorizontal: Spacing.lg,
     paddingVertical: Spacing.md,
-    borderBottomWidth: 1, // FIXED: Added border
+    borderBottomWidth: 1,
   },
   headerTitle: {
     fontSize: Typography.sizes.xl,

@@ -75,6 +75,7 @@ interface RequestState {
   myRequests: ParcelRequest[];
   incomingRequests: ParcelRequest[];
   acceptedRequests: ParcelRequest[];
+  completedRequests: ParcelRequest[]; // Issue #21: delivered + cancelled
   currentRequest: ParcelRequest | null;
   loading: boolean;
   error: string | null;
@@ -84,6 +85,7 @@ interface RequestState {
   getMyRequests: (senderId: string) => Promise<void>;
   getIncomingRequests: (travellerId: string) => Promise<void>;
   getAcceptedRequests: (travellerId: string) => Promise<void>;
+  getCompletedRequests: (travellerId: string) => Promise<void>; // Issue #21
   getRequestById: (requestId: string) => Promise<ParcelRequest | null>;
   acceptRequest: (requestId: string) => Promise<void>;
   rejectRequest: (requestId: string, reason?: string) => Promise<void>;
@@ -135,6 +137,7 @@ export const useRequestStore = create<RequestState>((set, get) => ({
   myRequests: [],
   incomingRequests: [],
   acceptedRequests: [],
+  completedRequests: [], // Issue #21
   currentRequest: null,
   loading: false,
   error: null,
@@ -269,6 +272,7 @@ export const useRequestStore = create<RequestState>((set, get) => ({
         `,
         )
         .eq("trip.traveller_id", travellerId)
+        .in("status", ["pending", "rejected"])
         .order("created_at", { ascending: false });
 
       if (error) throw error;
@@ -312,7 +316,7 @@ export const useRequestStore = create<RequestState>((set, get) => ({
         `,
         )
         .eq("trip.traveller_id", travellerId)
-        .in("status", ["accepted", "picked_up", "delivered"])
+        .in("status", ["accepted", "picked_up"])
         .order("created_at", { ascending: false });
 
       if (error) throw error;
@@ -328,6 +332,50 @@ export const useRequestStore = create<RequestState>((set, get) => ({
       const errorMessage = parseSupabaseError(error);
       logger.error("Fetch accepted requests failed", error);
       set({ loading: false, error: errorMessage, acceptedRequests: [] });
+    }
+  },
+
+  // Issue #21: Get traveller's completed requests (delivered + cancelled)
+  getCompletedRequests: async (travellerId: string) => {
+    try {
+      set({ loading: true, error: null });
+
+      const { data: requests, error } = await supabase
+        .from("parcel_requests")
+        .select(
+          `
+          *,
+          trip:trips!inner(
+            id,
+            source,
+            destination,
+            departure_date,
+            departure_time,
+            arrival_date,
+            arrival_time,
+            transport_mode,
+            parcel_size_capacity
+          ),
+          sender:profiles!parcel_requests_sender_id_fkey(full_name, phone)
+        `,
+        )
+        .eq("trip.traveller_id", travellerId)
+        .in("status", ["delivered", "cancelled"])
+        .order("created_at", { ascending: false });
+
+      if (error) throw error;
+
+      set({
+        completedRequests: (requests || []) as ParcelRequest[],
+        loading: false,
+      });
+      logger.info("Fetched completed requests", {
+        count: requests?.length || 0,
+      });
+    } catch (error: any) {
+      const errorMessage = parseSupabaseError(error);
+      logger.error("Fetch completed requests failed", error);
+      set({ loading: false, error: errorMessage, completedRequests: [] });
     }
   },
 
@@ -551,6 +599,9 @@ export const useRequestStore = create<RequestState>((set, get) => ({
           req.id === requestId ? { ...req, status } : req,
         ),
         acceptedRequests: state.acceptedRequests.map((req) =>
+          req.id === requestId ? { ...req, status } : req,
+        ),
+        completedRequests: state.completedRequests.map((req) =>
           req.id === requestId ? { ...req, status } : req,
         ),
         loading: false,
