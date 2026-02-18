@@ -878,6 +878,191 @@ const filteredRequests = incomingRequests
 
 ---
 
+### Issue #22 - Improve requests/[id].tsx detail page styling and structure ✅
+
+**Type:** Frontend Refactor - Layout & Styling
+**Priority:** MEDIUM
+**Time:** 1-2 hours
+**Date:** 2026-02-18
+
+**Problem:**
+
+The traveller-side request detail page (`app/requests/[id].tsx`) was
+visually inconsistent with the rest of the app:
+
+- Used multiple separate floating cards (one per section) instead of a
+  unified card layout
+- Status displayed as sub-text inside the header rather than as a
+  prominent pill banner inside the content
+- Header had `borderBottomWidth: 1`, unlike `trip-preview.tsx`
+- Action buttons (Accept/Reject, Mark Pickup, Mark Delivered) were
+  rendered in a `position`-based sticky footer outside the ScrollView,
+  causing them to overlay scroll content on smaller screens
+- Section spacing, typography, icon sizes, and chip styles did not
+  match `app/explore/trip-preview.tsx`
+
+**Frontend Changes (Applied via GitHub PR - 2026-02-18):**
+
+1. **`app/requests/[id].tsx`** (Refactored)
+
+   **Layout:**
+   - **Replaced:** Multi-card layout (one card per section) with a
+     single `mainCard` wrapping Route → Schedule Grid → Info Row →
+     Parcel Details → Photos, all separated by `divider` lines —
+     identical structure to `trip-preview.tsx`
+   - **Moved:** Contact cards (Sender + Receiver) into a second
+     `mainCard` below the primary card, separated by a `divider`
+   - **Removed:** `borderBottomWidth` from header — matches
+     `trip-preview.tsx` exactly
+
+   **Status Display:**
+   - **Removed:** Status badge as sub-text under the header title
+   - **Added:** Status pill banner at the top of `mainCard` using
+     `statusColor + "15"` background — consistent with `TripCard`
+     pattern used elsewhere in the app
+
+   **Styling — matched pixel-for-pixel with `trip-preview.tsx`:**
+   - `routeContainer` / `routePoint` / `routeDot` / `routeConnector`
+   - `scheduleGrid` / `scheduleBlock` / `scheduleIconContainer` /
+     `scheduleDetails`
+   - `infoRow` / `infoItem` / `infoIcon` / `infoLabel` / `infoValue`
+   - `categoryChip` / `categoryText`
+   - `mainCard` shadow, border radius (`BorderRadius.xl`), padding
+     (`Spacing.lg`)
+
+   **Action Buttons:**
+   - **Removed:** `footer` container entirely — no `position: absolute`,
+     no `borderTopWidth`, no background overlay
+   - **Moved:** All action button groups (Accept/Reject, Mark Picked Up,
+     Mark Delivered) inside `ScrollView` as the last content item,
+     wrapped in `actionsContainer`
+   - **Result:** Buttons scroll naturally with page content and are
+     never cut off regardless of screen size
+
+   **Animations:**
+   - **Removed:** `FadeInDown` entering animations on cards (conflicted
+     with unified card structure)
+   - **Preserved:** `ContactCard` spring press animation via
+     `useAnimatedStyle` / `withSpring`
+   - **Removed:** `FadeIn`/`FadeInDown` imports (no longer used)
+
+   **Scroll padding:**
+   - **Replaced:** Fixed spacer `<View style={{ height: Spacing.xxxl * 2 }} />`
+     with `paddingBottom: Spacing.xxxl` on `scrollContent`
+
+**How It Works Now:**
+
+#### Page Structure
+
+```
+
+┌─────────────────────────────────────────┐
+│ ← Request Details [header] │
+├─────────────────────────────────────────┤
+│ ScrollView │
+│ ┌───────────────────────────────────┐ │
+│ │ mainCard │ │
+│ │ [● Pending] ← status banner │ │
+│ │ ───────────────────────────── │ │
+│ │ From │ │
+│ │ Jaipur │ │
+│ │ · · · │ │
+│ │ To │ │
+│ │ Delhi │ │
+│ │ ───────────────────────────── │ │
+│ │ ↑ Departure ↓ Arrival │ │
+│ │ Feb 20 Feb 20 │ │
+│ │ 10:00 AM 3:30 PM │ │
+│ │ ───────────────────────────── │ │
+│ │ 🚂 Transport 📦 Trip Capacity │ │
+│ │ Train Medium │ │
+│ │ ───────────────────────────── │ │
+│ │ Parcel Details │ │
+│ │ [description box] │ │
+│ │ Category: [Documents chip] │ │
+│ │ ───────────────────────────── │ │
+│ │ Parcel Photos │ │
+│ │ [photo thumbnails] │ │
+│ └───────────────────────────────────┘ │
+│ │
+│ [🔒 Contact details visible after...] │ ← pending only
+│ │
+│ ┌───────────────────────────────────┐ │ ← canViewContacts only
+│ │ mainCard │ │
+│ │ 👤 Sender │ │
+│ │ [contact card + call button] │ │
+│ │ ───────────────────────────── │ │
+│ │ 📍 Receiver │ │
+│ │ [contact card + call button] │ │
+│ └───────────────────────────────────┘ │
+│ │
+│ [⚠ Alert card if cancelled/rejected] │
+│ │
+│ ┌─────────────┐ ┌─────────────────┐ │ ← pending only
+│ │ Reject │ │ Accept Request │ │
+│ └─────────────┘ └─────────────────┘ │
+│ │
+│ ┌─────────────────────────────────┐ │ ← accepted only
+│ │ Mark as Picked Up │ │
+│ └─────────────────────────────────┘ │
+│ │
+│ ┌─────────────────────────────────┐ │ ← picked_up only
+│ │ Mark as Delivered │ │
+│ └─────────────────────────────────┘ │
+└─────────────────────────────────────────┘
+
+```
+
+**Testing:**
+
+- ✅ Test 1: Pending state — status banner, parcel info, privacy
+  notice, Accept/Reject buttons all visible and scroll correctly
+- ✅ Test 2: Accepted state — contact cards visible, Mark Picked Up
+  button at bottom of scroll
+- ✅ Test 3: Picked Up state — Mark Delivered button at bottom of scroll
+- ✅ Test 4: Rejected state — alert card with rejection reason visible,
+  no action buttons
+- ✅ Test 5: Cancelled state — alert card with cancellation actor
+  visible, no action buttons
+- ✅ Test 6: Buttons not cut off on small screens
+- ✅ Test 7: Smooth scrolling throughout all states
+- ✅ Test 8: All modals (Accept, Reject, Pickup OTP, Delivery OTP)
+  trigger correctly from in-scroll buttons
+- ✅ Test 9: Layout matches trip-preview.tsx visually
+- ✅ Test 10: No TypeScript errors
+- ✅ Test 11: No console warnings
+
+**Acceptance Criteria:**
+
+- ✅ Layout matches trip-preview.tsx (sections, spacing, typography)
+- ✅ Accept/Reject buttons at bottom of scroll (not in a footer)
+- ✅ Sections clearly separated by divider lines
+- ✅ Buttons accessible and never cut off
+- ✅ Smooth scrolling throughout
+- ✅ Status shown as pill banner inside content, not header sub-text
+
+**Frontend Changes:**
+
+- `app/requests/[id].tsx` — unified card layout, in-scroll action
+  buttons, header/status/style alignment with trip-preview.tsx
+
+**Type Updates:**
+
+- None required — no new props or interfaces
+
+**Database Objects Touched:**
+
+- None — frontend-only changes
+
+**Related Issues:**
+
+- Related to: Issue #19 (my-requests detail UI consistency)
+- Related to: Issue #23
+- Follows styling pattern from: Issue #18 (RequestCard redesign to
+  match TripCard)
+
+---
+
 ### Issue #18 - Display trip cities and arrival time in RequestCard ✅
 
 **Type:** Frontend Bug Fix - Data Display + RLS Policy
@@ -941,49 +1126,56 @@ RequestCard component was not displaying trip source/destination cities and arri
 
 **Before (Broken - Infinite Recursion):**
 
-```
+````
+
 parcel_requests policy: "Senders can SELECT WHERE sender_id = auth.uid()"
-↓ User queries: SELECT * FROM parcel_requests JOIN trips
+↓ User queries: SELECT \* FROM parcel_requests JOIN trips
 trips policy: "Users can view trips WHERE EXISTS (SELECT FROM parcel_requests...)"
 ↓ RLS evaluates trips policy
 ↓ Subquery accesses parcel_requests
 ↓ RLS evaluates parcel_requests policy
 ↓ Policy references trips again
 ❌ INFINITE RECURSION ERROR
+
 ```
 
 **After (Fixed - SECURITY DEFINER breaks recursion):**
 
 ```
+
 parcel_requests policy: "Senders can SELECT WHERE sender_id = auth.uid()"
-↓ User queries: SELECT * FROM parcel_requests JOIN trips
+↓ User queries: SELECT \* FROM parcel_requests JOIN trips
 trips policy: "Users can view trips WHERE user_can_view_trip(id)"
 ↓ RLS calls function (SECURITY DEFINER)
 ↓ Function bypasses RLS, directly checks parcel_requests
 ✅ Returns boolean, no recursion
+
 ```
 
 #### RequestCard Layout
 
 ```
+
 ┌──────────────────────────────────────────┐
-│ [Pending] Status Banner (colored)        │
+│ [Pending] Status Banner (colored) │
 ├──────────────────────────────────────────┤
-│                                          │
-│  Jaipur        [🚂]         Delhi       │
-│  Feb 20, 2026               Feb 20, 2026 │
-│  10:00 AM                   3:30 PM      │
-│                                          │
+│ │
+│ Jaipur [🚂] Delhi │
+│ Feb 20, 2026 Feb 20, 2026 │
+│ 10:00 AM 3:30 PM │
+│ │
 ├──────────────────────────────────────────┤
-│  [📄 Documents]    [📦 Medium]           │
+│ [📄 Documents] [📦 Medium] │
 ├──────────────────────────────────────────┤
-│  View Full Details →                     │
+│ View Full Details → │
 └──────────────────────────────────────────┘
+
 ```
 
 #### Data Flow
 
 ```
+
 1. User opens My Requests tab
    ↓
 2. requestStore.getMyRequests(userId) called
@@ -998,6 +1190,7 @@ trips policy: "Users can view trips WHERE user_can_view_trip(id)"
    ↓
 7. RequestCard renders with source/destination/arrival
    ✅ Cities displayed correctly!
+
 ```
 
 **Testing:**
@@ -1073,9 +1266,9 @@ The `user_can_view_trip()` function is marked `STABLE`, allowing PostgreSQL to:
 
 ### Issue #19 - Request details UI improvements (Parts 1 & 2) ✅
 
-**Type**: Frontend Enhancement - Component Extraction + Permission System  
-**Priority**: HIGH  
-**Time**: 4-5 hours  
+**Type**: Frontend Enhancement - Component Extraction + Permission System
+**Priority**: HIGH
+**Time**: 4-5 hours
 **Date**: 2026-02-17
 
 **Problem:**
@@ -1183,36 +1376,38 @@ Request details screen had incomplete data display and non-functional edit butto
 #### Request Details Screen Layout
 
 ```
+
 ┌─────────────────────────────────────┐
-│ Header (Back + Status Badge)        │
+│ Header (Back + Status Badge) │
 └─────────────────────────────────────┘
 
 ┌─────────────────────────────────────┐
-│ TRIP ROUTE                          │
-│ From: Jaipur → To: Delhi            │
-│ Depart: Feb 15, 10:00 AM            │
-│ Arrive: Feb 15, 12:30 PM            │
-│ Transport: Flight                   │
-│ Accepts: Medium Parcels             │
+│ TRIP ROUTE │
+│ From: Jaipur → To: Delhi │
+│ Depart: Feb 15, 10:00 AM │
+│ Arrive: Feb 15, 12:30 PM │
+│ Transport: Flight │
+│ Accepts: Medium Parcels │
 └─────────────────────────────────────┘
 
 ┌─────────────────────────────────────┐
-│ PARCEL DETAILS [Edit Icon]          │ ← Conditional
-│ Category: Documents                 │
-│ Description: Important papers       │
-│ Photos: [3 images]                  │
+│ PARCEL DETAILS [Edit Icon] │ ← Conditional
+│ Category: Documents │
+│ Description: Important papers │
+│ Photos: [3 images] │
 └─────────────────────────────────────┘
 
 ┌─────────────────────────────────────┐
-│ RECEIVER DETAILS [Edit Icon]        │ ← Conditional
-│ Name: John Doe                      │
-│ Phone: +91 98765 43210              │
+│ RECEIVER DETAILS [Edit Icon] │ ← Conditional
+│ Name: John Doe │
+│ Phone: +91 98765 43210 │
 └─────────────────────────────────────┘
 
 ┌─────────────────────────────────────┐
-│ [Cancel Request Button]             │ ← If pending/accepted
+│ [Cancel Request Button] │ ← If pending/accepted
 └─────────────────────────────────────┘
-```
+
+````
 
 #### Permission Logic
 
