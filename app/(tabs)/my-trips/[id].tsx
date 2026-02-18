@@ -258,7 +258,11 @@ export default function TripDetailsScreen() {
   const status = currentTrip.status as TripStatus;
   const statusConfig = TRIP_STATUS_CONFIG[status];
   const statusColor = colors[statusConfig.colorKey];
-  const canCancel = status === "upcoming" || status === "locked";
+
+  // FIX (Issue #25): Added in_progress so Cancel Trip button appears
+  // when trip has picked_up parcels (departure has passed)
+  const canCancel =
+    status === "upcoming" || status === "locked" || status === "in_progress";
 
   return (
     <SafeAreaView
