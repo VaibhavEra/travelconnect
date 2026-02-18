@@ -645,6 +645,239 @@ badge color and icon once the filters expose them.
 
 ---
 
+### Issue #21 - Reorganize requests tab filters (incoming, active, completed) ✅
+
+**Type:** Frontend Refactor - Filter Configuration + Store Restructure
+**Priority:** MEDIUM
+**Time:** 1-2 hours
+**Date:** 2026-02-18
+
+**Problem:**
+
+The traveller requests screen used a 2-view switcher (Incoming / Active) with
+local filter types that relied on aliased status mappings instead of real status
+names:
+
+- `type RequestFilter = "all" | "pending" | "accepted" | "rejected"` — local,
+  included `accepted` which doesn't belong in the incoming view.
+- `type DeliveryFilter = "all" | "ready" | "transit" | "completed"` — local,
+  with aliases (`ready` → `accepted`, `transit` → `picked_up`,
+  `completed` → `delivered`) disconnected from real status names.
+- `getIncomingRequests` had no server-side status filter — it returned all
+  statuses for the traveller's trips, and `accepted` requests were manually
+  excluded in the UI via `.filter(r => r.status !== "accepted")`.
+- `getAcceptedRequests` included `delivered` in its query, even though
+  delivered requests don't belong in an "active" view.
+- No way for a traveller to view delivered or cancelled requests at all.
+- Filter chip arrays were hardcoded inline instead of using shared constants
+  from `lib/constants/filters.ts`, creating the same duplication problem
+  that Issues #10 and #17 had solved for my-trips and my-requests tabs.
+
+**Frontend Changes (Applied via GitHub PR - 2026-02-18):**
+
+1. **`lib/constants/filters.ts`** (Updated)
+   - **Added:** `INCOMING_REQUEST_FILTERS` — `all`, `pending`, `rejected`
+   - **Added:** `ACTIVE_REQUEST_FILTERS` — `all`, `accepted`, `picked_up`
+     (with label "In Transit" for `picked_up`)
+   - **Added:** `COMPLETED_REQUEST_FILTERS` — `all`, `delivered`, `cancelled`
+   - **Added:** Corresponding key types: `IncomingRequestFilterKey`,
+     `ActiveRequestFilterKey`, `CompletedRequestFilterKey`
+   - **Kept:** All existing constants (`REQUEST_FILTERS`, `TRIP_FILTERS`,
+     `DATE_FILTERS`, `DELIVERY_FILTERS`) untouched
+
+2. **`stores/requestStore.ts`** (Updated)
+   - **Added:** `completedRequests: ParcelRequest[]` to `RequestState`
+     interface and initial state
+   - **Added:** `getCompletedRequests(travellerId)` action — queries
+     `status IN ('delivered', 'cancelled')`, mirrors `getAcceptedRequests`
+     structure exactly
+   - **Updated:** `getIncomingRequests` query — added `.in("status",
+["pending", "rejected"])` server-side filter (previously returned all
+     statuses, leaking accepted requests into the incoming list)
+   - **Updated:** `getAcceptedRequests` query — changed `.in("status",
+["accepted", "picked_up"])`, removed `delivered` (now belongs to
+     completedRequests)
+   - **Updated:** `updateRequestStatus` — added `completedRequests` mapping
+     so generic status updates are reflected across all 4 local arrays
+
+3. **`app/(tabs)/requests/index.tsx`** (Refactored)
+   - **Removed:** Local `RequestFilter` type and alias-based filter logic
+   - **Removed:** Local `DeliveryFilter` type and alias mappings
+     (`ready` → `accepted`, `transit` → `picked_up`, `completed` →
+     `delivered`)
+   - **Removed:** Manual `filter(r => r.status !== "accepted")` workaround
+     in `filteredRequests`
+   - **Removed:** `getRequestFilterCount` and `getDeliveryFilterCount`
+     functions with alias mapping
+   - **Updated:** `type ViewMode` from `"incoming" | "accepted"` to
+     `"incoming" | "active" | "completed"`
+   - **Added:** Import of `INCOMING_REQUEST_FILTERS`, `ACTIVE_REQUEST_FILTERS`,
+     `COMPLETED_REQUEST_FILTERS` and their key types from `filters.ts`
+   - **Added:** Import of `completedRequests`, `getCompletedRequests` from store
+   - **Added:** `incomingFilter`, `activeFilter`, `completedFilter` state
+     using the new shared key types (replaced `requestFilter`,
+     `deliveryFilter`)
+   - **Updated:** `useFocusEffect` and `onRefresh` to handle 3 view modes
+   - **Updated:** Filter logic to direct 1:1 `r.status === filter` matching
+     — no aliases anywhere
+   - **Added:** `getIncomingFilterCount`, `getActiveFilterCount`,
+     `getCompletedFilterCount` using simple status comparison
+   - **Updated:** View switcher pill from 2 tabs to 3 tabs rendered via
+     `.map()` over a config array
+   - **Updated:** Filter chips in each section rendered via `.map()` over
+     shared constants (same pattern as Issues #10 and #17)
+   - **Added:** Completed tab section with `DeliveryCard` (no action buttons
+     passed — `showPickupButton` and `showDeliveryButton` are `false` for
+     `delivered`/`cancelled` statuses automatically)
+   - **Updated:** Header title and subtitle to reflect active `viewMode`
+     ("Requests" / "Deliveries" / "Completed")
+
+**How It Works Now:**
+
+#### Tab → Status Mapping
+
+```
+┌─────────────────────────────────────────────────────┐
+│  [Incoming]        [Active]        [Completed]      │
+│  pending           accepted        delivered        │
+│  rejected          picked_up       cancelled        │
+└─────────────────────────────────────────────────────┘
+```
+
+Each tab has its own sub-filter chip bar driven by a shared constant:
+
+```
+Incoming:  [All] [Pending] [Rejected]
+Active:    [All] [Accepted] [In Transit]
+Completed: [All] [Delivered] [Cancelled]
+```
+
+#### Filter Rendering Pattern (consistent with #10 and #17)
+
+**Before (hardcoded, aliased):**
+
+```typescript
+// Local type with non-status aliases
+type DeliveryFilter = "all" | "ready" | "transit" | "completed";
+
+// Hardcoded inline chips
+<FilterChip label="Ready" icon="checkmark-circle" ... />
+<FilterChip label="In Transit" icon="cube" ... />
+<FilterChip label="Completed" icon="checkmark-done" ... />
+
+// Alias mapping in filter logic
+if (deliveryFilter === "ready") return request.status === "accepted";
+if (deliveryFilter === "transit") return request.status === "picked_up";
+```
+
+**After (shared constants, direct matching):**
+
+```typescript
+// Shared constant from filters.ts
+import { ACTIVE_REQUEST_FILTERS, ActiveRequestFilterKey } from "@/lib/constants/filters";
+
+// Mapped chips — single source of truth
+{ACTIVE_REQUEST_FILTERS.map((f) => (
+  <FilterChip
+    key={f.key}
+    label={f.label}
+    icon={f.icon}
+    count={getActiveFilterCount(f.key as ActiveRequestFilterKey)}
+    active={activeFilter === f.key}
+    onPress={() => setActiveFilter(f.key as ActiveRequestFilterKey)}
+  />
+))}
+
+// Direct 1:1 matching — no aliases
+const filteredActive = acceptedRequests.filter((r) => {
+  if (activeFilter === "all") return true;
+  return r.status === activeFilter;
+});
+```
+
+#### Store Query Scoping (moved from UI to server)
+
+**Before:**
+
+```typescript
+// getIncomingRequests — no status filter, all statuses returned
+// UI had to manually exclude accepted:
+const filteredRequests = incomingRequests
+  .filter((r) => r.status !== "accepted") // workaround
+  .filter((r) => requestFilter === "all" || r.status === requestFilter);
+
+// getAcceptedRequests — included delivered
+.in("status", ["accepted", "picked_up", "delivered"])
+```
+
+**After:**
+
+```typescript
+// getIncomingRequests — scoped at query level
+.in("status", ["pending", "rejected"])
+
+// getAcceptedRequests — scoped at query level
+.in("status", ["accepted", "picked_up"])
+
+// getCompletedRequests — new, scoped at query level
+.in("status", ["delivered", "cancelled"])
+```
+
+**Testing:**
+
+- ✅ Test 1: Incoming tab shows only pending and rejected requests — PASSED
+- ✅ Test 2: Active tab shows only accepted and picked_up requests — PASSED
+- ✅ Test 3: Completed tab shows only delivered and cancelled requests — PASSED
+- ✅ Test 4: Filter chips in each tab show correct counts — PASSED
+- ✅ Test 5: Tab badges update correctly — PASSED
+- ✅ Test 6: Pull-to-refresh works on all 3 tabs — PASSED
+- ✅ Test 7: useFocusEffect fetches correct data per active tab — PASSED
+- ✅ Test 8: OTP flow (pickup + delivery) still works from Active tab — PASSED
+- ✅ Test 9: DeliveryCard in Completed tab shows no action buttons — PASSED
+- ✅ Test 10: Empty states display correctly per tab and filter — PASSED
+- ✅ Test 11: TypeScript compiles without errors — PASSED
+- ✅ Test 12: No console warnings — PASSED
+
+**Acceptance Criteria:**
+
+- ✅ Three tabs: Incoming, Active, Completed
+- ✅ Incoming shows only pending and rejected
+- ✅ Active shows only accepted and picked_up
+- ✅ Completed shows only delivered and cancelled
+- ✅ Tab navigation works smoothly
+- ✅ Filter chip arrays driven by shared constants (no local duplication)
+- ✅ Direct 1:1 status matching throughout (no aliases)
+- ✅ Status scoping moved to store queries (not UI workarounds)
+
+**Frontend Changes:**
+
+- `lib/constants/filters.ts` — Added 3 scoped filter arrays + key types
+- `stores/requestStore.ts` — Added `completedRequests` state +
+  `getCompletedRequests` action; scoped `getIncomingRequests` and
+  `getAcceptedRequests` queries; updated `updateRequestStatus`
+- `app/(tabs)/requests/index.tsx` — Removed local types and alias logic;
+  3-tab layout with shared constants and direct status matching
+
+**Type Updates:**
+
+- `IncomingRequestFilterKey`, `ActiveRequestFilterKey`,
+  `CompletedRequestFilterKey` — new shared types in `filters.ts`
+- `RequestState` — added `completedRequests: ParcelRequest[]` and
+  `getCompletedRequests` action
+
+**Database Objects Touched:**
+
+- None — frontend-only changes
+
+**Related Issues:**
+
+- Follows pattern from: Issue #10 (centralized trip filter configuration) ✅
+- Follows pattern from: Issue #17 (centralized request filter configuration) ✅
+- Related to: Issue #13 (UI consistency across cards)
+- Related to: Issue #22 (incoming requests tab for senders)
+
+---
+
 ### Issue #18 - Display trip cities and arrival time in RequestCard ✅
 
 **Type:** Frontend Bug Fix - Data Display + RLS Policy
