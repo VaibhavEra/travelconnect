@@ -68,6 +68,15 @@ export default function VerifyOtpModal({
   const attempts = failedAttempts ?? 0;
   const remainingAttempts = MAX_ATTEMPTS - attempts;
 
+  // FIX: Reset local state when modal opens so stale otp/error
+  // from a previous session never leaks into a fresh open.
+  useEffect(() => {
+    if (visible) {
+      setOtp("");
+      setError("");
+    }
+  }, [visible]);
+
   // Calculate time remaining for OTP expiry
   useEffect(() => {
     if (!otpExpiry) return;
@@ -170,13 +179,15 @@ export default function VerifyOtpModal({
 
       if (isValid) {
         setOtp("");
-        onClose();
+        // FIX: Do NOT call onClose() here.
+        // Parent's handleVerifyPickupOtp / handleVerifyDeliveryOtp calls
+        // setPickupOtpModalVisible(false) and shows an Alert on success.
+        // Calling onClose() here would race with the parent's setState.
       } else {
         setError("Invalid or expired OTP. Please try again.");
       }
-    } catch (error: any) {
-      // UPDATED: exact error code matching instead of substring matching
-      const code = error.message;
+    } catch (err: any) {
+      const code = err.message;
 
       if (code === "blocked") {
         const mins = Math.floor(blockSecondsRemaining / 60);
@@ -195,7 +206,7 @@ export default function VerifyOtpModal({
       } else if (code === "invalid_otp") {
         setError("Invalid OTP. Please check and try again.");
       } else {
-        setError(error.message || "Failed to verify OTP. Please try again.");
+        setError(err.message || "Failed to verify OTP. Please try again.");
       }
     } finally {
       setLoading(false);
@@ -242,6 +253,7 @@ export default function VerifyOtpModal({
       subtitle={config.getSubtitle(userName)}
       icon={<Ionicons name={config.icon} size={48} color={iconColor} />}
       loading={loading}
+      scrollable
       actions={
         <>
           <ModalButton
@@ -267,7 +279,7 @@ export default function VerifyOtpModal({
       }
     >
       <View>
-        {/* Block warning — shown when user is temporarily blocked */}
+        {/* Block warning */}
         {isBlocked && (
           <View
             style={[
@@ -334,13 +346,12 @@ export default function VerifyOtpModal({
           autoFocus
         />
 
-        {/* Error message */}
+        {/* Error / hint / attempts */}
         {error ? (
           <Text style={[styles.errorText, { color: colors.error }]}>
             {error}
           </Text>
         ) : isBlocked ? null : attempts > 0 && remainingAttempts > 0 ? (
-          // Attempts remaining warning — only shown when not blocked and has failures
           <Text style={[styles.attemptsText, { color: colors.warning }]}>
             {remainingAttempts} attempt{remainingAttempts !== 1 ? "s" : ""}{" "}
             remaining
