@@ -38,7 +38,7 @@ export default function ExploreSearchScreen() {
       edges={["top"]}
     >
       {/* Header */}
-      <View style={styles.header}>
+      <View style={[styles.header, { borderBottomColor: colors.border.light }]}>
         <View>
           <Text style={[styles.headerTitle, { color: colors.text.primary }]}>
             Find Trips
