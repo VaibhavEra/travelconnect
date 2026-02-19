@@ -1,4 +1,4 @@
-// app/my-requests/[id].tsx
+// app/(tabs)/my-requests/[id].tsx
 import CancelRequestModal from "@/components/request/CancelRequestModal";
 import EditReceiverDetailsModal from "@/components/request/EditReceiverDetailsModal";
 import EditRequestDetailsModal from "@/components/request/EditRequestDetailsModal";
@@ -7,8 +7,11 @@ import { CATEGORY_CONFIG } from "@/lib/constants/categories";
 import { getSizeCapacityLabel } from "@/lib/constants/parcel";
 import { REQUEST_STATUS_CONFIG, RequestStatus } from "@/lib/constants/status";
 import { TRANSPORT_ICONS } from "@/lib/constants/transport";
+import { showErrorAlert } from "@/lib/utils/alerts";
 import { formatCountdown, formatDate, formatTime } from "@/lib/utils/dateTime";
 import { haptics } from "@/lib/utils/haptics";
+import { logger } from "@/lib/utils/logger";
+import { showSuccessToast } from "@/lib/utils/toast";
 import { useRequestStore } from "@/stores/requestStore";
 import { BorderRadius, Spacing, Typography } from "@/styles";
 import { useThemeColors } from "@/styles/theme";
@@ -17,7 +20,6 @@ import { router, useLocalSearchParams } from "expo-router";
 import { useEffect, useState } from "react";
 import {
   ActivityIndicator,
-  Alert,
   Linking,
   Pressable,
   ScrollView,
@@ -26,6 +28,8 @@ import {
   View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+
+const MODULE = "RequestDetailsScreen";
 
 export default function RequestDetailsScreen() {
   const colors = useThemeColors();
@@ -75,26 +79,20 @@ export default function RequestDetailsScreen() {
     try {
       await cancelRequest(id, reason);
       haptics.success();
-      Alert.alert(
-        "Request Cancelled",
-        "Your parcel request has been cancelled.",
-        [
-          {
-            text: "OK",
-            onPress: () => router.back(),
-          },
-        ],
-      );
-    } catch (error: any) {
+      showSuccessToast("Your parcel request has been cancelled.");
+      router.back();
+    } catch (error: unknown) {
+      logger.error("Cancel request failed", error, { module: MODULE });
       haptics.error();
-      Alert.alert("Error", error.message || "Failed to cancel request");
+      showErrorAlert(error);
     }
   };
 
   const handleOpenTicket = (url: string) => {
     haptics.light();
-    Linking.openURL(url).catch(() => {
-      Alert.alert("Error", "Unable to open ticket file");
+    Linking.openURL(url).catch((error: unknown) => {
+      logger.error("Failed to open ticket URL", error, { module: MODULE });
+      showErrorAlert(error);
     });
   };
 
@@ -109,10 +107,11 @@ export default function RequestDetailsScreen() {
       haptics.light();
       await regeneratePickupOtp(id);
       haptics.success();
-      Alert.alert("Success", "Pickup OTP regenerated successfully");
-    } catch (error: any) {
+      showSuccessToast("Pickup OTP regenerated successfully.");
+    } catch (error: unknown) {
+      logger.error("Regenerate pickup OTP failed", error, { module: MODULE });
       haptics.error();
-      Alert.alert("Error", error.message || "Failed to regenerate OTP");
+      showErrorAlert(error);
     } finally {
       setRegeneratingPickup(false);
     }
@@ -124,10 +123,11 @@ export default function RequestDetailsScreen() {
       haptics.light();
       await regenerateDeliveryOtp(id);
       haptics.success();
-      Alert.alert("Success", "Delivery OTP regenerated successfully");
-    } catch (error: any) {
+      showSuccessToast("Delivery OTP regenerated successfully.");
+    } catch (error: unknown) {
+      logger.error("Regenerate delivery OTP failed", error, { module: MODULE });
       haptics.error();
-      Alert.alert("Error", error.message || "Failed to regenerate OTP");
+      showErrorAlert(error);
     } finally {
       setRegeneratingDelivery(false);
     }

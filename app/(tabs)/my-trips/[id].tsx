@@ -9,8 +9,15 @@ import {
 } from "@/lib/constants/parcel";
 import { TRIP_STATUS_CONFIG, TripStatus } from "@/lib/constants/status";
 import { TRANSPORT_CONFIG } from "@/lib/constants/transport";
+import {
+  showConfirmAlert,
+  showErrorAlert,
+  showSessionAlert,
+} from "@/lib/utils/alerts";
 import { formatDate, formatTime } from "@/lib/utils/dateTime";
 import { haptics } from "@/lib/utils/haptics";
+import { logger } from "@/lib/utils/logger";
+import { showSuccessToast } from "@/lib/utils/toast";
 import { useAuthStore } from "@/stores/authStore";
 import { useRequestStore } from "@/stores/requestStore";
 import { useTripStore } from "@/stores/tripStore";
@@ -21,7 +28,6 @@ import { router, useLocalSearchParams } from "expo-router";
 import { useEffect, useState } from "react";
 import {
   ActivityIndicator,
-  Alert,
   Linking,
   Pressable,
   ScrollView,
@@ -30,6 +36,8 @@ import {
   View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+
+const MODULE = "TripDetailsScreen";
 
 export default function TripDetailsScreen() {
   const colors = useThemeColors();
@@ -118,71 +126,58 @@ export default function TripDetailsScreen() {
 
     if (hasPickup && pickedUpRequest) {
       // CASE 1: After pickup - Need OTP from sender
-      Alert.alert(
+      showConfirmAlert(
         "Cancellation Requires OTP",
         "A parcel has been picked up for this trip. To cancel, you need a cancellation OTP from the sender.",
-        [
-          { text: "Cancel", style: "cancel" },
-          {
-            text: "Get OTP",
-            style: "default",
-            onPress: async () => {
-              try {
-                setActionLoading(true);
+        async () => {
+          try {
+            setActionLoading(true);
 
-                // Generate cancellation OTP
-                await generateCancellationOtp(pickedUpRequest.id);
+            // Generate cancellation OTP
+            await generateCancellationOtp(pickedUpRequest.id);
 
-                // Store request info for OTP modal
-                setCancellationOtpData({
-                  requestId: pickedUpRequest.id,
-                  senderName: pickedUpRequest.sender?.full_name || "the sender",
-                });
+            // Store request info for OTP modal
+            setCancellationOtpData({
+              requestId: pickedUpRequest.id,
+              senderName: pickedUpRequest.sender?.full_name || "the sender",
+            });
 
-                haptics.success();
-                setActionLoading(false);
-
-                // Show OTP modal
-                setShowCancellationOtpModal(true);
-              } catch (error: any) {
-                haptics.error();
-                setActionLoading(false);
-                Alert.alert(
-                  "Error",
-                  error.message || "Failed to generate cancellation OTP",
-                );
-              }
-            },
-          },
-        ],
+            haptics.success();
+            setShowCancellationOtpModal(true);
+          } catch (error) {
+            haptics.error();
+            logger.error("Failed to generate cancellation OTP", error, {
+              module: MODULE,
+            });
+            showErrorAlert(error);
+          } finally {
+            setActionLoading(false);
+          }
+        },
+        "Get OTP",
+        false,
       );
     } else {
       // CASE 2: Before pickup - Direct cancellation
-      Alert.alert(
+      showConfirmAlert(
         "Cancel Trip",
         "Are you sure you want to cancel this trip? This action cannot be undone.",
-        [
-          { text: "No", style: "cancel" },
-          {
-            text: "Yes, Cancel",
-            style: "destructive",
-            onPress: async () => {
-              try {
-                setActionLoading(true);
-                await deleteTrip(id);
-                haptics.success();
-                Alert.alert("Success", "Trip cancelled successfully", [
-                  { text: "OK", onPress: () => router.back() },
-                ]);
-              } catch (error: any) {
-                haptics.error();
-                Alert.alert("Error", error.message || "Failed to cancel trip");
-              } finally {
-                setActionLoading(false);
-              }
-            },
-          },
-        ],
+        async () => {
+          try {
+            setActionLoading(true);
+            await deleteTrip(id);
+            haptics.success();
+            showSuccessToast("Trip cancelled successfully");
+            router.back();
+          } catch (error) {
+            haptics.error();
+            logger.error("Failed to cancel trip", error, { module: MODULE });
+            showErrorAlert(error);
+          } finally {
+            setActionLoading(false);
+          }
+        },
+        "Yes, Cancel",
       );
     }
   };
@@ -197,17 +192,19 @@ export default function TripDetailsScreen() {
 
       if (isValid) {
         haptics.success();
-        Alert.alert(
+        showSessionAlert(
           "Trip Cancelled",
           "Your trip and the linked request have been cancelled successfully.",
-          [{ text: "OK", onPress: () => router.back() }],
+          () => router.back(),
         );
         return true;
       }
 
       return false;
-    } catch (error: any) {
-      console.error("Cancellation OTP verification failed:", error);
+    } catch (error) {
+      logger.error("Cancellation OTP verification failed", error, {
+        module: MODULE,
+      });
       throw error;
     }
   };
@@ -215,8 +212,9 @@ export default function TripDetailsScreen() {
   const handleViewTicket = () => {
     haptics.light();
     if (currentTrip?.ticket_file_url) {
-      Linking.openURL(currentTrip.ticket_file_url).catch(() => {
-        Alert.alert("Error", "Unable to open ticket file");
+      Linking.openURL(currentTrip.ticket_file_url).catch((error) => {
+        logger.error("Failed to open ticket file", error, { module: MODULE });
+        showErrorAlert(error);
       });
     }
   };

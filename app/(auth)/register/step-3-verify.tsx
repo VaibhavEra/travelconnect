@@ -1,7 +1,7 @@
 import AuthLayout from "@/components/auth/AuthLayout";
 import OtpInput from "@/components/auth/OtpInput";
 import ProgressIndicator from "@/components/auth/ProgressIndicator";
-import { parseSupabaseError } from "@/lib/utils/errorHandling";
+import { showErrorAlert } from "@/lib/utils/alerts";
 import { haptics } from "@/lib/utils/haptics";
 import { rateLimitConfigs, rateLimiter } from "@/lib/utils/rateLimit";
 import { AuthFlowState, useAuthStore } from "@/stores/authStore";
@@ -91,14 +91,13 @@ export default function RegisterStep3Screen() {
         [
           {
             text: "Get Started",
-            onPress: () => router.replace("/(tabs)/explore"), // Will redirect properly via _layout.tsx
+            onPress: () => router.replace("/(tabs)/explore"),
           },
         ],
       );
     } catch (error: any) {
       haptics.error();
-      const errorMessage = parseSupabaseError(error);
-      Alert.alert("Verification Failed", errorMessage);
+      showErrorAlert(error);
       setOtp(""); // Clear OTP on error
     } finally {
       setLoading(false);
@@ -129,8 +128,7 @@ export default function RegisterStep3Screen() {
       Alert.alert("Success", "Verification code sent to your email");
     } catch (error: any) {
       haptics.error();
-      const errorMessage = parseSupabaseError(error);
-      Alert.alert("Error", errorMessage);
+      showErrorAlert(error);
     } finally {
       setLoading(false);
     }

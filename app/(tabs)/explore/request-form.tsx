@@ -1,10 +1,14 @@
+// app/(tabs)/explore/request-form.tsx
 import ImagePicker from "@/components/forms/ImagePicker";
 import TextInput from "@/components/forms/TextInput";
 import { CATEGORY_CONFIG } from "@/lib/constants/categories";
 import { getSizeCapacityLabel } from "@/lib/constants/parcel";
+import { showErrorAlert } from "@/lib/utils/alerts";
 import { formatDate } from "@/lib/utils/dateTime";
 import { uploadFile } from "@/lib/utils/fileUpload";
 import { haptics } from "@/lib/utils/haptics";
+import { logger } from "@/lib/utils/logger";
+import { showSuccessToast } from "@/lib/utils/toast";
 import { RequestFormData, requestSchema } from "@/lib/validations/request";
 import { useAuthStore } from "@/stores/authStore";
 import { useRequestStore } from "@/stores/requestStore";
@@ -18,7 +22,6 @@ import { useEffect, useState } from "react";
 import { Controller, useForm } from "react-hook-form";
 import {
   ActivityIndicator,
-  Alert,
   KeyboardAvoidingView,
   Platform,
   Pressable,
@@ -28,6 +31,8 @@ import {
   View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+
+const MODULE = "RequestFormScreen";
 
 export default function RequestFormScreen() {
   const colors = useThemeColors();
@@ -83,13 +88,12 @@ export default function RequestFormScreen() {
               return uri; // Already a public URL
             }),
           );
-        } catch (uploadError: any) {
+        } catch (uploadError: unknown) {
           haptics.error();
-          Alert.alert(
-            "Upload Failed",
-            uploadError.message ||
-              "Failed to upload parcel photos. Please try again.",
-          );
+          logger.error("Parcel photo upload failed", uploadError, {
+            module: MODULE,
+          });
+          showErrorAlert(uploadError);
           setIsSubmitting(false);
           return;
         }
@@ -115,16 +119,14 @@ export default function RequestFormScreen() {
       router.replace("/(tabs)/my-requests");
 
       setTimeout(() => {
-        Alert.alert(
-          "Request Sent!",
-          "Your parcel request has been sent to the traveller. You can track its status here.",
-          [{ text: "OK" }],
+        showSuccessToast(
+          "Request sent! You can track its status in My Requests.",
         );
       }, 500);
-    } catch (error: any) {
-      console.error("Request creation error:", error);
+    } catch (error: unknown) {
+      logger.error("Request creation failed", error, { module: MODULE });
       haptics.error();
-      Alert.alert("Error", error.message || "Failed to send request");
+      showErrorAlert(error);
     } finally {
       setIsSubmitting(false);
     }

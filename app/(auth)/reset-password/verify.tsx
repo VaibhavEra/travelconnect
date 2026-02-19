@@ -1,6 +1,6 @@
 import AuthLayout from "@/components/auth/AuthLayout";
 import OtpInput from "@/components/auth/OtpInput";
-import { parseSupabaseError } from "@/lib/utils/errorHandling";
+import { showErrorAlert } from "@/lib/utils/alerts";
 import { haptics } from "@/lib/utils/haptics";
 import { rateLimitConfigs, rateLimiter } from "@/lib/utils/rateLimit";
 import { AuthFlowState, useAuthStore } from "@/stores/authStore";
@@ -88,8 +88,7 @@ export default function VerifyResetOtpScreen() {
       router.replace("/(auth)/reset-password/new-password");
     } catch (error: any) {
       haptics.error();
-      const errorMessage = parseSupabaseError(error);
-      Alert.alert("Verification Failed", errorMessage);
+      showErrorAlert(error);
       setOtp("");
     } finally {
       setLoading(false);
@@ -122,8 +121,7 @@ export default function VerifyResetOtpScreen() {
       );
     } catch (error: any) {
       haptics.error();
-      const errorMessage = parseSupabaseError(error);
-      Alert.alert("Error", errorMessage);
+      showErrorAlert(error);
     } finally {
       setResending(false);
     }

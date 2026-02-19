@@ -1,3 +1,4 @@
+// app/(tabs)/create-trip.tsx
 import CategoryCheckboxes from "@/components/forms/CategoryCheckboxes";
 import CityDropdown from "@/components/forms/CityDropdown";
 import DatePickerInput from "@/components/forms/DatePickerInput";
@@ -7,9 +8,12 @@ import TextInput from "@/components/forms/TextInput";
 import TimePickerInput from "@/components/forms/TimePickerInput";
 import TransportModeSelector from "@/components/forms/TransportModeSelector";
 import ModeSwitcher from "@/components/shared/ModeSwitcher";
+import { showErrorAlert } from "@/lib/utils/alerts";
 import { dateToISO, dateToTimeString } from "@/lib/utils/dateTime";
 import { uploadFile } from "@/lib/utils/fileUpload";
 import { haptics } from "@/lib/utils/haptics";
+import { logger } from "@/lib/utils/logger";
+import { showSuccessToast } from "@/lib/utils/toast";
 import {
   PackageCategory,
   ParcelSizeCapacity,
@@ -28,7 +32,6 @@ import { useState } from "react";
 import { Controller, useForm } from "react-hook-form";
 import {
   ActivityIndicator,
-  Alert,
   KeyboardAvoidingView,
   Platform,
   Pressable,
@@ -39,39 +42,7 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
-const getErrorMessage = (error: any): { title: string; message: string } => {
-  const errorMessage = error.message || "";
-
-  // Network/connection errors
-  if (errorMessage.includes("network") || errorMessage.includes("fetch")) {
-    return {
-      title: "Connection Error",
-      message: "Please check your internet connection and try again.",
-    };
-  }
-
-  // Database/permission errors
-  if (errorMessage.includes("policy") || errorMessage.includes("permission")) {
-    return {
-      title: "Access Denied",
-      message: "You don't have permission to create this trip.",
-    };
-  }
-
-  // File upload errors
-  if (errorMessage.includes("storage") || errorMessage.includes("upload")) {
-    return {
-      title: "Upload Failed",
-      message: "Failed to upload ticket file. Please try again.",
-    };
-  }
-
-  // Generic fallback for unexpected backend errors
-  return {
-    title: "Unable to Create Trip",
-    message: errorMessage || "An unexpected error occurred. Please try again.",
-  };
-};
+const MODULE = "CreateTripScreen";
 
 export default function CreateTripScreen() {
   const colors = useThemeColors();
@@ -148,13 +119,12 @@ export default function CreateTripScreen() {
       if (ticketUrl && ticketUrl.startsWith("file://")) {
         try {
           ticketUrl = await uploadFile(ticketUrl, "tickets");
-        } catch (uploadError: any) {
+        } catch (uploadError: unknown) {
           haptics.error();
-          Alert.alert(
-            "Upload Failed",
-            uploadError.message ||
-              "Failed to upload ticket file. Please try again.",
-          );
+          logger.error("Ticket file upload failed", uploadError, {
+            module: MODULE,
+          });
+          showErrorAlert(uploadError);
           setIsSubmitting(false);
           return;
         }
@@ -186,17 +156,14 @@ export default function CreateTripScreen() {
       router.push("/(tabs)/my-trips");
 
       setTimeout(() => {
-        Alert.alert(
-          "Trip Created!",
-          "Your trip has been created successfully. You can now receive parcel requests from senders.",
-          [{ text: "OK", style: "default" }],
+        showSuccessToast(
+          "Trip created! You can now receive parcel requests from senders.",
         );
       }, 300);
-    } catch (error: any) {
-      console.error("Trip creation error:", error);
+    } catch (error: unknown) {
+      logger.error("Trip creation failed", error, { module: MODULE });
       haptics.error();
-      const { title, message } = getErrorMessage(error);
-      Alert.alert(title, message, [{ text: "OK", style: "default" }]);
+      showErrorAlert(error);
     } finally {
       setIsSubmitting(false);
     }

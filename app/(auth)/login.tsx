@@ -1,6 +1,6 @@
 import AuthLayout from "@/components/auth/AuthLayout";
 import FormInput from "@/components/auth/FormInput";
-import { parseSupabaseError } from "@/lib/utils/errorHandling";
+import { showErrorAlert } from "@/lib/utils/alerts";
 import { haptics } from "@/lib/utils/haptics";
 import { useNetworkStatus } from "@/lib/utils/network";
 import { sanitize } from "@/lib/utils/sanitize";
@@ -69,10 +69,7 @@ export default function LoginScreen() {
       haptics.error();
 
       // Check for unverified email error
-      if (
-        error.message === "EMAIL_NOT_VERIFIED" ||
-        error.name === "EmailNotVerifiedError"
-      ) {
+      if (error.code === "EMAIL_NOT_VERIFIED") {
         const { flowContext } = useAuthStore.getState();
 
         if (flowContext?.email) {
@@ -116,8 +113,7 @@ export default function LoginScreen() {
           ],
         );
       } else {
-        const errorMessage = parseSupabaseError(error);
-        Alert.alert("Login Failed", errorMessage);
+        showErrorAlert(error);
       }
 
       setLoading(false);

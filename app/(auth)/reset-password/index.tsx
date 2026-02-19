@@ -1,6 +1,7 @@
 import AuthLayout from "@/components/auth/AuthLayout";
 import FormInput from "@/components/auth/FormInput";
 import { haptics } from "@/lib/utils/haptics";
+import { logger } from "@/lib/utils/logger";
 import { useNetworkStatus } from "@/lib/utils/network";
 import { rateLimitConfigs, rateLimiter } from "@/lib/utils/rateLimit";
 import { sanitize } from "@/lib/utils/sanitize";
@@ -24,6 +25,8 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
+
+const MODULE = "ForgotPasswordScreen";
 
 export default function ForgotPasswordScreen() {
   const colors = useThemeColors();
@@ -75,6 +78,7 @@ export default function ForgotPasswordScreen() {
       setEmailSent(true);
     } catch (error: any) {
       haptics.error();
+      logger.error("Reset password failed", error, { module: MODULE });
       setEmailSent(true);
     } finally {
       setLoading(false);
@@ -108,6 +112,7 @@ export default function ForgotPasswordScreen() {
       );
     } catch (error: any) {
       haptics.success();
+      logger.error("Resend reset code failed", error, { module: MODULE });
       Alert.alert(
         "Code Resent",
         "A new verification code has been sent to your email.",
