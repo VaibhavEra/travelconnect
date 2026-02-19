@@ -442,7 +442,7 @@ export const useRequestStore = create<RequestState>((set, get) => ({
 
       if (rpcError) throw rpcError;
 
-      logger.info("Request accepted atomically", { result });
+      logger.info("Request accepted atomically", { requestId });
 
       // Refresh the request to get latest data
       const request = await get().getRequestById(requestId);
@@ -649,10 +649,7 @@ export const useRequestStore = create<RequestState>((set, get) => ({
         throw new Error(result.error || "invalid_otp");
       }
 
-      logger.info("Pickup verified, delivery OTP generated", {
-        requestId,
-        deliveryOtp: result.delivery_otp,
-      });
+      logger.info("Pickup verified, delivery OTP generated", { requestId });
 
       if (get().currentRequest?.id === requestId) {
         await get().getRequestById(requestId);
