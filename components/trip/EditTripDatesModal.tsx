@@ -2,8 +2,11 @@
 import DatePickerInput from "@/components/forms/DatePickerInput";
 import TimePickerInput from "@/components/forms/TimePickerInput";
 import BaseModal from "@/components/shared/BaseModal";
+import { showErrorAlert } from "@/lib/utils/alerts";
 import { dateToISO, dateToTimeString } from "@/lib/utils/dateTime";
 import { haptics } from "@/lib/utils/haptics";
+import { logger } from "@/lib/utils/logger";
+import { showSuccessToast } from "@/lib/utils/toast";
 import {
   TripEditDatesFormData,
   tripEditDatesSchema,
@@ -87,14 +90,16 @@ export default function EditTripDatesModal({
       );
 
       haptics.success();
-      Alert.alert(
-        "Success",
-        "Trip dates updated successfully. Affected senders will be notified.",
+      showSuccessToast(
+        "Trip dates updated. Affected senders will be notified.",
       );
       onClose();
-    } catch (error: any) {
+    } catch (error) {
+      logger.error("Update trip dates failed", error, {
+        module: "EditTripDatesModal",
+      });
       haptics.error();
-      Alert.alert("Error", error.message || "Failed to update trip dates");
+      showErrorAlert(error);
     } finally {
       setLoading(false);
       setChecking(false);

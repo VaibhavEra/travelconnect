@@ -1,5 +1,7 @@
 // components/modals/RejectRequestModal.tsx
 import { BaseModal, ModalButton } from "@/components/shared";
+import { showErrorAlert } from "@/lib/utils/alerts";
+import { logger } from "@/lib/utils/logger";
 import { BorderRadius, Spacing, Typography } from "@/styles";
 import { useThemeColors } from "@/styles/theme";
 import { Ionicons } from "@expo/vector-icons";
@@ -59,8 +61,10 @@ export default function RejectRequestModal({
       setSelectedQuickReason(null);
       onClose();
     } catch (err) {
-      console.error("Reject request failed:", err);
-      setError("Failed to reject request. Please try again.");
+      logger.error("Reject request failed", err, {
+        module: "RejectRequestModal",
+      });
+      showErrorAlert(err);
     } finally {
       setLoading(false);
     }

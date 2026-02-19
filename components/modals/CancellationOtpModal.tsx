@@ -1,5 +1,7 @@
 // components/modals/CancellationOtpModal.tsx
 import { BaseModal, ModalButton } from "@/components/shared";
+import { parseOtpError } from "@/lib/utils/errorHandling";
+import { logger } from "@/lib/utils/logger";
 import { BorderRadius, Spacing, Typography, withOpacity } from "@/styles";
 import { useThemeColors } from "@/styles/theme";
 import { Ionicons } from "@expo/vector-icons";
@@ -58,17 +60,12 @@ export default function CancellationOtpModal({
       } else {
         setError("Invalid OTP. Please check with the sender and try again.");
       }
-    } catch (err: any) {
-      console.error("Verify cancellation OTP failed:", err);
-      // FIX: use exact code matching instead of fragile substring matching
-      const code = err.message;
-      if (code === "invalid_otp") {
-        setError("Invalid OTP. Please check and try again.");
-      } else if (code === "expired") {
-        setError("This OTP has expired. Please contact support.");
-      } else {
-        setError(err.message || "Failed to verify OTP. Please try again.");
-      }
+    } catch (err) {
+      logger.error("Verify cancellation OTP failed", err, {
+        module: "CancellationOtpModal",
+      });
+      const parsed = parseOtpError(err, "cancellation");
+      setError(parsed.userMessage);
     } finally {
       setLoading(false);
     }
