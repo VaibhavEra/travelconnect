@@ -1,3 +1,7 @@
+// app/_layout.tsx
+import { useAuthStore } from "@/stores/authStore";
+import { useModeStore } from "@/stores/modeStore";
+import { useThemeColors } from "@/styles/theme";
 import {
   Slot,
   useRootNavigationState,
@@ -6,10 +10,7 @@ import {
 } from "expo-router";
 import { useEffect } from "react";
 import { ActivityIndicator, StyleSheet, View } from "react-native";
-
-import { useAuthStore } from "@/stores/authStore";
-import { useModeStore } from "@/stores/modeStore";
-import { useThemeColors } from "@/styles/theme";
+import { Toaster } from "sonner-native";
 
 export default function RootLayout() {
   const colors = useThemeColors();
@@ -91,7 +92,12 @@ export default function RootLayout() {
     );
   }
 
-  return <Slot />;
+  return (
+    <>
+      <Slot />
+      <Toaster />
+    </>
+  );
 }
 
 const styles = StyleSheet.create({
