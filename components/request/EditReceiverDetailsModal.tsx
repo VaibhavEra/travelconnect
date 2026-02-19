@@ -1,5 +1,9 @@
+// components/request/EditReceiverDetailsModal.tsx
 import TextInput from "@/components/forms/TextInput";
+import { showErrorAlert } from "@/lib/utils/alerts";
 import { haptics } from "@/lib/utils/haptics";
+import { logger } from "@/lib/utils/logger";
+import { showSuccessToast } from "@/lib/utils/toast";
 import {
   RequestEditReceiverFormData,
   requestEditReceiverSchema,
@@ -13,7 +17,6 @@ import { useEffect } from "react";
 import { Controller, useForm } from "react-hook-form";
 import {
   ActivityIndicator,
-  Alert,
   KeyboardAvoidingView,
   Modal,
   Platform,
@@ -75,16 +78,15 @@ export default function EditReceiverDetailsModal({
       );
 
       haptics.success();
-      Alert.alert("Success", "Receiver details updated successfully");
+      showSuccessToast("Receiver details updated successfully");
       onSuccess();
       onClose();
-    } catch (error: any) {
-      console.error("Update error:", error);
+    } catch (error) {
+      logger.error("Update receiver details failed", error, {
+        module: "EditReceiverDetailsModal",
+      });
       haptics.error();
-      Alert.alert(
-        "Error",
-        error.message || "Failed to update receiver details",
-      );
+      showErrorAlert(error);
     }
   };
 

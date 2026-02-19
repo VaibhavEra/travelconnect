@@ -1,10 +1,17 @@
 // stores/authStore.ts
 import { supabase } from "@/lib/supabase";
+import {
+  createAppError,
+  isAppError,
+  parseSupabaseError,
+} from "@/lib/utils/errorHandling";
 import { logger } from "@/lib/utils/logger";
 import { Database } from "@/types/database.types";
 import { Session, User } from "@supabase/supabase-js";
 import { create } from "zustand";
 import { useProfileStore } from "./profileStore";
+
+const MODULE = "authStore";
 
 // Type for profile from database
 type Profile = Database["public"]["Tables"]["profiles"]["Row"];
@@ -187,7 +194,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
 
       authSubscription = subscription;
     } catch (error) {
-      logger.error("Initialize auth failed", error);
+      logger.error("Initialize auth failed", error, { module: MODULE });
       set({ loading: false });
     }
   },
@@ -200,15 +207,18 @@ export const useAuthStore = create<AuthState>((set, get) => ({
         password,
       });
 
-      // Check for specific error about email confirmation
       if (error) {
-        logger.error("Supabase auth error", error);
+        // Email not confirmed — use code check first, message as fallback
+        if (
+          error.code === "email_not_confirmed" ||
+          error.message.includes("Email not confirmed")
+        ) {
+          logger.info(
+            "Email verification required",
+            { email },
+            { module: MODULE },
+          );
 
-        // Email not confirmed error
-        if (error.message.includes("Email not confirmed")) {
-          logger.info("Email verification required", { email });
-
-          // Set pending verification with available info
           set({
             flowState: AuthFlowState.SIGNUP_OTP_SENT,
             flowContext: {
@@ -225,21 +235,25 @@ export const useAuthStore = create<AuthState>((set, get) => ({
             },
           });
 
-          // Throw custom error for the login screen to handle
-          const customError = new Error("EMAIL_NOT_VERIFIED");
-          customError.name = "EmailNotVerifiedError";
-          throw customError;
+          // Throw typed AppError so screens use .code instead of .name check
+          throw createAppError(
+            "EMAIL_NOT_VERIFIED",
+            "Please verify your email before logging in.",
+            error,
+          );
         }
 
-        // Other auth errors (wrong password, etc.)
-        throw error;
+        // All other Supabase auth errors
+        throw parseSupabaseError(error);
       }
 
       // Successful login - additional verification check (if Supabase allows unverified logins)
       if (data.user && !data.user.email_confirmed_at) {
-        logger.warn("User email not verified (backup check)", {
-          email: data.user.email,
-        });
+        logger.warn(
+          "User email not verified (backup check)",
+          { email: data.user.email },
+          { module: MODULE },
+        );
 
         set({
           flowState: AuthFlowState.SIGNUP_OTP_SENT,
@@ -259,9 +273,10 @@ export const useAuthStore = create<AuthState>((set, get) => ({
         // Sign out the session
         await supabase.auth.signOut();
 
-        const customError = new Error("EMAIL_NOT_VERIFIED");
-        customError.name = "EmailNotVerifiedError";
-        throw customError;
+        throw createAppError(
+          "EMAIL_NOT_VERIFIED",
+          "Please verify your email before logging in.",
+        );
       }
 
       // Fetch profile
@@ -271,7 +286,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
         .eq("id", data.user.id)
         .single();
 
-      if (profileError) throw profileError;
+      if (profileError) throw parseSupabaseError(profileError);
 
       // Sync profile to profileStore
       useProfileStore.getState().setProfile(profile);
@@ -285,9 +300,16 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       // Clear failed login attempts after successful login
       await get().clearFailedAttempts(email);
       logger.info("Failed login attempts cleared after successful login");
-    } catch (error: any) {
-      logger.error("Sign in failed", error);
-      throw error;
+    } catch (error) {
+      // Re-throw AppErrors (already parsed above) as-is
+      // Re-throw raw Supabase errors after parsing
+      if (isAppError(error)) {
+        logger.error("Sign in failed", error, { module: MODULE });
+        throw error;
+      }
+      const appError = parseSupabaseError(error);
+      logger.error("Sign in failed", error, { module: MODULE });
+      throw appError;
     }
   },
 
@@ -317,8 +339,9 @@ export const useAuthStore = create<AuthState>((set, get) => ({
         },
       });
 
-      if (authError) throw authError;
-      if (!authData.user) throw new Error("User creation failed");
+      if (authError) throw parseSupabaseError(authError);
+      if (!authData.user)
+        throw createAppError("UNKNOWN", "User creation failed.");
 
       // Store flow context (NEW)
       set({
@@ -337,8 +360,9 @@ export const useAuthStore = create<AuthState>((set, get) => ({
         },
       });
     } catch (error) {
-      logger.error("Sign up failed", error);
-      throw error;
+      logger.error("Sign up failed", error, { module: MODULE });
+      if (isAppError(error)) throw error;
+      throw parseSupabaseError(error);
     }
   },
 
@@ -351,7 +375,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
         type: "signup",
       });
 
-      if (error) throw error;
+      if (error) throw parseSupabaseError(error);
 
       // After successful verification, fetch/create profile
       if (data.user) {
@@ -383,8 +407,13 @@ export const useAuthStore = create<AuthState>((set, get) => ({
         const profile = await fetchProfile();
 
         if (!profile) {
-          logger.error("Profile creation failed after verification");
-          throw new Error(
+          logger.error(
+            "Profile creation failed after verification",
+            undefined,
+            { module: MODULE },
+          );
+          throw createAppError(
+            "UNKNOWN",
             "Account created but profile setup incomplete. Please contact support.",
           );
         }
@@ -401,8 +430,9 @@ export const useAuthStore = create<AuthState>((set, get) => ({
         });
       }
     } catch (error) {
-      logger.error("Email OTP verification failed", error);
-      throw error;
+      logger.error("Email OTP verification failed", error, { module: MODULE });
+      if (isAppError(error)) throw error;
+      throw parseSupabaseError(error);
     }
   },
 
@@ -414,11 +444,12 @@ export const useAuthStore = create<AuthState>((set, get) => ({
         email,
       });
 
-      if (error) throw error;
+      if (error) throw parseSupabaseError(error);
       logger.info("OTP resent successfully", { email });
     } catch (error) {
-      logger.error("Resend email OTP failed", error);
-      throw error;
+      logger.error("Resend email OTP failed", error, { module: MODULE });
+      if (isAppError(error)) throw error;
+      throw parseSupabaseError(error);
     }
   },
 
@@ -448,7 +479,9 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       // THEN do async operations (moved after state clear)
       const { error } = await supabase.auth.signOut();
       if (error) {
-        logger.error("Sign out error (non-blocking)", error);
+        logger.error("Sign out error (non-blocking)", error, {
+          module: MODULE,
+        });
       }
 
       // Clear failed login attempts on logout
@@ -457,7 +490,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
         logger.info("Failed login attempts cleared on logout");
       }
     } catch (error) {
-      logger.error("Sign out failed", error);
+      logger.error("Sign out failed", error, { module: MODULE });
       // Ensure state is cleared even on error
       set({
         session: null,
@@ -477,7 +510,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
         redirectTo: "travelconnect://reset-password",
       });
 
-      if (error) throw error;
+      if (error) throw parseSupabaseError(error);
 
       // Set flow state (NEW)
       set({
@@ -490,8 +523,9 @@ export const useAuthStore = create<AuthState>((set, get) => ({
 
       logger.info("Password recovery OTP sent", { email });
     } catch (error) {
-      logger.error("Reset password failed", error);
-      throw error;
+      logger.error("Reset password failed", error, { module: MODULE });
+      if (isAppError(error)) throw error;
+      throw parseSupabaseError(error);
     }
   },
 
@@ -504,7 +538,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
         type: "recovery",
       });
 
-      if (error) throw error;
+      if (error) throw parseSupabaseError(error);
 
       // User now has RECOVERY session with expiry (NEW)
       const resetSessionExpiry = Date.now() + 10 * 60 * 1000; // 10 minutes
@@ -522,8 +556,11 @@ export const useAuthStore = create<AuthState>((set, get) => ({
 
       logger.info("Recovery OTP verified successfully");
     } catch (error) {
-      logger.error("Recovery OTP verification failed", error);
-      throw error;
+      logger.error("Recovery OTP verification failed", error, {
+        module: MODULE,
+      });
+      if (isAppError(error)) throw error;
+      throw parseSupabaseError(error);
     }
   },
 
@@ -536,7 +573,8 @@ export const useAuthStore = create<AuthState>((set, get) => ({
         !flowContext?.resetSessionExpiry ||
         Date.now() > flowContext.resetSessionExpiry
       ) {
-        throw new Error(
+        throw createAppError(
+          "OTP_EXPIRED",
           "Reset session has expired. Please request a new code.",
         );
       }
@@ -545,7 +583,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
         password: newPassword,
       });
 
-      if (error) throw error;
+      if (error) throw parseSupabaseError(error);
 
       // Fetch profile after password update
       const currentUser = get().user;
@@ -576,8 +614,9 @@ export const useAuthStore = create<AuthState>((set, get) => ({
 
       logger.info("Password updated successfully");
     } catch (error) {
-      logger.error("Update password failed", error);
-      throw error;
+      logger.error("Update password failed", error, { module: MODULE });
+      if (isAppError(error)) throw error;
+      throw parseSupabaseError(error);
     }
   },
 
@@ -594,13 +633,13 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       });
 
       if (error) {
-        logger.error("Check account locked failed", error);
+        logger.error("Check account locked failed", error, { module: MODULE });
         return false; // Fail open - don't block user if check fails
       }
 
       return data as boolean;
     } catch (error) {
-      logger.error("Check account locked exception", error);
+      logger.error("Check account locked exception", error, { module: MODULE });
       return false;
     }
   },
@@ -614,10 +653,10 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       });
 
       if (error) {
-        logger.error("Record failed login failed", error);
+        logger.error("Record failed login failed", error, { module: MODULE });
       }
     } catch (error) {
-      logger.error("Record failed login exception", error);
+      logger.error("Record failed login exception", error, { module: MODULE });
     }
   },
 
@@ -629,10 +668,12 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       });
 
       if (error) {
-        logger.error("Clear failed attempts failed", error);
+        logger.error("Clear failed attempts failed", error, { module: MODULE });
       }
     } catch (error) {
-      logger.error("Clear failed attempts exception", error);
+      logger.error("Clear failed attempts exception", error, {
+        module: MODULE,
+      });
     }
   },
 }));

@@ -1,4 +1,7 @@
+// components/modals/VerifyOtpModal.tsx
 import { BaseModal, ModalButton } from "@/components/shared";
+import { parseOtpError } from "@/lib/utils/errorHandling";
+import { logger } from "@/lib/utils/logger";
 import { BorderRadius, Spacing, Typography, withOpacity } from "@/styles";
 import { useThemeColors } from "@/styles/theme";
 import { Ionicons } from "@expo/vector-icons";
@@ -186,27 +189,18 @@ export default function VerifyOtpModal({
       } else {
         setError("Invalid or expired OTP. Please try again.");
       }
-    } catch (err: any) {
-      const code = err.message;
+    } catch (err) {
+      logger.error("Verify OTP failed", err, { module: "VerifyOtpModal" });
+      const parsed = parseOtpError(err, type);
 
-      if (code === "blocked") {
+      if (parsed.isBlocked && blockSecondsRemaining > 0) {
         const mins = Math.floor(blockSecondsRemaining / 60);
         const secs = blockSecondsRemaining % 60;
         setError(
-          blockSecondsRemaining > 0
-            ? `Too many failed attempts. Try again in ${mins}:${secs.toString().padStart(2, "0")}`
-            : "Too many failed attempts. Please wait before trying again.",
+          `Too many failed attempts. Try again in ${mins}:${secs.toString().padStart(2, "0")}`,
         );
-      } else if (code === "expired") {
-        setError(
-          type === "pickup"
-            ? "This OTP has expired. Please contact the sender."
-            : "This OTP has expired. Please contact support.",
-        );
-      } else if (code === "invalid_otp") {
-        setError("Invalid OTP. Please check and try again.");
       } else {
-        setError(err.message || "Failed to verify OTP. Please try again.");
+        setError(parsed.userMessage);
       }
     } finally {
       setLoading(false);

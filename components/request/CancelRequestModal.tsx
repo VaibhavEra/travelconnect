@@ -1,4 +1,6 @@
+// components/request/CancelRequestModal.tsx
 import { BaseModal, ModalButton } from "@/components/shared";
+import { logger } from "@/lib/utils/logger";
 import { BorderRadius, Spacing, Typography } from "@/styles";
 import { useThemeColors } from "@/styles/theme";
 import { Ionicons } from "@expo/vector-icons";
@@ -38,8 +40,11 @@ export default function CancelRequestModal({
       await onCancel(reason.trim() || undefined);
       setReason("");
       onClose();
-    } catch (error: any) {
-      // Error handling in parent component
+    } catch (error) {
+      // Error display handled in parent component
+      logger.error("Cancel request failed", error, {
+        module: "CancelRequestModal",
+      });
     } finally {
       setLoading(false);
     }

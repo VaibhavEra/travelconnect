@@ -1,4 +1,7 @@
+// components/auth/FileUploadButton.tsx
+import { showErrorAlert } from "@/lib/utils/alerts";
 import { haptics } from "@/lib/utils/haptics";
+import { logger } from "@/lib/utils/logger";
 import { BorderRadius, Spacing, Typography } from "@/styles";
 import { useThemeColors } from "@/styles/theme";
 import { Ionicons } from "@expo/vector-icons";
@@ -58,8 +61,11 @@ export default function FileUploadButton({
       // Store LOCAL URI only - no upload yet
       onChange(file.uri);
       haptics.success();
-    } catch (err: any) {
-      Alert.alert("Error", err.message || "Failed to select file");
+    } catch (err) {
+      logger.error("File selection failed", err, {
+        module: "FileUploadButton",
+      });
+      showErrorAlert(err);
       haptics.error();
     } finally {
       setIsSelecting(false);

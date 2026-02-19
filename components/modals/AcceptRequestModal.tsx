@@ -2,6 +2,7 @@
 import { BaseModal, ModalButton } from "@/components/shared";
 import { CATEGORY_CONFIG } from "@/lib/constants/categories";
 import { getSizeCapacityLabel } from "@/lib/constants/parcel";
+import { logger } from "@/lib/utils/logger";
 import { BorderRadius, Spacing, Typography } from "@/styles";
 import { useThemeColors } from "@/styles/theme";
 import { Ionicons } from "@expo/vector-icons";
@@ -38,7 +39,9 @@ export default function AcceptRequestModal({
     } catch (error) {
       // onAccept() in parent catches internally and shows Alert, so this
       // catch block is a safety net for unexpected throws only.
-      console.error("Accept request failed:", error);
+      logger.error("Accept request failed", error, {
+        module: "AcceptRequestModal",
+      });
     } finally {
       setLoading(false);
     }

@@ -1,40 +1,41 @@
 // lib/utils/logger.ts
 
-/**
- * Logger utility for development and production
- *
- * - Development: Logs to console for debugging
- * - Production: Silent (can add Sentry/LogRocket later)
- *
- * __DEV__ is automatically set by React Native:
- * - true in development builds
- * - false in production (completely stripped out during minification)
- */
+type LogContext = Record<string, unknown>;
+
+interface LogMeta {
+  module?: string;
+  [key: string]: unknown;
+}
+
+const formatMessage = (message: string, meta?: LogMeta): string => {
+  return meta?.module ? `[${meta.module}] ${message}` : message;
+};
 
 export const logger = {
-  info: (message: string, ...args: any[]) => {
+  info: (message: string, context?: LogContext, meta?: LogMeta) => {
     if (__DEV__) {
-      console.log(`[INFO] ${message}`, ...args);
+      console.log(`[INFO] ${formatMessage(message, meta)}`, context ?? "");
     }
     // TODO: Add analytics service in production (e.g., Mixpanel, Amplitude)
   },
 
-  error: (message: string, error?: any) => {
+  error: (message: string, error?: unknown, meta?: LogMeta) => {
     if (__DEV__) {
-      console.error(`[ERROR] ${message}`, error);
+      console.error(`[ERROR] ${formatMessage(message, meta)}`, error ?? "");
     }
     // TODO: Add error tracking in production (e.g., Sentry)
+    // e.g. Sentry.captureException(error, { extra: { message, ...meta } })
   },
 
-  warn: (message: string, ...args: any[]) => {
+  warn: (message: string, context?: LogContext, meta?: LogMeta) => {
     if (__DEV__) {
-      console.warn(`[WARN] ${message}`, ...args);
+      console.warn(`[WARN] ${formatMessage(message, meta)}`, context ?? "");
     }
   },
 
-  debug: (message: string, ...args: any[]) => {
+  debug: (message: string, context?: LogContext, meta?: LogMeta) => {
     if (__DEV__) {
-      console.log(`[DEBUG] ${message}`, ...args);
+      console.log(`[DEBUG] ${formatMessage(message, meta)}`, context ?? "");
     }
   },
 };

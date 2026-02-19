@@ -3,7 +3,10 @@ import CategoryCheckboxes from "@/components/forms/CategoryCheckboxes";
 import ParcelSizeSelector from "@/components/forms/ParcelSizeSelector";
 import TextInput from "@/components/forms/TextInput";
 import BaseModal from "@/components/shared/BaseModal";
+import { showErrorAlert } from "@/lib/utils/alerts";
 import { haptics } from "@/lib/utils/haptics";
+import { logger } from "@/lib/utils/logger";
+import { showSuccessToast } from "@/lib/utils/toast";
 import {
   TripEditDetailsFormData,
   tripEditDetailsSchema,
@@ -83,11 +86,14 @@ export default function EditTripDetailsModal({
       });
 
       haptics.success();
-      Alert.alert("Success", "Trip details updated successfully");
+      showSuccessToast("Trip details updated successfully");
       onClose();
-    } catch (error: any) {
+    } catch (error) {
+      logger.error("Update trip details failed", error, {
+        module: "EditTripDetailsModal",
+      });
       haptics.error();
-      Alert.alert("Error", error.message || "Failed to update trip details");
+      showErrorAlert(error);
     } finally {
       setLoading(false);
       setChecking(false);

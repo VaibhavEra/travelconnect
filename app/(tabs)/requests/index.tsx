@@ -12,6 +12,7 @@ import {
   IncomingRequestFilterKey,
 } from "@/lib/constants/filters";
 import { haptics } from "@/lib/utils/haptics";
+import { showSuccessToast } from "@/lib/utils/toast";
 import { useAuthStore } from "@/stores/authStore";
 import { useModeStore } from "@/stores/modeStore";
 import { useRequestStore } from "@/stores/requestStore";
@@ -22,7 +23,6 @@ import { useFocusEffect } from "expo-router";
 import { useCallback, useState } from "react";
 import {
   ActivityIndicator,
-  Alert,
   Pressable,
   RefreshControl,
   ScrollView,
@@ -202,8 +202,7 @@ export default function RequestsScreen() {
 
       if (isValid && user) {
         setOtpModalVisible(false);
-        Alert.alert(
-          "Success",
+        showSuccessToast(
           otpType === "pickup"
             ? "Parcel marked as picked up!"
             : "Parcel marked as delivered!",

@@ -1,7 +1,11 @@
+// components/request/EditRequestDetailsModal.tsx
 import ImagePicker from "@/components/forms/ImagePicker";
 import TextInput from "@/components/forms/TextInput";
 import { CATEGORY_CONFIG } from "@/lib/constants/categories";
+import { showErrorAlert } from "@/lib/utils/alerts";
 import { haptics } from "@/lib/utils/haptics";
+import { logger } from "@/lib/utils/logger";
+import { showSuccessToast } from "@/lib/utils/toast";
 import {
   RequestEditDetailsFormData,
   requestEditDetailsSchema,
@@ -15,7 +19,6 @@ import { useEffect } from "react";
 import { Controller, useForm } from "react-hook-form";
 import {
   ActivityIndicator,
-  Alert,
   KeyboardAvoidingView,
   Modal,
   Platform,
@@ -84,13 +87,15 @@ export default function EditRequestDetailsModal({
       );
 
       haptics.success();
-      Alert.alert("Success", "Request details updated successfully");
+      showSuccessToast("Request details updated successfully");
       onSuccess();
       onClose();
-    } catch (error: any) {
-      console.error("Update error:", error);
+    } catch (error) {
+      logger.error("Update request details failed", error, {
+        module: "EditRequestDetailsModal",
+      });
       haptics.error();
-      Alert.alert("Error", error.message || "Failed to update request details");
+      showErrorAlert(error);
     }
   };
 

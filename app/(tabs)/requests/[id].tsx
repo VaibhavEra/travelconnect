@@ -10,8 +10,11 @@ import {
 } from "@/lib/constants/parcel";
 import { REQUEST_STATUS_CONFIG, RequestStatus } from "@/lib/constants/status";
 import { TRANSPORT_ICONS, TransportMode } from "@/lib/constants/transport";
+import { showErrorAlert, showSessionAlert } from "@/lib/utils/alerts";
 import { formatDate, formatTime } from "@/lib/utils/dateTime";
 import { haptics } from "@/lib/utils/haptics";
+import { logger } from "@/lib/utils/logger";
+import { showSuccessToast } from "@/lib/utils/toast";
 import { useRequestStore } from "@/stores/requestStore";
 import { BorderRadius, Spacing, Typography } from "@/styles";
 import { useThemeColors } from "@/styles/theme";
@@ -20,7 +23,6 @@ import { router, useLocalSearchParams } from "expo-router";
 import { useEffect, useState } from "react";
 import {
   ActivityIndicator,
-  Alert,
   Linking,
   Pressable,
   ScrollView,
@@ -34,6 +36,8 @@ import Animated, {
   withSpring,
 } from "react-native-reanimated";
 import { SafeAreaView } from "react-native-safe-area-context";
+
+const MODULE = "IncomingRequestDetailsScreen";
 
 export default function IncomingRequestDetailsScreen() {
   const colors = useThemeColors();
@@ -68,12 +72,15 @@ export default function IncomingRequestDetailsScreen() {
     try {
       await acceptRequest(id);
       haptics.success();
-      Alert.alert("Request Accepted!", "The sender has been notified.", [
-        { text: "OK", onPress: () => router.back() },
-      ]);
-    } catch (error: any) {
+      showSessionAlert(
+        "Request Accepted!",
+        "The sender has been notified.",
+        () => router.back(),
+      );
+    } catch (error) {
       haptics.error();
-      Alert.alert("Error", error.message || "Failed to accept request");
+      logger.error("Failed to accept request", error, { module: MODULE });
+      showErrorAlert(error);
     }
   };
 
@@ -81,12 +88,15 @@ export default function IncomingRequestDetailsScreen() {
     try {
       await rejectRequest(id, reason);
       haptics.success();
-      Alert.alert("Request Rejected", "The sender has been notified.", [
-        { text: "OK", onPress: () => router.back() },
-      ]);
-    } catch (error: any) {
+      showSessionAlert(
+        "Request Rejected",
+        "The sender has been notified.",
+        () => router.back(),
+      );
+    } catch (error) {
       haptics.error();
-      Alert.alert("Error", error.message || "Failed to reject request");
+      logger.error("Failed to reject request", error, { module: MODULE });
+      showErrorAlert(error);
     }
   };
 
@@ -105,12 +115,12 @@ export default function IncomingRequestDetailsScreen() {
       const isValid = await verifyPickupOtp(id, otp);
       if (isValid) {
         setPickupOtpModalVisible(false);
-        Alert.alert("Success", "Parcel marked as picked up!");
+        showSuccessToast("Parcel marked as picked up!");
         await getRequestById(id);
       }
       return isValid;
     } catch (error) {
-      console.error("Verify pickup OTP failed:", error);
+      logger.error("Verify pickup OTP failed", error, { module: MODULE });
       throw error;
     }
   };
@@ -120,12 +130,12 @@ export default function IncomingRequestDetailsScreen() {
       const isValid = await verifyDeliveryOtp(id, otp);
       if (isValid) {
         setDeliveryOtpModalVisible(false);
-        Alert.alert("Success", "Parcel marked as delivered!");
+        showSuccessToast("Parcel marked as delivered!");
         await getRequestById(id);
       }
       return isValid;
     } catch (error) {
-      console.error("Verify delivery OTP failed:", error);
+      logger.error("Verify delivery OTP failed", error, { module: MODULE });
       throw error;
     }
   };

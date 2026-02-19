@@ -1,8 +1,8 @@
 import AuthLayout from "@/components/auth/AuthLayout";
 import FormInput from "@/components/auth/FormInput";
 import ProgressIndicator from "@/components/auth/ProgressIndicator";
+import { showErrorAlert } from "@/lib/utils/alerts";
 import { availabilityCheck } from "@/lib/utils/availabilityCheck";
-import { parseSupabaseError } from "@/lib/utils/errorHandling";
 import { haptics } from "@/lib/utils/haptics";
 import { useNetworkStatus } from "@/lib/utils/network";
 import { rateLimitConfigs, rateLimiter } from "@/lib/utils/rateLimit";
@@ -229,17 +229,16 @@ export default function RegisterStep2Screen() {
       router.replace("/(auth)/register/step-3-verify");
     } catch (error: any) {
       haptics.error();
-      const errorMessage = parseSupabaseError(error);
 
       // Update availability states
-      if (errorMessage.includes("Username already taken")) {
+      if (error.code === "DUPLICATE_USERNAME") {
         setUsernameAvailable(false);
       }
-      if (errorMessage.includes("Phone number already registered")) {
+      if (error.code === "DUPLICATE_PHONE") {
         setPhoneAvailable(false);
       }
 
-      Alert.alert("Registration Failed", errorMessage);
+      showErrorAlert(error);
     } finally {
       setLoading(false);
     }
@@ -421,7 +420,7 @@ export default function RegisterStep2Screen() {
 const styles = StyleSheet.create({
   backButton: {
     position: "absolute",
-    top: Spacing.md, // FIXED: Now relative to safe area
+    top: Spacing.md,
     left: Spacing.lg,
     zIndex: 10,
     width: 40,
@@ -429,7 +428,6 @@ const styles = StyleSheet.create({
     borderRadius: 20,
     alignItems: "center",
     justifyContent: "center",
-    // Subtle shadow for depth
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,

@@ -1,6 +1,6 @@
 import AuthLayout from "@/components/auth/AuthLayout";
 import FormInput from "@/components/auth/FormInput";
-import { parseSupabaseError } from "@/lib/utils/errorHandling";
+import { showErrorAlert } from "@/lib/utils/alerts";
 import { haptics } from "@/lib/utils/haptics";
 import { getPasswordStrength } from "@/lib/utils/passwordStrength";
 import { NewPasswordFormData, newPasswordSchema } from "@/lib/validations/auth";
@@ -70,24 +70,7 @@ export default function ResetNewPasswordScreen() {
       ]);
       return;
     }
-
-    // Check expiry timestamp
-    if (
-      flowContext?.resetSessionExpiry &&
-      Date.now() > flowContext.resetSessionExpiry
-    ) {
-      Alert.alert(
-        "Session Expired",
-        "Your reset session has expired. Please request a new code.",
-        [
-          {
-            text: "OK",
-            onPress: () => router.replace("/(auth)/reset-password"),
-          },
-        ],
-      );
-    }
-  }, [session, flowState, flowContext]);
+  }, [session, flowState]);
 
   const onSubmit = async (data: NewPasswordFormData) => {
     setLoading(true);
@@ -100,14 +83,13 @@ export default function ResetNewPasswordScreen() {
         [
           {
             text: "Continue",
-            onPress: () => router.replace("/(tabs)/explore"), // FIXED
+            onPress: () => router.replace("/(tabs)/explore"),
           },
         ],
       );
     } catch (error: any) {
       haptics.error();
-      const errorMessage = parseSupabaseError(error);
-      Alert.alert("Error", errorMessage);
+      showErrorAlert(error);
     } finally {
       setLoading(false);
     }
