@@ -3353,6 +3353,95 @@ end-to-end despite the backend being fully functional:
 
 ---
 
+### Issue #28 - Clear OTP fields on terminal request states ✅
+
+**Type:** Backend-Only Fix (Supabase SQL Editor)
+**Priority:** HIGH
+**Time:** 30 minutes
+**Date:** 2026-02-19
+
+**Problem:**
+
+The `clear_otp_after_use` trigger only cleared OTP fields on the two
+normal happy-path transitions:
+
+- `accepted → picked_up` (cleared pickup OTP)
+- `picked_up → delivered` (cleared delivery OTP)
+
+This left OTP fields (`pickup_otp`, `pickup_otp_expiry`,
+`delivery_otp`, `delivery_otp_expiry`, `cancellation_otp`,
+`cancellation_otp_expiry`) and brute-force counters
+(`failed_pickup_attempts`, `pickup_blocked_until`,
+`failed_delivery_attempts`, `delivery_blocked_until`) populated on rows
+that transitioned to terminal states (`cancelled`, `rejected`,
+`expired`, `failed`) — a data hygiene and minor security concern.
+
+**Root Cause Analysis:**
+
+`verify_cancellation_otp_and_cancel_trip` already clears
+`cancellation_otp` / `cancellation_otp_expiry` in its own UPDATE, so
+that path was already correct. The real gap was the cascade path:
+`cascade_trip_cancellation` sets `status = 'cancelled'` on picked-up
+requests without clearing any OTP fields, leaving `cancellation_otp`
+populated on cancelled rows.
+
+**Backend Changes (Applied via Supabase SQL Editor - 2026-02-19):**
+
+1. **`clear_otp_after_use()` trigger function** (Updated)
+   - **Added:** Third `ELSIF` branch handling all terminal states:
+     `cancelled`, `rejected`, `expired`, `failed`
+   - **Clears on terminal transition:**
+     - `pickup_otp = NULL`
+     - `pickup_otp_expiry = NULL`
+     - `failed_pickup_attempts = 0`
+     - `pickup_blocked_until = NULL`
+     - `delivery_otp = NULL`
+     - `delivery_otp_expiry = NULL`
+     - `failed_delivery_attempts = 0`
+     - `delivery_blocked_until = NULL`
+     - `cancellation_otp = NULL`
+     - `cancellation_otp_expiry = NULL`
+   - **Kept:** Existing `accepted → picked_up` and `picked_up →
+delivered` branches unchanged
+   - **No trigger DDL change** — timing (`BEFORE UPDATE`), event, and
+     `WHEN` condition unchanged
+
+**How It Works Now:**
+
+| Transition                                            | OTPs Cleared?                      |
+| ----------------------------------------------------- | ---------------------------------- |
+| `accepted → picked_up`                                | ✅ pickup OTP (existing)           |
+| `picked_up → delivered`                               | ✅ delivery OTP (existing)         |
+| Any → `cancelled` / `rejected` / `expired` / `failed` | ✅ all OTP fields + counters (new) |
+
+**Verification:**
+
+```sql
+SELECT pg_get_functiondef(oid)
+FROM pg_proc
+WHERE proname = 'clear_otp_after_use';
+```
+
+**Database Objects Touched:**
+
+1. Function: `clear_otp_after_use()` — body updated, signature
+   unchanged
+
+**Frontend Changes:**
+
+- None — trigger fires automatically on status transition
+
+**Type Updates:**
+
+- None required
+
+**Related Issues:**
+
+- Related to: Issue #2 (cancellation flow) ✅
+- Related to: Issue #20 (OTP brute force protection) ✅
+
+---
+
 ## Technical Implementation
 
 ### Files Changed
