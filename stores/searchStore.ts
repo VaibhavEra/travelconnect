@@ -1,8 +1,10 @@
 import { supabase } from "@/lib/supabase";
-import { parseSupabaseError } from "@/lib/utils/errorHandling";
+import { AppError, parseSupabaseError } from "@/lib/utils/errorHandling";
 import { logger } from "@/lib/utils/logger";
 import { Trip } from "@/stores/tripStore";
 import { create } from "zustand";
+
+const MODULE = "searchStore";
 
 interface SearchFilters {
   source: string;
@@ -16,7 +18,7 @@ interface SearchState {
   filters: SearchFilters;
   results: Trip[];
   loading: boolean;
-  error: string | null;
+  error: AppError | null;
 
   // Actions
   setFilters: (filters: Partial<SearchFilters>) => void;
@@ -118,7 +120,7 @@ export const useSearchStore = create<SearchState>((set, get) => ({
       const { data: trips, error } = await query;
 
       if (error) {
-        logger.error("Search query error", error);
+        logger.error("Search query error", error, { module: MODULE });
         throw error;
       }
 
@@ -129,10 +131,10 @@ export const useSearchStore = create<SearchState>((set, get) => ({
         count: normalizedTrips.length,
         filters,
       });
-    } catch (error: any) {
-      const errorMessage = parseSupabaseError(error);
-      logger.error("Search failed", error);
-      set({ loading: false, error: errorMessage, results: [] });
+    } catch (error) {
+      const appError = parseSupabaseError(error);
+      logger.error("Search failed", error, { module: MODULE });
+      set({ loading: false, error: appError, results: [] });
     }
   },
 

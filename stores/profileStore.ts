@@ -1,8 +1,11 @@
 // stores/profileStore.ts
 import { supabase } from "@/lib/supabase";
+import { isAppError, parseSupabaseError } from "@/lib/utils/errorHandling";
 import { logger } from "@/lib/utils/logger";
 import { Database } from "@/types/database.types";
 import { create } from "zustand";
+
+const MODULE = "profileStore";
 
 // Type for profile from database
 type Profile = Database["public"]["Tables"]["profiles"]["Row"];
@@ -47,9 +50,10 @@ export const useProfileStore = create<ProfileState>((set, get) => ({
       set({ profile, loading: false });
       logger.info("Profile refreshed", { username: profile.username });
     } catch (error) {
-      logger.error("Refresh profile failed", error);
+      logger.error("Refresh profile failed", error, { module: MODULE });
       set({ loading: false });
-      throw error;
+      if (isAppError(error)) throw error;
+      throw parseSupabaseError(error);
     }
   },
 
@@ -70,9 +74,10 @@ export const useProfileStore = create<ProfileState>((set, get) => ({
       set({ profile, loading: false });
       logger.info("Profile updated", { updates });
     } catch (error) {
-      logger.error("Update profile failed", error);
+      logger.error("Update profile failed", error, { module: MODULE });
       set({ loading: false });
-      throw error;
+      if (isAppError(error)) throw error;
+      throw parseSupabaseError(error);
     }
   },
 }));

@@ -1,9 +1,17 @@
+// stores/tripStore.ts
 import { supabase } from "@/lib/supabase";
-import { parseSupabaseError } from "@/lib/utils/errorHandling";
+import {
+  AppError,
+  createAppError,
+  isAppError,
+  parseSupabaseError,
+} from "@/lib/utils/errorHandling";
 import { logger } from "@/lib/utils/logger";
 import { TripFormData } from "@/lib/validations/trip";
 import { Database } from "@/types/database.types";
 import { create } from "zustand";
+
+const MODULE = "tripStore";
 
 // Type for trip from database (with proper non-null assertions)
 type DbTrip = Database["public"]["Tables"]["trips"]["Row"];
@@ -61,7 +69,7 @@ interface TripState {
   trips: Trip[];
   currentTrip: Trip | null;
   loading: boolean;
-  error: string | null;
+  error: AppError | null;
 
   // Actions
   createTrip: (data: TripFormData, userId: string) => Promise<Trip>;
@@ -119,6 +127,19 @@ const normalizeTrip = (dbTrip: DbTrip): Trip => {
   };
 };
 
+// Internal helper — parses any error into AppError, stores it, and re-throws.
+// Only used for MUTATING actions that screens need to react to.
+const handleMutationError = (
+  error: unknown,
+  message: string,
+  setFn: (err: AppError) => void,
+): never => {
+  const appError = isAppError(error) ? error : parseSupabaseError(error);
+  logger.error(message, error, { module: MODULE });
+  setFn(appError);
+  throw appError;
+};
+
 export const useTripStore = create<TripState>((set, get) => ({
   // Initial state
   trips: [],
@@ -129,7 +150,7 @@ export const useTripStore = create<TripState>((set, get) => ({
   // ============================================================================
   // Create new trip (REMOVED notes parameter - Issue #7)
   // ============================================================================
-  createTrip: async (data: TripFormData, userId: string) => {
+  createTrip: async (data: TripFormData, userId: string): Promise<Trip> => {
     try {
       set({ loading: true, error: null });
 
@@ -177,11 +198,11 @@ export const useTripStore = create<TripState>((set, get) => ({
 
       logger.info("Trip created successfully", { tripId: normalizedTrip.id });
       return normalizedTrip;
-    } catch (error: any) {
-      const errorMessage = parseSupabaseError(error);
-      logger.error("Create trip failed", error);
-      set({ loading: false, error: errorMessage });
-      throw new Error(errorMessage);
+    } catch (error) {
+      handleMutationError(error, "Create trip failed", (appError) =>
+        set({ loading: false, error: appError }),
+      );
+      throw error; // unreachable — handleMutationError always throws
     }
   },
 
@@ -203,10 +224,10 @@ export const useTripStore = create<TripState>((set, get) => ({
 
       set({ trips: normalizedTrips, loading: false });
       logger.info("Fetched trips", { count: normalizedTrips.length });
-    } catch (error: any) {
-      const errorMessage = parseSupabaseError(error);
-      logger.error("Fetch trips failed", error);
-      set({ loading: false, error: errorMessage });
+    } catch (error) {
+      const appError = parseSupabaseError(error);
+      logger.error("Fetch trips failed", error, { module: MODULE });
+      set({ loading: false, error: appError });
     }
   },
 
@@ -237,10 +258,10 @@ export const useTripStore = create<TripState>((set, get) => ({
 
       set({ trips: normalizedTrips, loading: false });
       logger.info("Fetched available trips", { count: normalizedTrips.length });
-    } catch (error: any) {
-      const errorMessage = parseSupabaseError(error);
-      logger.error("Fetch available trips failed", error);
-      set({ loading: false, error: errorMessage, trips: [] });
+    } catch (error) {
+      const appError = parseSupabaseError(error);
+      logger.error("Fetch available trips failed", error, { module: MODULE });
+      set({ loading: false, error: appError, trips: [] });
     }
   },
 
@@ -262,10 +283,10 @@ export const useTripStore = create<TripState>((set, get) => ({
       set({ currentTrip: normalizedTrip, loading: false });
       logger.info("Fetched trip", { tripId });
       return normalizedTrip;
-    } catch (error: any) {
-      const errorMessage = parseSupabaseError(error);
-      logger.error("Get trip failed", error);
-      set({ loading: false, error: errorMessage, currentTrip: null });
+    } catch (error) {
+      const appError = parseSupabaseError(error);
+      logger.error("Get trip failed", error, { module: MODULE });
+      set({ loading: false, error: appError, currentTrip: null });
       return null;
     }
   },
@@ -278,13 +299,13 @@ export const useTripStore = create<TripState>((set, get) => ({
       });
 
       if (error) {
-        logger.error("Check edit permission failed", error);
+        logger.error("Check edit permission failed", error, { module: MODULE });
         return false;
       }
 
       return data ?? false;
     } catch (error) {
-      logger.error("canEditTrip error", error);
+      logger.error("canEditTrip error", error, { module: MODULE });
       return false;
     }
   },
@@ -297,13 +318,15 @@ export const useTripStore = create<TripState>((set, get) => ({
       });
 
       if (error) {
-        logger.error("Check date edit permission failed", error);
+        logger.error("Check date edit permission failed", error, {
+          module: MODULE,
+        });
         return false;
       }
 
       return data ?? false;
     } catch (error) {
-      logger.error("canEditTripDates error", error);
+      logger.error("canEditTripDates error", error, { module: MODULE });
       return false;
     }
   },
@@ -347,7 +370,8 @@ export const useTripStore = create<TripState>((set, get) => ({
 
       // Validate we have fields to update
       if (Object.keys(filteredUpdates).length === 0) {
-        throw new Error(
+        throw createAppError(
+          "UNKNOWN",
           "No valid fields to update. Allowed fields: parcel_size_capacity, allowed_categories, dates, pnr_number, ticket_file_url.",
         );
       }
@@ -355,7 +379,8 @@ export const useTripStore = create<TripState>((set, get) => ({
       // Check edit permission (no accepted requests)
       const canEdit = await get().canEditTrip(tripId);
       if (!canEdit) {
-        throw new Error(
+        throw createAppError(
+          "INSUFFICIENT_PRIVILEGE",
           "Cannot edit trip after pickup or in completed/cancelled state. To edit dates after acceptance (before pickup), use updateTripDates().",
         );
       }
@@ -389,11 +414,12 @@ export const useTripStore = create<TripState>((set, get) => ({
         tripId,
         updatedFields: Object.keys(filteredUpdates),
       });
-    } catch (error: any) {
-      const errorMessage = parseSupabaseError(error);
-      logger.error("Update trip general fields failed", error);
-      set({ loading: false, error: errorMessage });
-      throw new Error(errorMessage);
+    } catch (error) {
+      handleMutationError(
+        error,
+        "Update trip general fields failed",
+        (appError) => set({ loading: false, error: appError }),
+      );
     }
   },
 
@@ -414,8 +440,9 @@ export const useTripStore = create<TripState>((set, get) => ({
       // Check date edit permission
       const canEdit = await get().canEditTripDates(tripId);
       if (!canEdit) {
-        throw new Error(
-          "Cannot edit trip dates after pickup or in completed/cancelled state",
+        throw createAppError(
+          "INSUFFICIENT_PRIVILEGE",
+          "Cannot edit trip dates after pickup or in completed/cancelled state.",
         );
       }
 
@@ -431,7 +458,7 @@ export const useTripStore = create<TripState>((set, get) => ({
       );
 
       if (validationError) throw validationError;
-      if (!isValid) throw new Error("Invalid trip dates");
+      if (!isValid) throw createAppError("UNKNOWN", "Invalid trip dates.");
 
       // Update dates only with RLS protection
       const { data: trip, error } = await supabase
@@ -463,11 +490,10 @@ export const useTripStore = create<TripState>((set, get) => ({
       logger.info("Trip dates updated", { tripId });
 
       // TODO: Issue #14 - Trigger sender notification if accepted requests exist
-    } catch (error: any) {
-      const errorMessage = parseSupabaseError(error);
-      logger.error("Update trip dates failed", error);
-      set({ loading: false, error: errorMessage });
-      throw new Error(errorMessage);
+    } catch (error) {
+      handleMutationError(error, "Update trip dates failed", (appError) =>
+        set({ loading: false, error: appError }),
+      );
     }
   },
 
@@ -532,11 +558,10 @@ export const useTripStore = create<TripState>((set, get) => ({
       }
 
       logger.info("Trip status updated", { tripId, status });
-    } catch (error: any) {
-      const errorMessage = parseSupabaseError(error);
-      logger.error("Update trip status failed", error);
-      set({ loading: false, error: errorMessage });
-      throw new Error(errorMessage);
+    } catch (error) {
+      handleMutationError(error, "Update trip status failed", (appError) =>
+        set({ loading: false, error: appError }),
+      );
     }
   },
 
@@ -561,11 +586,10 @@ export const useTripStore = create<TripState>((set, get) => ({
       }));
 
       logger.info("Trip cancelled", { tripId });
-    } catch (error: any) {
-      const errorMessage = parseSupabaseError(error);
-      logger.error("Delete trip failed", error);
-      set({ loading: false, error: errorMessage });
-      throw new Error(errorMessage);
+    } catch (error) {
+      handleMutationError(error, "Delete trip failed", (appError) =>
+        set({ loading: false, error: appError }),
+      );
     }
   },
 

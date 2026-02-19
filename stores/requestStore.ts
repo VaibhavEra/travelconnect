@@ -1,8 +1,14 @@
 import { supabase } from "@/lib/supabase";
-import { parseSupabaseError } from "@/lib/utils/errorHandling";
+import {
+  AppError,
+  isAppError,
+  parseSupabaseError,
+} from "@/lib/utils/errorHandling";
 import { logger } from "@/lib/utils/logger";
 import { Database } from "@/types/database.types";
 import { create } from "zustand";
+
+const MODULE = "requestStore";
 
 // Type for parcel request from database
 type DbParcelRequest = Database["public"]["Tables"]["parcel_requests"]["Row"];
@@ -78,7 +84,7 @@ interface RequestState {
   completedRequests: ParcelRequest[]; // Issue #21: delivered + cancelled
   currentRequest: ParcelRequest | null;
   loading: boolean;
-  error: string | null;
+  error: AppError | null;
 
   // Actions
   createRequest: (data: CreateRequestData, senderId: string) => Promise<void>;
@@ -131,6 +137,19 @@ interface RequestState {
 
   clearError: () => void;
 }
+
+// Internal helper — parses any error into AppError, stores it, and re-throws.
+// Only used for MUTATING actions that screens need to react to.
+const handleMutationError = (
+  error: unknown,
+  message: string,
+  setFn: (err: AppError) => void,
+): never => {
+  const appError = isAppError(error) ? error : parseSupabaseError(error);
+  logger.error(message, error, { module: MODULE });
+  setFn(appError);
+  throw appError;
+};
 
 export const useRequestStore = create<RequestState>((set, get) => ({
   // Initial state
@@ -199,11 +218,10 @@ export const useRequestStore = create<RequestState>((set, get) => ({
       }));
 
       logger.info("Request created successfully", { requestId });
-    } catch (error: any) {
-      const errorMessage = parseSupabaseError(error);
-      logger.error("Create request failed", error);
-      set({ loading: false, error: errorMessage });
-      throw new Error(errorMessage);
+    } catch (error) {
+      handleMutationError(error, "Create request failed", (appError) =>
+        set({ loading: false, error: appError }),
+      );
     }
   },
 
@@ -240,10 +258,10 @@ export const useRequestStore = create<RequestState>((set, get) => ({
 
       set({ myRequests: (requests || []) as ParcelRequest[], loading: false });
       logger.info("Fetched my requests", { count: requests?.length || 0 });
-    } catch (error: any) {
-      const errorMessage = parseSupabaseError(error);
-      logger.error("Fetch my requests failed", error);
-      set({ loading: false, error: errorMessage, myRequests: [] });
+    } catch (error) {
+      const appError = parseSupabaseError(error);
+      logger.error("Fetch my requests failed", error, { module: MODULE });
+      set({ loading: false, error: appError, myRequests: [] });
     }
   },
 
@@ -284,10 +302,10 @@ export const useRequestStore = create<RequestState>((set, get) => ({
       logger.info("Fetched incoming requests", {
         count: requests?.length || 0,
       });
-    } catch (error: any) {
-      const errorMessage = parseSupabaseError(error);
-      logger.error("Fetch incoming requests failed", error);
-      set({ loading: false, error: errorMessage, incomingRequests: [] });
+    } catch (error) {
+      const appError = parseSupabaseError(error);
+      logger.error("Fetch incoming requests failed", error, { module: MODULE });
+      set({ loading: false, error: appError, incomingRequests: [] });
     }
   },
 
@@ -328,10 +346,10 @@ export const useRequestStore = create<RequestState>((set, get) => ({
       logger.info("Fetched accepted requests", {
         count: requests?.length || 0,
       });
-    } catch (error: any) {
-      const errorMessage = parseSupabaseError(error);
-      logger.error("Fetch accepted requests failed", error);
-      set({ loading: false, error: errorMessage, acceptedRequests: [] });
+    } catch (error) {
+      const appError = parseSupabaseError(error);
+      logger.error("Fetch accepted requests failed", error, { module: MODULE });
+      set({ loading: false, error: appError, acceptedRequests: [] });
     }
   },
 
@@ -372,10 +390,12 @@ export const useRequestStore = create<RequestState>((set, get) => ({
       logger.info("Fetched completed requests", {
         count: requests?.length || 0,
       });
-    } catch (error: any) {
-      const errorMessage = parseSupabaseError(error);
-      logger.error("Fetch completed requests failed", error);
-      set({ loading: false, error: errorMessage, completedRequests: [] });
+    } catch (error) {
+      const appError = parseSupabaseError(error);
+      logger.error("Fetch completed requests failed", error, {
+        module: MODULE,
+      });
+      set({ loading: false, error: appError, completedRequests: [] });
     }
   },
 
@@ -415,10 +435,10 @@ export const useRequestStore = create<RequestState>((set, get) => ({
       set({ currentRequest: parcelRequest, loading: false });
       logger.info("Fetched request", { requestId });
       return parcelRequest;
-    } catch (error: any) {
-      const errorMessage = parseSupabaseError(error);
-      logger.error("Get request failed", error);
-      set({ loading: false, error: errorMessage, currentRequest: null });
+    } catch (error) {
+      const appError = parseSupabaseError(error);
+      logger.error("Get request failed", error, { module: MODULE });
+      set({ loading: false, error: appError, currentRequest: null });
       return null;
     }
   },
@@ -467,11 +487,10 @@ export const useRequestStore = create<RequestState>((set, get) => ({
       }));
 
       logger.info("Request accepted", { requestId });
-    } catch (error: any) {
-      const errorMessage = parseSupabaseError(error);
-      logger.error("Accept request failed", error);
-      set({ loading: false, error: errorMessage });
-      throw new Error(errorMessage);
+    } catch (error) {
+      handleMutationError(error, "Accept request failed", (appError) =>
+        set({ loading: false, error: appError }),
+      );
     }
   },
 
@@ -512,11 +531,10 @@ export const useRequestStore = create<RequestState>((set, get) => ({
       }));
 
       logger.info("Request rejected by traveller", { requestId });
-    } catch (error: any) {
-      const errorMessage = parseSupabaseError(error);
-      logger.error("Reject request failed", error);
-      set({ loading: false, error: errorMessage });
-      throw new Error(errorMessage);
+    } catch (error) {
+      handleMutationError(error, "Reject request failed", (appError) =>
+        set({ loading: false, error: appError }),
+      );
     }
   },
 
@@ -564,11 +582,10 @@ export const useRequestStore = create<RequestState>((set, get) => ({
       }));
 
       logger.info("Request cancelled", { requestId });
-    } catch (error: any) {
-      const errorMessage = parseSupabaseError(error);
-      logger.error("Cancel request failed", error);
-      set({ loading: false, error: errorMessage });
-      throw new Error(errorMessage);
+    } catch (error) {
+      handleMutationError(error, "Cancel request failed", (appError) =>
+        set({ loading: false, error: appError }),
+      );
     }
   },
 
@@ -608,11 +625,10 @@ export const useRequestStore = create<RequestState>((set, get) => ({
       }));
 
       logger.info("Request status updated", { requestId, status });
-    } catch (error: any) {
-      const errorMessage = parseSupabaseError(error);
-      logger.error("Update status failed", error);
-      set({ loading: false, error: errorMessage });
-      throw new Error(errorMessage);
+    } catch (error) {
+      handleMutationError(error, "Update status failed", (appError) =>
+        set({ loading: false, error: appError }),
+      );
     }
   },
 
@@ -666,9 +682,9 @@ export const useRequestStore = create<RequestState>((set, get) => ({
     } catch (error: any) {
       const knownErrors = ["invalid_otp", "blocked", "expired"];
       if (!knownErrors.includes(error.message)) {
-        logger.error("Verify pickup OTP failed", error);
+        logger.error("Verify pickup OTP failed", error, { module: MODULE });
       }
-      set({ loading: false, error: error.message });
+      set({ loading: false, error: parseSupabaseError(error) });
       throw error;
     }
   },
@@ -722,9 +738,9 @@ export const useRequestStore = create<RequestState>((set, get) => ({
     } catch (error: any) {
       const knownErrors = ["invalid_otp", "blocked", "expired"];
       if (!knownErrors.includes(error.message)) {
-        logger.error("Verify delivery OTP failed", error);
+        logger.error("Verify delivery OTP failed", error, { module: MODULE });
       }
-      set({ loading: false, error: error.message });
+      set({ loading: false, error: parseSupabaseError(error) });
       throw error;
     }
   },
@@ -741,7 +757,7 @@ export const useRequestStore = create<RequestState>((set, get) => ({
       if (error) throw error;
       return data?.pickup_otp || null;
     } catch (error) {
-      logger.error("Get pickup OTP failed", error);
+      logger.error("Get pickup OTP failed", error, { module: MODULE });
       return null;
     }
   },
@@ -758,7 +774,7 @@ export const useRequestStore = create<RequestState>((set, get) => ({
       if (error) throw error;
       return data?.delivery_otp || null;
     } catch (error) {
-      logger.error("Get delivery OTP failed", error);
+      logger.error("Get delivery OTP failed", error, { module: MODULE });
       return null;
     }
   },
@@ -781,11 +797,11 @@ export const useRequestStore = create<RequestState>((set, get) => ({
       logger.info("Pickup OTP regenerated", { requestId });
 
       return newOtp as string;
-    } catch (error: any) {
-      const errorMessage = parseSupabaseError(error);
-      logger.error("Regenerate pickup OTP failed", error);
-      set({ loading: false, error: errorMessage });
-      throw new Error(errorMessage);
+    } catch (error) {
+      handleMutationError(error, "Regenerate pickup OTP failed", (appError) =>
+        set({ loading: false, error: appError }),
+      );
+      throw error; // unreachable — handleMutationError always throws
     }
   },
 
@@ -807,11 +823,11 @@ export const useRequestStore = create<RequestState>((set, get) => ({
       logger.info("Delivery OTP regenerated", { requestId });
 
       return newOtp as string;
-    } catch (error: any) {
-      const errorMessage = parseSupabaseError(error);
-      logger.error("Regenerate delivery OTP failed", error);
-      set({ loading: false, error: errorMessage });
-      throw new Error(errorMessage);
+    } catch (error) {
+      handleMutationError(error, "Regenerate delivery OTP failed", (appError) =>
+        set({ loading: false, error: appError }),
+      );
+      throw error; // unreachable — handleMutationError always throws
     }
   },
 
@@ -857,11 +873,10 @@ export const useRequestStore = create<RequestState>((set, get) => ({
       }));
 
       logger.info("Receiver details updated", { requestId });
-    } catch (error: any) {
-      const errorMessage = parseSupabaseError(error);
-      logger.error("Update receiver details failed", error);
-      set({ loading: false, error: errorMessage });
-      throw new Error(errorMessage);
+    } catch (error) {
+      handleMutationError(error, "Update receiver details failed", (appError) =>
+        set({ loading: false, error: appError }),
+      );
     }
   },
 
@@ -881,11 +896,13 @@ export const useRequestStore = create<RequestState>((set, get) => ({
       logger.info("Cancellation OTP generated", { requestId });
 
       return cancellationOtp as string;
-    } catch (error: any) {
-      const errorMessage = parseSupabaseError(error);
-      logger.error("Generate cancellation OTP failed", error);
-      set({ loading: false, error: errorMessage });
-      throw new Error(errorMessage);
+    } catch (error) {
+      handleMutationError(
+        error,
+        "Generate cancellation OTP failed",
+        (appError) => set({ loading: false, error: appError }),
+      );
+      throw error; // unreachable — handleMutationError always throws
     }
   },
 
@@ -897,13 +914,13 @@ export const useRequestStore = create<RequestState>((set, get) => ({
       });
 
       if (error) {
-        logger.error("Check edit permission failed", error);
+        logger.error("Check edit permission failed", error, { module: MODULE });
         return false;
       }
 
       return data ?? false;
     } catch (error) {
-      logger.error("canEditRequestDetails error", error);
+      logger.error("canEditRequestDetails error", error, { module: MODULE });
       return false;
     }
   },
@@ -916,13 +933,15 @@ export const useRequestStore = create<RequestState>((set, get) => ({
       });
 
       if (error) {
-        logger.error("Check receiver edit permission failed", error);
+        logger.error("Check receiver edit permission failed", error, {
+          module: MODULE,
+        });
         return false;
       }
 
       return data ?? false;
     } catch (error) {
-      logger.error("canEditReceiverDetails error", error);
+      logger.error("canEditReceiverDetails error", error, { module: MODULE });
       return false;
     }
   },
@@ -953,11 +972,10 @@ export const useRequestStore = create<RequestState>((set, get) => ({
 
       set({ loading: false });
       logger.info("Request details updated", { requestId });
-    } catch (error: any) {
-      const errorMessage = parseSupabaseError(error);
-      logger.error("Update request details failed", error);
-      set({ loading: false, error: errorMessage });
-      throw new Error(errorMessage);
+    } catch (error) {
+      handleMutationError(error, "Update request details failed", (appError) =>
+        set({ loading: false, error: appError }),
+      );
     }
   },
 
@@ -993,10 +1011,14 @@ export const useRequestStore = create<RequestState>((set, get) => ({
       set({ loading: false });
       return false;
     } catch (error: any) {
-      const errorMessage = parseSupabaseError(error);
-      logger.error("Verify cancellation OTP failed", error);
-      set({ loading: false, error: errorMessage });
-      throw new Error(errorMessage);
+      const knownErrors = ["invalid_otp", "blocked", "expired"];
+      if (!knownErrors.includes(error.message)) {
+        logger.error("Verify cancellation OTP failed", error, {
+          module: MODULE,
+        });
+      }
+      set({ loading: false, error: parseSupabaseError(error) });
+      throw error;
     }
   },
 
