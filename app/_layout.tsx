@@ -10,6 +10,7 @@ import {
 } from "expo-router";
 import { useEffect } from "react";
 import { ActivityIndicator, StyleSheet, View } from "react-native";
+import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { Toaster } from "sonner-native";
 
 export default function RootLayout() {
@@ -94,8 +95,10 @@ export default function RootLayout() {
 
   return (
     <>
-      <Slot />
-      <Toaster />
+      <GestureHandlerRootView style={{ flex: 1 }}>
+        <Slot />
+        <Toaster />
+      </GestureHandlerRootView>
     </>
   );
 }
