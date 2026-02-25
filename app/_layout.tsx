@@ -20,11 +20,7 @@ export default function RootLayout() {
   const navState = useRootNavigationState();
 
   const { session, loading: authLoading, initialize } = useAuthStore();
-  const {
-    currentMode,
-    loading: modeLoading,
-    initialize: initializeMode,
-  } = useModeStore();
+  const { loading: modeLoading, initialize: initializeMode } = useModeStore();
 
   /**
    * Initialize auth + mode exactly once
@@ -55,9 +51,6 @@ export default function RootLayout() {
       (segment) => typeof segment === "string" && segment.startsWith("["),
     );
 
-    const defaultRoute =
-      currentMode === "sender" ? "/(tabs)/explore" : "/(tabs)/create-trip";
-
     // Not logged in → force auth
     if (!session && !inAuthGroup) {
       router.replace("/(auth)/login");
@@ -66,16 +59,16 @@ export default function RootLayout() {
 
     // Logged in but still in auth (except reset flow)
     if (session && inAuthGroup && !isPasswordResetFlow) {
-      router.replace(defaultRoute);
+      router.replace("/(tabs)/explore");
       return;
     }
 
     // Logged in but outside tabs/auth (deep links, bad state)
     if (session && !inTabsGroup && !inAuthGroup && !isDynamicRoute) {
-      router.replace(defaultRoute);
+      router.replace("/(tabs)/explore");
       return;
     }
-  }, [navState, segments, session, authLoading, modeLoading, currentMode]);
+  }, [navState, segments, session, authLoading, modeLoading]);
 
   /**
    * Global loading screen

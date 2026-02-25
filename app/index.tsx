@@ -1,5 +1,4 @@
 import { useAuthStore } from "@/stores/authStore";
-import { useModeStore } from "@/stores/modeStore";
 import { Redirect } from "expo-router";
 
 /**
@@ -8,17 +7,10 @@ import { Redirect } from "expo-router";
  */
 export default function Index() {
   const { session } = useAuthStore();
-  const { currentMode } = useModeStore();
 
   if (!session) {
     return <Redirect href="/(auth)/login" />;
   }
 
-  return (
-    <Redirect
-      href={
-        currentMode === "sender" ? "/(tabs)/explore" : "/(tabs)/create-trip"
-      }
-    />
-  );
+  return <Redirect href="/(tabs)/explore" />;
 }
