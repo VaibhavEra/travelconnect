@@ -16,7 +16,7 @@ const MODULE = "tripStore";
 // Type for trip from database (with proper non-null assertions)
 type DbTrip = Database["public"]["Tables"]["trips"]["Row"];
 
-// Refined Trip type with guaranteed non-null values (REMOVED notes - Issue #7)
+// Refined Trip type with guaranteed non-null values
 export type Trip = {
   id: string;
   traveller_id: string;
@@ -31,7 +31,6 @@ export type Trip = {
   allowed_categories: string[];
   pnr_number: string;
   ticket_file_url: string;
-  // REMOVED: notes field (Issue #7)
   status:
     | "upcoming"
     | "locked"
@@ -43,7 +42,7 @@ export type Trip = {
   updated_at: string;
 };
 
-// Type for editable general fields (before acceptance) - REMOVED notes (Issue #7)
+// Type for editable general fields (before acceptance)
 type EditableGeneralTripFields = Pick<
   DbTrip,
   | "parcel_size_capacity"
@@ -54,7 +53,6 @@ type EditableGeneralTripFields = Pick<
   | "arrival_time"
   | "pnr_number"
   | "ticket_file_url"
-  // REMOVED: notes (Issue #7)
 >;
 
 // Type for date-only updates (after acceptance)
@@ -92,15 +90,12 @@ interface TripState {
     arrival_time: string,
   ) => Promise<void>;
 
-  // DEPRECATED: Will be removed in Issue #11
-  updateTrip: (tripId: string, updates: Partial<DbTrip>) => Promise<void>;
-
   updateTripStatus: (tripId: string, status: Trip["status"]) => Promise<void>;
   deleteTrip: (tripId: string) => Promise<void>;
   clearError: () => void;
 }
 
-// Helper to convert DbTrip to Trip (REMOVED notes - Issue #7)
+// Helper to convert DbTrip to Trip
 const normalizeTrip = (dbTrip: DbTrip): Trip => {
   // Ensure status is valid
   const validStatus = dbTrip.status as Trip["status"];
@@ -120,7 +115,6 @@ const normalizeTrip = (dbTrip: DbTrip): Trip => {
     allowed_categories: dbTrip.allowed_categories,
     pnr_number: dbTrip.pnr_number,
     ticket_file_url: dbTrip.ticket_file_url,
-    // REMOVED: notes mapping (Issue #7)
     status: validStatus,
     created_at: dbTrip.created_at,
     updated_at: dbTrip.updated_at,
@@ -148,13 +142,12 @@ export const useTripStore = create<TripState>((set, get) => ({
   error: null,
 
   // ============================================================================
-  // Create new trip (REMOVED notes parameter - Issue #7)
+  // Create new trip
   // ============================================================================
   createTrip: async (data: TripFormData, userId: string): Promise<Trip> => {
     try {
       set({ loading: true, error: null });
 
-      // Prepare RPC parameters (NO p_notes - Issue #7)
       const rpcParams = {
         p_source: data.source.trim(),
         p_destination: data.destination.trim(),
@@ -167,7 +160,6 @@ export const useTripStore = create<TripState>((set, get) => ({
         p_pnr_number: data.pnr_number.trim(),
         p_ticket_file_url: data.ticket_file_url,
         p_allowed_categories: data.allowed_categories,
-        // REMOVED: p_notes conditional logic (Issue #7)
       };
 
       // Use RPC function for server-side validation
@@ -206,7 +198,9 @@ export const useTripStore = create<TripState>((set, get) => ({
     }
   },
 
+  // ============================================================================
   // Get user's trips
+  // ============================================================================
   getMyTrips: async (userId: string) => {
     try {
       set({ loading: true, error: null });
@@ -231,7 +225,9 @@ export const useTripStore = create<TripState>((set, get) => ({
     }
   },
 
+  // ============================================================================
   // Get all available trips (for senders to browse)
+  // ============================================================================
   getAvailableTrips: async () => {
     try {
       set({ loading: true, error: null });
@@ -265,7 +261,9 @@ export const useTripStore = create<TripState>((set, get) => ({
     }
   },
 
+  // ============================================================================
   // Get single trip by ID
+  // ============================================================================
   getTripById: async (tripId: string) => {
     try {
       set({ loading: true, error: null });
@@ -291,7 +289,9 @@ export const useTripStore = create<TripState>((set, get) => ({
     }
   },
 
+  // ============================================================================
   // Check if trip can be edited (Issue #4: Simplified, no 24h restriction)
+  // ============================================================================
   canEditTrip: async (tripId: string): Promise<boolean> => {
     try {
       const { data, error } = await supabase.rpc("can_edit_trip", {
@@ -332,7 +332,7 @@ export const useTripStore = create<TripState>((set, get) => ({
   },
 
   // ============================================================================
-  // Update general trip fields (REMOVED notes - Issue #7)
+  // Update general trip fields (Issue #4 + #27)
   // Can only be used BEFORE any request is accepted
   // ============================================================================
   updateTripGeneralFields: async (
@@ -342,7 +342,7 @@ export const useTripStore = create<TripState>((set, get) => ({
     try {
       set({ loading: true, error: null });
 
-      // Whitelist only editable general fields (REMOVED notes - Issue #7)
+      // Whitelist only editable general fields
       const allowedFields: (keyof EditableGeneralTripFields)[] = [
         "parcel_size_capacity",
         "allowed_categories",
@@ -352,7 +352,6 @@ export const useTripStore = create<TripState>((set, get) => ({
         "arrival_time",
         "pnr_number",
         "ticket_file_url",
-        // REMOVED: notes (Issue #7)
       ];
 
       // Filter to only allowed fields
@@ -498,43 +497,8 @@ export const useTripStore = create<TripState>((set, get) => ({
   },
 
   // ============================================================================
-  // DEPRECATED: Use updateTripGeneralFields() or updateTripDates() instead
-  // TODO: Remove in Issue #11 after updating all component usages
-  // ============================================================================
-  updateTrip: async (tripId: string, updates: Partial<DbTrip>) => {
-    logger.warn(
-      "updateTrip() is deprecated. Use updateTripGeneralFields() or updateTripDates() instead. This will be removed in Issue #11.",
-    );
-
-    // Temporary: Route to appropriate method based on fields
-    const dateFields = [
-      "departure_date",
-      "departure_time",
-      "arrival_date",
-      "arrival_time",
-    ];
-    const updateKeys = Object.keys(updates);
-    const isDatesOnly = updateKeys.every((key) => dateFields.includes(key));
-
-    if (isDatesOnly && updateKeys.length === 4) {
-      // Route to updateTripDates
-      return get().updateTripDates(
-        tripId,
-        updates.departure_date!,
-        updates.departure_time!,
-        updates.arrival_date!,
-        updates.arrival_time!,
-      );
-    } else {
-      // Route to updateTripGeneralFields
-      return get().updateTripGeneralFields(
-        tripId,
-        updates as Partial<EditableGeneralTripFields>,
-      );
-    }
-  },
-
   // Update trip status (convenience method)
+  // ============================================================================
   updateTripStatus: async (tripId: string, status: Trip["status"]) => {
     try {
       set({ loading: true, error: null });
@@ -565,7 +529,9 @@ export const useTripStore = create<TripState>((set, get) => ({
     }
   },
 
+  // ============================================================================
   // Delete trip (soft delete by setting status to cancelled)
+  // ============================================================================
   deleteTrip: async (tripId: string) => {
     try {
       set({ loading: true, error: null });
