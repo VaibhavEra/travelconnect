@@ -1,3 +1,4 @@
+import ModeSwitcher from "@/components/shared/ModeSwitcher";
 import { haptics } from "@/lib/utils/haptics";
 import { useAuthStore } from "@/stores/authStore";
 import { useModeStore } from "@/stores/modeStore";
@@ -9,7 +10,6 @@ import { useState } from "react";
 import {
   ActivityIndicator,
   Alert,
-  Pressable,
   ScrollView,
   StyleSheet,
   Text,
@@ -24,7 +24,7 @@ export default function ProfileScreen() {
   const user = useAuthStore((state) => state.user);
   const { signOut } = useAuthStore();
   const profile = useProfileStore((state) => state.profile);
-  const { currentMode, switchMode } = useModeStore();
+  const currentMode = useModeStore((state) => state.currentMode);
   const [signingOut, setSigningOut] = useState(false);
 
   // ADD THIS: Guard against null user during sign out
@@ -56,12 +56,6 @@ export default function ProfileScreen() {
         },
       },
     ]);
-  };
-
-  const handleModeSwitch = async () => {
-    haptics.selection();
-    const newMode = currentMode === "sender" ? "traveller" : "sender";
-    await switchMode(newMode);
   };
 
   return (
@@ -124,32 +118,9 @@ export default function ProfileScreen() {
           </View>
         </Animated.View>
 
-        {/* Mode Switcher Button (Temporary) */}
-        <Animated.View entering={FadeInDown.delay(150)}>
-          <Pressable
-            style={({ pressed }) => [
-              styles.modeSwitcherButton,
-              { backgroundColor: colors.primary },
-              pressed && styles.modeSwitcherButtonPressed,
-            ]}
-            onPress={handleModeSwitch}
-          >
-            <Ionicons
-              name={currentMode === "sender" ? "airplane" : "search"}
-              size={20}
-              color={colors.text.inverse}
-            />
-            <Text
-              style={[styles.modeSwitcherText, { color: colors.text.inverse }]}
-            >
-              Switch to {currentMode === "sender" ? "Traveller" : "Sender"} Mode
-            </Text>
-          </Pressable>
-        </Animated.View>
-
         {/* Current Mode Card */}
         <Animated.View
-          entering={FadeInDown.delay(200)}
+          entering={FadeInDown.delay(150)}
           style={[
             styles.modeCard,
             {
@@ -180,6 +151,7 @@ export default function ProfileScreen() {
                 {currentMode === "sender" ? "Sender" : "Traveller"}
               </Text>
             </View>
+            <ModeSwitcher />
           </View>
           <Text
             style={[styles.modeDescription, { color: colors.text.secondary }]}
@@ -460,23 +432,6 @@ const styles = StyleSheet.create({
   },
   ratingCount: {
     fontSize: Typography.sizes.sm,
-  },
-  modeSwitcherButton: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: Spacing.sm,
-    paddingVertical: Spacing.md,
-    borderRadius: BorderRadius.lg,
-    marginBottom: Spacing.md,
-    overflow: "hidden",
-  },
-  modeSwitcherButtonPressed: {
-    opacity: 0.8,
-  },
-  modeSwitcherText: {
-    fontSize: Typography.sizes.md,
-    fontWeight: Typography.weights.semibold,
   },
   modeCard: {
     padding: Spacing.lg,
