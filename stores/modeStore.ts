@@ -12,6 +12,7 @@ type UserMode = "sender" | "traveller";
 interface ModeState {
   currentMode: UserMode;
   loading: boolean;
+  switching: boolean;
 
   // Actions
   switchMode: (mode: UserMode) => Promise<void>;
@@ -21,11 +22,12 @@ interface ModeState {
 export const useModeStore = create<ModeState>((set, get) => ({
   currentMode: "sender", // Default mode
   loading: true,
+  switching: false,
 
   // Initialize mode from AsyncStorage
   initialize: async () => {
     try {
-      set({ loading: true });
+      set({ loading: true, switching: false });
 
       const storedMode = await AsyncStorage.getItem(MODE_STORAGE_KEY);
 
@@ -41,21 +43,25 @@ export const useModeStore = create<ModeState>((set, get) => ({
         "Mode initialized",
         { mode: get().currentMode },
         { module: MODULE },
-      ); // ADDED
+      );
     } catch (error) {
-      logger.error("Failed to initialize mode", error, { module: MODULE }); // CHANGED
-      set({ currentMode: "sender", loading: false });
+      logger.error("Failed to initialize mode", error, { module: MODULE });
+      set({ currentMode: "sender", loading: false, switching: false });
     }
   },
 
   // Switch mode and persist to storage
   switchMode: async (mode: UserMode) => {
+    // guard against concurrent switches
+    if (get().switching) return;
     try {
-      set({ currentMode: mode });
+      set({ switching: true, currentMode: mode });
       await AsyncStorage.setItem(MODE_STORAGE_KEY, mode);
-      logger.info("Mode switched", { mode }, { module: MODULE }); // ADDED
+      logger.info("Mode switched", { mode }, { module: MODULE });
     } catch (error) {
-      logger.error("Failed to switch mode", error, { module: MODULE }); // CHANGED
+      logger.error("Failed to switch mode", error, { module: MODULE });
+    } finally {
+      set({ switching: false });
     }
   },
 }));
