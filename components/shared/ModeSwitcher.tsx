@@ -3,24 +3,24 @@ import { useModeStore } from "@/stores/modeStore";
 import { BorderRadius, Spacing } from "@/styles";
 import { useThemeColors } from "@/styles/theme";
 import { Ionicons } from "@expo/vector-icons";
-import { useRouter } from "expo-router";
+import { router } from "expo-router";
 import { StyleSheet, TouchableOpacity, View } from "react-native";
 
 export default function ModeSwitcher() {
   const colors = useThemeColors();
-  const { currentMode, switchMode } = useModeStore();
-  const router = useRouter();
+  const { currentMode, switchMode, switching } = useModeStore();
 
   const handleSwitch = async () => {
+    if (switching) return;
     haptics.selection();
     const newMode = currentMode === "sender" ? "traveller" : "sender";
-    await switchMode(newMode);
-
-    // Navigate to appropriate default tab
-    if (newMode === "sender") {
-      router.replace("/(tabs)/explore");
-    } else {
-      router.replace("/(tabs)/create-trip");
+    try {
+      await switchMode(newMode);
+      router.replace(
+        newMode === "sender" ? "/(tabs)/explore" : "/(tabs)/create-trip",
+      );
+    } catch (error) {
+      haptics.error();
     }
   };
 
@@ -29,9 +29,11 @@ export default function ModeSwitcher() {
       style={[
         styles.container,
         { backgroundColor: colors.background.secondary },
+        switching && styles.containerDisabled,
       ]}
       onPress={handleSwitch}
       activeOpacity={0.7}
+      disabled={switching}
     >
       <View
         style={[
@@ -79,10 +81,12 @@ const styles = StyleSheet.create({
   container: {
     flexDirection: "row",
     alignItems: "center",
-    marginRight: Spacing.md,
     borderRadius: BorderRadius.full,
     padding: Spacing.xs - 2,
     gap: Spacing.xs - 2,
+  },
+  containerDisabled: {
+    opacity: 0.6,
   },
   iconContainer: {
     width: 28,
