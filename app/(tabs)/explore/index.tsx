@@ -1,7 +1,7 @@
 import DateFilter from "@/components/search/DateFilter";
 import TransportModeFilter from "@/components/search/TransportModeFilter";
 import TripSearchBar from "@/components/search/TripSearchBar";
-import ModeSwitcher from "@/components/shared/ModeSwitcher";
+import { ScreenHeader } from "@/components/shared";
 import { haptics } from "@/lib/utils/haptics";
 import { useSearchStore } from "@/stores/searchStore";
 import { BorderRadius, Spacing, Typography } from "@/styles";
@@ -37,20 +37,7 @@ export default function ExploreSearchScreen() {
       style={[styles.container, { backgroundColor: colors.background.primary }]}
       edges={["top"]}
     >
-      {/* Header */}
-      <View style={[styles.header, { borderBottomColor: colors.border.light }]}>
-        <View>
-          <Text style={[styles.headerTitle, { color: colors.text.primary }]}>
-            Find Trips
-          </Text>
-          <Text
-            style={[styles.headerSubtitle, { color: colors.text.secondary }]}
-          >
-            Search for available trips
-          </Text>
-        </View>
-        <ModeSwitcher />
-      </View>
+      <ScreenHeader title="Find Trips" subtitle="Search for available trips" />
 
       <KeyboardAvoidingView
         behavior={Platform.OS === "ios" ? "padding" : "height"}
@@ -120,22 +107,6 @@ export default function ExploreSearchScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-  },
-  header: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    paddingHorizontal: Spacing.lg,
-    paddingVertical: Spacing.md,
-    borderBottomWidth: 1,
-  },
-  headerTitle: {
-    fontSize: Typography.sizes.xl,
-    fontWeight: Typography.weights.bold,
-    marginBottom: 2,
-  },
-  headerSubtitle: {
-    fontSize: Typography.sizes.sm,
   },
   keyboardView: {
     flex: 1,

@@ -7,7 +7,7 @@ import ParcelSizeSelector from "@/components/forms/ParcelSizeSelector";
 import TextInput from "@/components/forms/TextInput";
 import TimePickerInput from "@/components/forms/TimePickerInput";
 import TransportModeSelector from "@/components/forms/TransportModeSelector";
-import ModeSwitcher from "@/components/shared/ModeSwitcher";
+import { ScreenHeader } from "@/components/shared";
 import { showErrorAlert } from "@/lib/utils/alerts";
 import { dateToISO, dateToTimeString } from "@/lib/utils/dateTime";
 import { uploadFile } from "@/lib/utils/fileUpload";
@@ -177,17 +177,10 @@ export default function CreateTripScreen() {
       style={[styles.container, { backgroundColor: colors.background.primary }]}
       edges={["top"]}
     >
-      <View style={[styles.header, { borderBottomColor: colors.border.light }]}>
-        <View>
-          <Text style={[styles.title, { color: colors.text.primary }]}>
-            Create Trip
-          </Text>
-          <Text style={[styles.subtitle, { color: colors.text.secondary }]}>
-            Share your journey, help others
-          </Text>
-        </View>
-        <ModeSwitcher />
-      </View>
+      <ScreenHeader
+        title="Create Trip"
+        subtitle="Share your journey, help others"
+      />
 
       <KeyboardAvoidingView
         style={styles.keyboardView}
@@ -565,22 +558,6 @@ export default function CreateTripScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-  },
-  header: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    paddingHorizontal: Spacing.lg,
-    paddingVertical: Spacing.md,
-    borderBottomWidth: 1,
-  },
-  title: {
-    fontSize: Typography.sizes.xl,
-    fontWeight: Typography.weights.bold,
-    marginBottom: 2,
-  },
-  subtitle: {
-    fontSize: Typography.sizes.sm,
   },
   keyboardView: {
     flex: 1,

@@ -1,6 +1,6 @@
 import RequestCard from "@/components/request/RequestCard";
+import { ScreenHeader } from "@/components/shared";
 import FilterChip from "@/components/shared/FilterChip";
-import ModeSwitcher from "@/components/shared/ModeSwitcher";
 import { REQUEST_FILTERS, RequestFilterKey } from "@/lib/constants/filters";
 import { haptics } from "@/lib/utils/haptics";
 import { useAuthStore } from "@/stores/authStore";
@@ -95,20 +95,10 @@ export default function MyRequestsScreen() {
       style={[styles.container, { backgroundColor: colors.background.primary }]}
       edges={["top"]}
     >
-      <View style={[styles.header, { borderBottomColor: colors.border.light }]}>
-        <View>
-          <Text style={[styles.headerTitle, { color: colors.text.primary }]}>
-            My Requests
-          </Text>
-          <Text
-            style={[styles.headerSubtitle, { color: colors.text.secondary }]}
-          >
-            {myRequests.length}{" "}
-            {myRequests.length === 1 ? "request" : "requests"}
-          </Text>
-        </View>
-        <ModeSwitcher />
-      </View>
+      <ScreenHeader
+        title="My Requests"
+        subtitle={`${myRequests.length} ${myRequests.length === 1 ? "request" : "requests"}`}
+      />
 
       <ScrollView
         style={styles.scrollView}
@@ -263,22 +253,6 @@ const styles = StyleSheet.create({
   },
   loadingText: {
     fontSize: Typography.sizes.md,
-  },
-  header: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    paddingHorizontal: Spacing.lg,
-    paddingVertical: Spacing.md,
-    borderBottomWidth: 1,
-  },
-  headerTitle: {
-    fontSize: Typography.sizes.xl,
-    fontWeight: Typography.weights.bold,
-    marginBottom: 2,
-  },
-  headerSubtitle: {
-    fontSize: Typography.sizes.sm,
   },
   scrollView: {
     flex: 1,

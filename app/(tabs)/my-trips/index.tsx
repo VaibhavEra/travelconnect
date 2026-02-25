@@ -1,5 +1,5 @@
+import { ScreenHeader } from "@/components/shared";
 import FilterChip from "@/components/shared/FilterChip";
-import ModeSwitcher from "@/components/shared/ModeSwitcher";
 import TripCard from "@/components/trip/TripCard";
 import { TRIP_FILTERS, TripFilterKey } from "@/lib/constants/filters";
 import { haptics } from "@/lib/utils/haptics";
@@ -103,20 +103,10 @@ export default function MyTripsScreen() {
       style={[styles.container, { backgroundColor: colors.background.primary }]}
       edges={["top"]}
     >
-      {/* Header */}
-      <View style={[styles.header, { borderBottomColor: colors.border.light }]}>
-        <View>
-          <Text style={[styles.headerTitle, { color: colors.text.primary }]}>
-            My Trips
-          </Text>
-          <Text
-            style={[styles.headerSubtitle, { color: colors.text.secondary }]}
-          >
-            {trips.length} {trips.length === 1 ? "trip" : "trips"}
-          </Text>
-        </View>
-        <ModeSwitcher />
-      </View>
+      <ScreenHeader
+        title="My Trips"
+        subtitle={`${trips.length} ${trips.length === 1 ? "trip" : "trips"}`}
+      />
 
       <ScrollView
         style={styles.scrollView}
@@ -190,7 +180,6 @@ export default function MyTripsScreen() {
             {TRIP_FILTERS.map((filterConfig) => {
               const count = getFilterCount(filterConfig.key);
               const isActive = filter === filterConfig.key;
-
               return (
                 <FilterChip
                   key={filterConfig.key}
@@ -292,22 +281,6 @@ const styles = StyleSheet.create({
   },
   loadingText: {
     fontSize: Typography.sizes.md,
-  },
-  header: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    paddingHorizontal: Spacing.lg,
-    paddingVertical: Spacing.md,
-    borderBottomWidth: 1,
-  },
-  headerTitle: {
-    fontSize: Typography.sizes.xl,
-    fontWeight: Typography.weights.bold,
-    marginBottom: 2,
-  },
-  headerSubtitle: {
-    fontSize: Typography.sizes.sm,
   },
   scrollView: {
     flex: 1,

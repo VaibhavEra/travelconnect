@@ -1,8 +1,8 @@
 import DeliveryCard from "@/components/delivery/DeliveryCard";
 import VerifyOtpModal from "@/components/modals/VerifyOtpModal";
 import IncomingRequestCard from "@/components/request/IncomingRequestCard";
+import { ScreenHeader } from "@/components/shared";
 import FilterChip from "@/components/shared/FilterChip";
-import ModeSwitcher from "@/components/shared/ModeSwitcher";
 import {
   ACTIVE_REQUEST_FILTERS,
   ActiveRequestFilterKey,
@@ -46,7 +46,7 @@ type OtpType = "pickup" | "delivery";
 export default function RequestsScreen() {
   const colors = useThemeColors();
   const { user } = useAuthStore();
-  const { currentMode } = useModeStore();
+  const currentMode = useModeStore((state) => state.currentMode);
   const {
     incomingRequests,
     acceptedRequests,
@@ -239,28 +239,22 @@ export default function RequestsScreen() {
       style={[styles.container, { backgroundColor: colors.background.primary }]}
       edges={["top"]}
     >
-      {/* Header */}
-      <View style={[styles.header, { borderBottomColor: colors.border.light }]}>
-        <View>
-          <Text style={[styles.headerTitle, { color: colors.text.primary }]}>
-            {viewMode === "incoming"
-              ? "Requests"
-              : viewMode === "active"
-                ? "Deliveries"
-                : "Completed"}
-          </Text>
-          <Text
-            style={[styles.headerSubtitle, { color: colors.text.secondary }]}
-          >
-            {viewMode === "incoming"
-              ? `${incomingRequests.length} ${incomingRequests.length === 1 ? "request" : "requests"}`
-              : viewMode === "active"
-                ? `${acceptedRequests.length} active`
-                : `${completedRequests.length} completed`}
-          </Text>
-        </View>
-        <ModeSwitcher />
-      </View>
+      <ScreenHeader
+        title={
+          viewMode === "incoming"
+            ? "Requests"
+            : viewMode === "active"
+              ? "Deliveries"
+              : "Completed"
+        }
+        subtitle={
+          viewMode === "incoming"
+            ? `${incomingRequests.length} ${incomingRequests.length === 1 ? "request" : "requests"}`
+            : viewMode === "active"
+              ? `${acceptedRequests.length} active`
+              : `${completedRequests.length} completed`
+        }
+      />
 
       <ScrollView
         style={styles.scrollView}
@@ -735,22 +729,6 @@ const styles = StyleSheet.create({
   },
   loadingText: {
     fontSize: Typography.sizes.md,
-  },
-  header: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    paddingHorizontal: Spacing.lg,
-    paddingVertical: Spacing.md,
-    borderBottomWidth: 1,
-  },
-  headerTitle: {
-    fontSize: Typography.sizes.xl,
-    fontWeight: Typography.weights.bold,
-    marginBottom: 2,
-  },
-  headerSubtitle: {
-    fontSize: Typography.sizes.sm,
   },
   scrollView: {
     flex: 1,
