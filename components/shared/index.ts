@@ -1,3 +1,4 @@
+export { default as BackButton } from "./BackButton";
 export { default as BaseModal } from "./BaseModal";
 export * from "./CategoryBadge";
 export { default as FilterChip } from "./FilterChip";

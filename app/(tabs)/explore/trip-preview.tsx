@@ -1,3 +1,4 @@
+import { BackButton } from "@/components/shared";
 import { CATEGORY_CONFIG } from "@/lib/constants/categories";
 import {
   getSizeCapacityIcon,
@@ -41,11 +42,6 @@ export default function TripPreviewScreen() {
     });
   };
 
-  const handleBack = () => {
-    haptics.light();
-    router.back();
-  };
-
   if (loading || !currentTrip) {
     return (
       <SafeAreaView
@@ -70,22 +66,11 @@ export default function TripPreviewScreen() {
       edges={["top"]}
     >
       {/* Header */}
-      <View style={styles.header}>
-        <Pressable
-          onPress={handleBack}
-          hitSlop={10}
-          style={[
-            styles.backButton,
-            { backgroundColor: colors.background.secondary },
-          ]}
-        >
-          <Ionicons name="arrow-back" size={24} color={colors.text.primary} />
-        </Pressable>
-        <View style={styles.headerContent}>
-          <Text style={[styles.headerTitle, { color: colors.text.primary }]}>
-            Trip Details
-          </Text>
-        </View>
+      <View style={[styles.header, { borderBottomColor: colors.border.light }]}>
+        <BackButton />
+        <Text style={[styles.headerTitle, { color: colors.text.primary }]}>
+          Trip Details
+        </Text>
       </View>
 
       <ScrollView
@@ -381,18 +366,10 @@ const styles = StyleSheet.create({
     gap: Spacing.sm,
     paddingHorizontal: Spacing.lg,
     paddingVertical: Spacing.md,
-  },
-  backButton: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  headerContent: {
-    flex: 1,
+    borderBottomWidth: 1,
   },
   headerTitle: {
+    flex: 1,
     fontSize: Typography.sizes.lg,
     fontWeight: Typography.weights.bold,
   },

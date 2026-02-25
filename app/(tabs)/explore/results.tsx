@@ -1,3 +1,4 @@
+import { BackButton } from "@/components/shared";
 import AvailableTripCard from "@/components/trip/AvailableTripCard";
 import { haptics } from "@/lib/utils/haptics";
 import { useSearchStore } from "@/stores/searchStore";
@@ -27,11 +28,6 @@ export default function ExploreResultsScreen() {
     setRefreshing(true);
     await searchTrips();
     setRefreshing(false);
-  };
-
-  const handleBack = () => {
-    haptics.light();
-    router.back();
   };
 
   const handleModifySearch = () => {
@@ -70,17 +66,8 @@ export default function ExploreResultsScreen() {
       edges={["top"]}
     >
       {/* Header */}
-      <View style={styles.header}>
-        <Pressable
-          onPress={handleBack}
-          hitSlop={10}
-          style={[
-            styles.backButton,
-            { backgroundColor: colors.background.secondary },
-          ]}
-        >
-          <Ionicons name="arrow-back" size={24} color={colors.text.primary} />
-        </Pressable>
+      <View style={[styles.header, { borderBottomColor: colors.border.light }]}>
+        <BackButton />
         <View style={styles.headerContent}>
           <Text style={[styles.headerTitle, { color: colors.text.primary }]}>
             Available Trips
@@ -152,7 +139,7 @@ export default function ExploreResultsScreen() {
             </Text>
             <Pressable
               style={[styles.emptyButton, { backgroundColor: colors.primary }]}
-              onPress={handleBack}
+              onPress={handleModifySearch}
             >
               <Text
                 style={[styles.emptyButtonText, { color: colors.text.inverse }]}
@@ -186,13 +173,7 @@ const styles = StyleSheet.create({
     gap: Spacing.sm,
     paddingHorizontal: Spacing.lg,
     paddingVertical: Spacing.md,
-  },
-  backButton: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    alignItems: "center",
-    justifyContent: "center",
+    borderBottomWidth: 1,
   },
   headerContent: {
     flex: 1,

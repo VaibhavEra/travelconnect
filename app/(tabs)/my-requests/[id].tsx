@@ -3,6 +3,7 @@ import CancelRequestModal from "@/components/request/CancelRequestModal";
 import EditReceiverDetailsModal from "@/components/request/EditReceiverDetailsModal";
 import EditRequestDetailsModal from "@/components/request/EditRequestDetailsModal";
 import PhotoGallery from "@/components/request/PhotoGallery";
+import { BackButton } from "@/components/shared";
 import { CATEGORY_CONFIG } from "@/lib/constants/categories";
 import { getSizeCapacityLabel } from "@/lib/constants/parcel";
 import { REQUEST_STATUS_CONFIG, RequestStatus } from "@/lib/constants/status";
@@ -203,28 +204,17 @@ export default function RequestDetailsScreen() {
     >
       {/* Header */}
       <View style={[styles.header, { borderBottomColor: colors.border.light }]}>
-        <Pressable
-          onPress={() => {
-            haptics.light();
-            router.back();
-          }}
-          style={[
-            styles.backButton,
-            { backgroundColor: colors.background.secondary },
-          ]}
+        <BackButton />
+        <Text style={[styles.headerTitle, { color: colors.text.primary }]}>
+          Request Details
+        </Text>
+        <View
+          style={[styles.statusBadge, { backgroundColor: statusColor + "15" }]}
         >
-          <Ionicons name="arrow-back" size={24} color={colors.text.primary} />
-        </Pressable>
-        <View style={styles.headerContent}>
-          <Text style={[styles.headerTitle, { color: colors.text.primary }]}>
-            Request Details
+          <Ionicons name={statusConfig.icon} size={14} color={statusColor} />
+          <Text style={[styles.statusBadgeText, { color: statusColor }]}>
+            {statusConfig.label}
           </Text>
-          <View style={styles.statusBadge}>
-            <Ionicons name={statusConfig.icon} size={14} color={statusColor} />
-            <Text style={[styles.statusBadgeText, { color: statusColor }]}>
-              {statusConfig.label}
-            </Text>
-          </View>
         </View>
       </View>
 
@@ -968,20 +958,8 @@ const styles = StyleSheet.create({
     gap: Spacing.md,
     borderBottomWidth: 1,
   },
-  backButton: {
-    width: 40,
-    height: 40,
-    borderRadius: BorderRadius.full,
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  headerContent: {
-    flex: 1,
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-  },
   headerTitle: {
+    flex: 1,
     fontSize: Typography.sizes.lg,
     fontWeight: Typography.weights.bold,
   },
@@ -991,6 +969,7 @@ const styles = StyleSheet.create({
     gap: Spacing.xs,
     paddingHorizontal: Spacing.sm,
     paddingVertical: Spacing.xs,
+    borderRadius: BorderRadius.sm,
   },
   statusBadgeText: {
     fontSize: Typography.sizes.sm,

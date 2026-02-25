@@ -3,6 +3,7 @@ import AcceptRequestModal from "@/components/modals/AcceptRequestModal";
 import RejectRequestModal from "@/components/modals/RejectRequestModal";
 import VerifyOtpModal from "@/components/modals/VerifyOtpModal";
 import PhotoGallery from "@/components/request/PhotoGallery";
+import { BackButton } from "@/components/shared";
 import { CATEGORY_CONFIG } from "@/lib/constants/categories";
 import {
   getSizeCapacityIcon,
@@ -140,11 +141,6 @@ export default function IncomingRequestDetailsScreen() {
     }
   };
 
-  const handleBack = () => {
-    haptics.light();
-    router.back();
-  };
-
   if (loading || !currentRequest) {
     return (
       <SafeAreaView
@@ -186,21 +182,18 @@ export default function IncomingRequestDetailsScreen() {
       style={[styles.container, { backgroundColor: colors.background.primary }]}
       edges={["top"]}
     >
-      {/* Header — matches trip-preview.tsx exactly */}
-      <View style={styles.header}>
-        <Pressable
-          onPress={handleBack}
-          hitSlop={10}
-          style={[
-            styles.backButton,
-            { backgroundColor: colors.background.secondary },
-          ]}
+      {/* Header */}
+      <View style={[styles.header, { borderBottomColor: colors.border.light }]}>
+        <BackButton />
+        <Text style={[styles.headerTitle, { color: colors.text.primary }]}>
+          Request Details
+        </Text>
+        <View
+          style={[styles.statusBadge, { backgroundColor: statusColor + "15" }]}
         >
-          <Ionicons name="arrow-back" size={24} color={colors.text.primary} />
-        </Pressable>
-        <View style={styles.headerContent}>
-          <Text style={[styles.headerTitle, { color: colors.text.primary }]}>
-            Request Details
+          <Ionicons name={statusConfig.icon} size={14} color={statusColor} />
+          <Text style={[styles.statusBadgeText, { color: statusColor }]}>
+            {statusConfig.label}
           </Text>
         </View>
       </View>
@@ -217,23 +210,6 @@ export default function IncomingRequestDetailsScreen() {
             { backgroundColor: colors.background.secondary },
           ]}
         >
-          {/* Status Banner */}
-          <View
-            style={[
-              styles.statusBanner,
-              { backgroundColor: statusColor + "15" },
-            ]}
-          >
-            <Ionicons name={statusConfig.icon} size={16} color={statusColor} />
-            <Text style={[styles.statusBannerText, { color: statusColor }]}>
-              {statusConfig.label}
-            </Text>
-          </View>
-
-          <View
-            style={[styles.divider, { backgroundColor: colors.border.light }]}
-          />
-
           {/* Route — mirrors trip-preview.tsx routeContainer */}
           <View style={styles.routeContainer}>
             <View style={styles.routePoint}>
@@ -877,28 +853,31 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     alignItems: "center",
   },
-  // ── Header — identical to trip-preview.tsx ──
+  // ── Header ──
   header: {
     flexDirection: "row",
     alignItems: "center",
     gap: Spacing.sm,
     paddingHorizontal: Spacing.lg,
     paddingVertical: Spacing.md,
-    // no borderBottomWidth — matches trip-preview
-  },
-  backButton: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  headerContent: {
-    flex: 1,
+    borderBottomWidth: 1,
   },
   headerTitle: {
+    flex: 1,
     fontSize: Typography.sizes.lg,
     fontWeight: Typography.weights.bold,
+  },
+  statusBadge: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    paddingHorizontal: Spacing.sm,
+    paddingVertical: Spacing.xs,
+    borderRadius: BorderRadius.sm,
+  },
+  statusBadgeText: {
+    fontSize: Typography.sizes.sm,
+    fontWeight: Typography.weights.semibold,
   },
   // ── ScrollView ──
   scrollView: {
@@ -919,21 +898,6 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.05,
     shadowRadius: 8,
     elevation: 2,
-  },
-  // ── Status Banner ──
-  statusBanner: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: Spacing.xs,
-    paddingVertical: Spacing.xs,
-    paddingHorizontal: Spacing.sm,
-    borderRadius: BorderRadius.sm,
-    alignSelf: "flex-start",
-    marginBottom: Spacing.md,
-  },
-  statusBannerText: {
-    fontSize: Typography.sizes.sm,
-    fontWeight: Typography.weights.bold,
   },
   // ── Divider — identical to trip-preview.tsx ──
   divider: {

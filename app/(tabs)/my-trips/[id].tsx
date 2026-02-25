@@ -1,5 +1,6 @@
 // app/(tabs)/my-trips/[id].tsx
 import CancellationOtpModal from "@/components/modals/CancellationOtpModal";
+import { BackButton } from "@/components/shared";
 import EditTripDatesModal from "@/components/trip/EditTripDatesModal";
 import EditTripDetailsModal from "@/components/trip/EditTripDetailsModal";
 import { CATEGORY_CONFIG } from "@/lib/constants/categories";
@@ -219,11 +220,6 @@ export default function TripDetailsScreen() {
     }
   };
 
-  const handleBack = () => {
-    haptics.light();
-    router.back();
-  };
-
   const handleEditDetails = () => {
     haptics.light();
     setShowDetailsModal(true);
@@ -269,26 +265,17 @@ export default function TripDetailsScreen() {
     >
       {/* Header - NO GLOBAL EDIT BUTTON */}
       <View style={[styles.header, { borderBottomColor: colors.border.light }]}>
-        <Pressable
-          onPress={handleBack}
-          hitSlop={10}
-          style={[
-            styles.backButton,
-            { backgroundColor: colors.background.secondary },
-          ]}
+        <BackButton />
+        <Text style={[styles.headerTitle, { color: colors.text.primary }]}>
+          Trip Details
+        </Text>
+        <View
+          style={[styles.statusBadge, { backgroundColor: statusColor + "15" }]}
         >
-          <Ionicons name="arrow-back" size={24} color={colors.text.primary} />
-        </Pressable>
-        <View style={styles.headerContent}>
-          <Text style={[styles.headerTitle, { color: colors.text.primary }]}>
-            Trip Details
+          <Ionicons name={statusConfig.icon} size={14} color={statusColor} />
+          <Text style={[styles.statusBadgeText, { color: statusColor }]}>
+            {statusConfig.label}
           </Text>
-          <View style={styles.statusBadge}>
-            <Ionicons name={statusConfig.icon} size={14} color={statusColor} />
-            <Text style={[styles.statusBadgeText, { color: statusColor }]}>
-              {statusConfig.label}
-            </Text>
-          </View>
         </View>
       </View>
 
@@ -705,18 +692,8 @@ const styles = StyleSheet.create({
     paddingVertical: Spacing.md,
     borderBottomWidth: 1,
   },
-  backButton: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  headerContent: {
-    flex: 1,
-    gap: 4,
-  },
   headerTitle: {
+    flex: 1,
     fontSize: Typography.sizes.lg,
     fontWeight: Typography.weights.bold,
   },
@@ -724,6 +701,9 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     gap: 6,
+    paddingHorizontal: Spacing.sm,
+    paddingVertical: Spacing.xs,
+    borderRadius: BorderRadius.sm,
   },
   statusBadgeText: {
     fontSize: Typography.sizes.sm,
