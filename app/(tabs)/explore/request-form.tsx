@@ -1,6 +1,7 @@
 // app/(tabs)/explore/request-form.tsx
 import ImagePicker from "@/components/forms/ImagePicker";
 import TextInput from "@/components/forms/TextInput";
+import { LoadingScreen, ScreenContainer } from "@/components/shared";
 import { CATEGORY_CONFIG } from "@/lib/constants/categories";
 import { getSizeCapacityLabel } from "@/lib/constants/parcel";
 import { showErrorAlert } from "@/lib/utils/alerts";
@@ -30,7 +31,6 @@ import {
   Text,
   View,
 } from "react-native";
-import { SafeAreaView } from "react-native-safe-area-context";
 
 const MODULE = "RequestFormScreen";
 
@@ -138,28 +138,13 @@ export default function RequestFormScreen() {
   };
 
   if (tripLoading || !currentTrip) {
-    return (
-      <SafeAreaView
-        style={[
-          styles.container,
-          { backgroundColor: colors.background.primary },
-        ]}
-        edges={["top"]}
-      >
-        <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color={colors.primary} />
-        </View>
-      </SafeAreaView>
-    );
+    return <LoadingScreen />;
   }
 
   const isFormDisabled = !isValid || requestLoading || isSubmitting;
 
   return (
-    <SafeAreaView
-      style={[styles.container, { backgroundColor: colors.background.primary }]}
-      edges={["top"]}
-    >
+    <ScreenContainer>
       {/* Header with Trip Route and Dates */}
       <View style={[styles.header, { borderBottomColor: colors.border.light }]}>
         <Pressable
@@ -542,19 +527,11 @@ export default function RequestFormScreen() {
           <View style={{ height: Spacing.xxxl }} />
         </ScrollView>
       </KeyboardAvoidingView>
-    </SafeAreaView>
+    </ScreenContainer>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-  },
-  loadingContainer: {
-    flex: 1,
-    justifyContent: "center",
-    alignItems: "center",
-  },
   header: {
     paddingHorizontal: Spacing.lg,
     paddingTop: Spacing.md,

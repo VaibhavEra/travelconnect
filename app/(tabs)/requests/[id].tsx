@@ -7,6 +7,8 @@ import PhotoGallery from "@/components/request/PhotoGallery";
 import {
   AlertCard,
   DetailScreenHeader,
+  LoadingScreen,
+  ScreenContainer,
   StatusBadge,
 } from "@/components/shared";
 import TripInfoRow from "@/components/trip/TripInfoRow";
@@ -24,15 +26,7 @@ import { useThemeColors } from "@/styles/theme";
 import { Ionicons } from "@expo/vector-icons";
 import { router, useLocalSearchParams } from "expo-router";
 import { useEffect, useState } from "react";
-import {
-  ActivityIndicator,
-  Pressable,
-  ScrollView,
-  StyleSheet,
-  Text,
-  View,
-} from "react-native";
-import { SafeAreaView } from "react-native-safe-area-context";
+import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 
 const MODULE = "IncomingRequestDetailsScreen";
 
@@ -133,19 +127,7 @@ export default function IncomingRequestDetailsScreen() {
   };
 
   if (loading || !currentRequest) {
-    return (
-      <SafeAreaView
-        style={[
-          styles.container,
-          { backgroundColor: colors.background.primary },
-        ]}
-        edges={["top"]}
-      >
-        <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color={colors.primary} />
-        </View>
-      </SafeAreaView>
-    );
+    return <LoadingScreen />;
   }
 
   const request = currentRequest;
@@ -165,10 +147,7 @@ export default function IncomingRequestDetailsScreen() {
     CATEGORY_CONFIG[request.category as keyof typeof CATEGORY_CONFIG];
 
   return (
-    <SafeAreaView
-      style={[styles.container, { backgroundColor: colors.background.primary }]}
-      edges={["top"]}
-    >
+    <ScreenContainer>
       {/* Header */}
       <DetailScreenHeader
         title="Request Details"
@@ -410,7 +389,7 @@ export default function IncomingRequestDetailsScreen() {
           </View>
         )}
 
-        {/* ── Alert Card (cancelled / rejected reason) ── */}
+        {/* ── Alert Card ── */}
         {(isCancelled || (isRejected && request.rejection_reason)) && (
           <AlertCard
             title={
@@ -568,17 +547,11 @@ export default function IncomingRequestDetailsScreen() {
         failedAttempts={request.failed_delivery_attempts}
         blockedUntil={request.delivery_blocked_until}
       />
-    </SafeAreaView>
+    </ScreenContainer>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1 },
-  loadingContainer: {
-    flex: 1,
-    justifyContent: "center",
-    alignItems: "center",
-  },
   scrollView: { flex: 1 },
   scrollContent: {
     padding: Spacing.lg,

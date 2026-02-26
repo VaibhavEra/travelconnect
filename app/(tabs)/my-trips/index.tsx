@@ -1,4 +1,8 @@
-import { ScreenHeader } from "@/components/shared";
+import {
+  LoadingScreen,
+  ScreenContainer,
+  ScreenHeader,
+} from "@/components/shared";
 import FilterChip from "@/components/shared/FilterChip";
 import TripCard from "@/components/trip/TripCard";
 import { TRIP_FILTERS, TripFilterKey } from "@/lib/constants/filters";
@@ -11,7 +15,6 @@ import { Ionicons } from "@expo/vector-icons";
 import { router, useFocusEffect } from "expo-router";
 import { useCallback, useState } from "react";
 import {
-  ActivityIndicator,
   Pressable,
   RefreshControl,
   ScrollView,
@@ -26,7 +29,6 @@ import Animated, {
   useSharedValue,
   withTiming,
 } from "react-native-reanimated";
-import { SafeAreaView } from "react-native-safe-area-context";
 
 export default function MyTripsScreen() {
   const colors = useThemeColors();
@@ -82,27 +84,11 @@ export default function MyTripsScreen() {
   const completedCount = getFilterCount("completed");
 
   if (loading && !refreshing) {
-    return (
-      <SafeAreaView
-        style={[
-          styles.loadingContainer,
-          { backgroundColor: colors.background.primary },
-        ]}
-        edges={["top"]}
-      >
-        <ActivityIndicator size="large" color={colors.primary} />
-        <Text style={[styles.loadingText, { color: colors.text.secondary }]}>
-          Loading your trips...
-        </Text>
-      </SafeAreaView>
-    );
+    return <LoadingScreen message="Loading your trips..." />;
   }
 
   return (
-    <SafeAreaView
-      style={[styles.container, { backgroundColor: colors.background.primary }]}
-      edges={["top"]}
-    >
+    <ScreenContainer>
       <ScreenHeader
         title="My Trips"
         subtitle={`${trips.length} ${trips.length === 1 ? "trip" : "trips"}`}
@@ -265,23 +251,11 @@ export default function MyTripsScreen() {
       >
         <Ionicons name="add" size={28} color={colors.text.inverse} />
       </Pressable>
-    </SafeAreaView>
+    </ScreenContainer>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-  },
-  loadingContainer: {
-    flex: 1,
-    justifyContent: "center",
-    alignItems: "center",
-    gap: Spacing.md,
-  },
-  loadingText: {
-    fontSize: Typography.sizes.md,
-  },
   scrollView: {
     flex: 1,
   },

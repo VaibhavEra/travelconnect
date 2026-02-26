@@ -1,5 +1,9 @@
 import RequestCard from "@/components/request/RequestCard";
-import { ScreenHeader } from "@/components/shared";
+import {
+  LoadingScreen,
+  ScreenContainer,
+  ScreenHeader,
+} from "@/components/shared";
 import FilterChip from "@/components/shared/FilterChip";
 import { REQUEST_FILTERS, RequestFilterKey } from "@/lib/constants/filters";
 import { haptics } from "@/lib/utils/haptics";
@@ -11,7 +15,6 @@ import { Ionicons } from "@expo/vector-icons";
 import { useFocusEffect } from "expo-router";
 import { useCallback, useState } from "react";
 import {
-  ActivityIndicator,
   RefreshControl,
   ScrollView,
   StyleSheet,
@@ -25,7 +28,6 @@ import Animated, {
   useSharedValue,
   withTiming,
 } from "react-native-reanimated";
-import { SafeAreaView } from "react-native-safe-area-context";
 
 export default function MyRequestsScreen() {
   const colors = useThemeColors();
@@ -74,27 +76,11 @@ export default function MyRequestsScreen() {
   const deliveredCount = getFilterCount("delivered");
 
   if (loading && !refreshing) {
-    return (
-      <SafeAreaView
-        style={[
-          styles.loadingContainer,
-          { backgroundColor: colors.background.primary },
-        ]}
-        edges={["top"]}
-      >
-        <ActivityIndicator size="large" color={colors.primary} />
-        <Text style={[styles.loadingText, { color: colors.text.secondary }]}>
-          Loading your requests...
-        </Text>
-      </SafeAreaView>
-    );
+    return <LoadingScreen message="Loading your requests..." />;
   }
 
   return (
-    <SafeAreaView
-      style={[styles.container, { backgroundColor: colors.background.primary }]}
-      edges={["top"]}
-    >
+    <ScreenContainer>
       <ScreenHeader
         title="My Requests"
         subtitle={`${myRequests.length} ${myRequests.length === 1 ? "request" : "requests"}`}
@@ -237,23 +223,11 @@ export default function MyRequestsScreen() {
 
         <View style={{ height: Spacing.xxxl }} />
       </ScrollView>
-    </SafeAreaView>
+    </ScreenContainer>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-  },
-  loadingContainer: {
-    flex: 1,
-    justifyContent: "center",
-    alignItems: "center",
-    gap: Spacing.md,
-  },
-  loadingText: {
-    fontSize: Typography.sizes.md,
-  },
   scrollView: {
     flex: 1,
   },

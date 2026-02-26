@@ -1,7 +1,7 @@
 import DateFilter from "@/components/search/DateFilter";
 import TransportModeFilter from "@/components/search/TransportModeFilter";
 import TripSearchBar from "@/components/search/TripSearchBar";
-import { ScreenHeader } from "@/components/shared";
+import { ScreenContainer, ScreenHeader } from "@/components/shared";
 import { haptics } from "@/lib/utils/haptics";
 import { useSearchStore } from "@/stores/searchStore";
 import { BorderRadius, Spacing, Typography } from "@/styles";
@@ -17,7 +17,6 @@ import {
   Text,
   View,
 } from "react-native";
-import { SafeAreaView } from "react-native-safe-area-context";
 
 export default function ExploreSearchScreen() {
   const colors = useThemeColors();
@@ -33,10 +32,7 @@ export default function ExploreSearchScreen() {
   };
 
   return (
-    <SafeAreaView
-      style={[styles.container, { backgroundColor: colors.background.primary }]}
-      edges={["top"]}
-    >
+    <ScreenContainer>
       <ScreenHeader title="Find Trips" subtitle="Search for available trips" />
 
       <KeyboardAvoidingView
@@ -100,14 +96,11 @@ export default function ExploreSearchScreen() {
           )}
         </ScrollView>
       </KeyboardAvoidingView>
-    </SafeAreaView>
+    </ScreenContainer>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-  },
   keyboardView: {
     flex: 1,
   },

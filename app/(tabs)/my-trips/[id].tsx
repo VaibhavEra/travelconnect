@@ -1,6 +1,11 @@
 // app/(tabs)/my-trips/[id].tsx
 import CancellationOtpModal from "@/components/modals/CancellationOtpModal";
-import { DetailScreenHeader, StatusBadge } from "@/components/shared";
+import {
+  DetailScreenHeader,
+  LoadingScreen,
+  ScreenContainer,
+  StatusBadge,
+} from "@/components/shared";
 import EditTripDatesModal from "@/components/trip/EditTripDatesModal";
 import EditTripDetailsModal from "@/components/trip/EditTripDetailsModal";
 import TripInfoRow from "@/components/trip/TripInfoRow";
@@ -33,7 +38,6 @@ import {
   Text,
   View,
 } from "react-native";
-import { SafeAreaView } from "react-native-safe-area-context";
 
 const MODULE = "TripDetailsScreen";
 
@@ -228,22 +232,7 @@ export default function TripDetailsScreen() {
   };
 
   if (loading || !currentTrip) {
-    return (
-      <SafeAreaView
-        style={[
-          styles.container,
-          { backgroundColor: colors.background.primary },
-        ]}
-        edges={["top"]}
-      >
-        <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color={colors.primary} />
-          <Text style={[styles.loadingText, { color: colors.text.secondary }]}>
-            Loading trip details...
-          </Text>
-        </View>
-      </SafeAreaView>
-    );
+    return <LoadingScreen message="Loading trip details..." />;
   }
 
   const status = currentTrip.status as TripStatus;
@@ -256,10 +245,7 @@ export default function TripDetailsScreen() {
     status === "upcoming" || status === "locked" || status === "in_progress";
 
   return (
-    <SafeAreaView
-      style={[styles.container, { backgroundColor: colors.background.primary }]}
-      edges={["top"]}
-    >
+    <ScreenContainer>
       {/* Header */}
       <DetailScreenHeader
         title="Trip Details"
@@ -488,23 +474,11 @@ export default function TripDetailsScreen() {
           )}
         </>
       )}
-    </SafeAreaView>
+    </ScreenContainer>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-  },
-  loadingContainer: {
-    flex: 1,
-    justifyContent: "center",
-    alignItems: "center",
-    gap: Spacing.md,
-  },
-  loadingText: {
-    fontSize: Typography.sizes.md,
-  },
   scrollView: {
     flex: 1,
   },

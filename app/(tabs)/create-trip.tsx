@@ -7,7 +7,7 @@ import ParcelSizeSelector from "@/components/forms/ParcelSizeSelector";
 import TextInput from "@/components/forms/TextInput";
 import TimePickerInput from "@/components/forms/TimePickerInput";
 import TransportModeSelector from "@/components/forms/TransportModeSelector";
-import { ScreenHeader } from "@/components/shared";
+import { ScreenContainer, ScreenHeader } from "@/components/shared";
 import { showErrorAlert } from "@/lib/utils/alerts";
 import {
   combineDateAndTime,
@@ -43,7 +43,6 @@ import {
   Text,
   View,
 } from "react-native";
-import { SafeAreaView } from "react-native-safe-area-context";
 
 const MODULE = "CreateTripScreen";
 
@@ -129,10 +128,7 @@ export default function CreateTripScreen() {
   const hasErrors = Object.keys(errors).length > 0;
 
   return (
-    <SafeAreaView
-      style={[styles.container, { backgroundColor: colors.background.primary }]}
-      edges={["top"]}
-    >
+    <ScreenContainer>
       <ScreenHeader
         title="Create Trip"
         subtitle="Share your journey, help others"
@@ -470,14 +466,11 @@ export default function CreateTripScreen() {
           <View style={{ height: Spacing.xxxl }} />
         </ScrollView>
       </KeyboardAvoidingView>
-    </SafeAreaView>
+    </ScreenContainer>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-  },
   keyboardView: {
     flex: 1,
   },

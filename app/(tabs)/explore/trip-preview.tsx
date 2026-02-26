@@ -1,4 +1,8 @@
-import { DetailScreenHeader } from "@/components/shared";
+import {
+  DetailScreenHeader,
+  LoadingScreen,
+  ScreenContainer,
+} from "@/components/shared";
 import TripInfoRow from "@/components/trip/TripInfoRow";
 import TripRouteCard from "@/components/trip/TripRouteCard";
 import TripScheduleGrid from "@/components/trip/TripScheduleGrid";
@@ -10,15 +14,7 @@ import { useThemeColors } from "@/styles/theme";
 import { Ionicons } from "@expo/vector-icons";
 import { router, useLocalSearchParams } from "expo-router";
 import { useEffect } from "react";
-import {
-  ActivityIndicator,
-  Pressable,
-  ScrollView,
-  StyleSheet,
-  Text,
-  View,
-} from "react-native";
-import { SafeAreaView } from "react-native-safe-area-context";
+import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 
 export default function TripPreviewScreen() {
   const colors = useThemeColors();
@@ -40,28 +36,13 @@ export default function TripPreviewScreen() {
   };
 
   if (loading || !currentTrip) {
-    return (
-      <SafeAreaView
-        style={[
-          styles.container,
-          { backgroundColor: colors.background.primary },
-        ]}
-        edges={["top"]}
-      >
-        <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color={colors.primary} />
-        </View>
-      </SafeAreaView>
-    );
+    return <LoadingScreen />;
   }
 
   const isNotAvailable = currentTrip.status !== "upcoming";
 
   return (
-    <SafeAreaView
-      style={[styles.container, { backgroundColor: colors.background.primary }]}
-      edges={["top"]}
-    >
+    <ScreenContainer>
       {/* Header */}
       <DetailScreenHeader title="Trip Details" />
 
@@ -171,19 +152,11 @@ export default function TripPreviewScreen() {
           </Text>
         </Pressable>
       </View>
-    </SafeAreaView>
+    </ScreenContainer>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-  },
-  loadingContainer: {
-    flex: 1,
-    justifyContent: "center",
-    alignItems: "center",
-  },
   scrollView: {
     flex: 1,
   },

@@ -1,7 +1,11 @@
 import DeliveryCard from "@/components/delivery/DeliveryCard";
 import VerifyOtpModal from "@/components/modals/VerifyOtpModal";
 import IncomingRequestCard from "@/components/request/IncomingRequestCard";
-import { ScreenHeader } from "@/components/shared";
+import {
+  LoadingScreen,
+  ScreenContainer,
+  ScreenHeader,
+} from "@/components/shared";
 import FilterChip from "@/components/shared/FilterChip";
 import {
   ACTIVE_REQUEST_FILTERS,
@@ -22,7 +26,6 @@ import { Ionicons } from "@expo/vector-icons";
 import { useFocusEffect } from "expo-router";
 import { useCallback, useState } from "react";
 import {
-  ActivityIndicator,
   Pressable,
   RefreshControl,
   ScrollView,
@@ -38,7 +41,6 @@ import Animated, {
   useSharedValue,
   withTiming,
 } from "react-native-reanimated";
-import { SafeAreaView } from "react-native-safe-area-context";
 
 type ViewMode = "incoming" | "active" | "completed";
 type OtpType = "pickup" | "delivery";
@@ -216,29 +218,11 @@ export default function RequestsScreen() {
   };
 
   if (loading && !refreshing) {
-    return (
-      <SafeAreaView
-        style={[
-          styles.container,
-          { backgroundColor: colors.background.primary },
-        ]}
-        edges={["top"]}
-      >
-        <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color={colors.primary} />
-          <Text style={[styles.loadingText, { color: colors.text.secondary }]}>
-            Loading requests...
-          </Text>
-        </View>
-      </SafeAreaView>
-    );
+    return <LoadingScreen message="Loading requests..." />;
   }
 
   return (
-    <SafeAreaView
-      style={[styles.container, { backgroundColor: colors.background.primary }]}
-      edges={["top"]}
-    >
+    <ScreenContainer>
       <ScreenHeader
         title={
           viewMode === "incoming"
@@ -713,23 +697,11 @@ export default function RequestsScreen() {
         failedAttempts={selectedFailedAttempts}
         blockedUntil={selectedBlockedUntil}
       />
-    </SafeAreaView>
+    </ScreenContainer>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-  },
-  loadingContainer: {
-    flex: 1,
-    justifyContent: "center",
-    alignItems: "center",
-    gap: Spacing.md,
-  },
-  loadingText: {
-    fontSize: Typography.sizes.md,
-  },
   scrollView: {
     flex: 1,
   },

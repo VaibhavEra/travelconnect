@@ -1,4 +1,8 @@
-import { BackButton } from "@/components/shared";
+import {
+  BackButton,
+  LoadingScreen,
+  ScreenContainer,
+} from "@/components/shared";
 import AvailableTripCard from "@/components/trip/AvailableTripCard";
 import { haptics } from "@/lib/utils/haptics";
 import { useSearchStore } from "@/stores/searchStore";
@@ -8,7 +12,6 @@ import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
 import { useState } from "react";
 import {
-  ActivityIndicator,
   Pressable,
   RefreshControl,
   ScrollView,
@@ -16,7 +19,6 @@ import {
   Text,
   View,
 } from "react-native";
-import { SafeAreaView } from "react-native-safe-area-context";
 
 export default function ExploreResultsScreen() {
   const colors = useThemeColors();
@@ -42,29 +44,11 @@ export default function ExploreResultsScreen() {
   };
 
   if (loading && !refreshing) {
-    return (
-      <SafeAreaView
-        style={[
-          styles.container,
-          { backgroundColor: colors.background.primary },
-        ]}
-        edges={["top"]}
-      >
-        <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color={colors.primary} />
-          <Text style={[styles.loadingText, { color: colors.text.secondary }]}>
-            Searching for trips...
-          </Text>
-        </View>
-      </SafeAreaView>
-    );
+    return <LoadingScreen message="Searching for trips..." />;
   }
 
   return (
-    <SafeAreaView
-      style={[styles.container, { backgroundColor: colors.background.primary }]}
-      edges={["top"]}
-    >
+    <ScreenContainer>
       {/* Header */}
       <View style={[styles.header, { borderBottomColor: colors.border.light }]}>
         <BackButton />
@@ -78,7 +62,7 @@ export default function ExploreResultsScreen() {
             {filters.source} → {filters.destination}
           </Text>
         </View>
-        {/* NEW: Modify Search Button */}
+        {/* Modify Search Button */}
         <Pressable
           onPress={handleModifySearch}
           hitSlop={10}
@@ -159,14 +143,11 @@ export default function ExploreResultsScreen() {
           </View>
         )}
       </ScrollView>
-    </SafeAreaView>
+    </ScreenContainer>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-  },
   header: {
     flexDirection: "row",
     alignItems: "center",
@@ -185,22 +166,12 @@ const styles = StyleSheet.create({
   headerSubtitle: {
     fontSize: Typography.sizes.sm,
   },
-  // NEW: Modify button
   modifyButton: {
     width: 40,
     height: 40,
     borderRadius: 20,
     alignItems: "center",
     justifyContent: "center",
-  },
-  loadingContainer: {
-    flex: 1,
-    justifyContent: "center",
-    alignItems: "center",
-    gap: Spacing.md,
-  },
-  loadingText: {
-    fontSize: Typography.sizes.md,
   },
   scrollView: {
     flex: 1,
