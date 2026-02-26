@@ -1,4 +1,4 @@
-import { BackButton } from "@/components/shared";
+import { DetailScreenHeader } from "@/components/shared";
 import TripInfoRow from "@/components/trip/TripInfoRow";
 import TripRouteCard from "@/components/trip/TripRouteCard";
 import TripScheduleGrid from "@/components/trip/TripScheduleGrid";
@@ -63,12 +63,7 @@ export default function TripPreviewScreen() {
       edges={["top"]}
     >
       {/* Header */}
-      <View style={[styles.header, { borderBottomColor: colors.border.light }]}>
-        <BackButton />
-        <Text style={[styles.headerTitle, { color: colors.text.primary }]}>
-          Trip Details
-        </Text>
-      </View>
+      <DetailScreenHeader title="Trip Details" />
 
       <ScrollView
         style={styles.scrollView}
@@ -188,19 +183,6 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: "center",
     alignItems: "center",
-  },
-  header: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: Spacing.sm,
-    paddingHorizontal: Spacing.lg,
-    paddingVertical: Spacing.md,
-    borderBottomWidth: 1,
-  },
-  headerTitle: {
-    flex: 1,
-    fontSize: Typography.sizes.lg,
-    fontWeight: Typography.weights.bold,
   },
   scrollView: {
     flex: 1,

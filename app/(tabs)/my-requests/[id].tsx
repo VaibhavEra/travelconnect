@@ -1,10 +1,15 @@
 // app/(tabs)/my-requests/[id].tsx
 import CancelRequestModal from "@/components/request/CancelRequestModal";
+import ContactCard from "@/components/request/ContactCard";
 import EditReceiverDetailsModal from "@/components/request/EditReceiverDetailsModal";
 import EditRequestDetailsModal from "@/components/request/EditRequestDetailsModal";
 import OtpCard from "@/components/request/OtpCard";
 import PhotoGallery from "@/components/request/PhotoGallery";
-import { AlertCard, BackButton } from "@/components/shared";
+import {
+  AlertCard,
+  DetailScreenHeader,
+  StatusBadge,
+} from "@/components/shared";
 import TripInfoRow from "@/components/trip/TripInfoRow";
 import TripRouteCard from "@/components/trip/TripRouteCard";
 import TripScheduleGrid from "@/components/trip/TripScheduleGrid";
@@ -97,11 +102,6 @@ export default function RequestDetailsScreen() {
       logger.error("Failed to open ticket URL", error, { module: MODULE });
       showErrorAlert(error);
     });
-  };
-
-  const handleCallTraveller = (phone: string) => {
-    haptics.light();
-    Linking.openURL(`tel:${phone}`);
   };
 
   const handleRegeneratePickupOtp = async () => {
@@ -200,20 +200,16 @@ export default function RequestDetailsScreen() {
       edges={["top"]}
     >
       {/* Header */}
-      <View style={[styles.header, { borderBottomColor: colors.border.light }]}>
-        <BackButton />
-        <Text style={[styles.headerTitle, { color: colors.text.primary }]}>
-          Request Details
-        </Text>
-        <View
-          style={[styles.statusBadge, { backgroundColor: statusColor + "15" }]}
-        >
-          <Ionicons name={statusConfig.icon} size={14} color={statusColor} />
-          <Text style={[styles.statusBadgeText, { color: statusColor }]}>
-            {statusConfig.label}
-          </Text>
-        </View>
-      </View>
+      <DetailScreenHeader
+        title="Request Details"
+        right={
+          <StatusBadge
+            icon={statusConfig.icon}
+            label={statusConfig.label}
+            color={statusColor}
+          />
+        }
+      />
 
       <ScrollView
         style={styles.scrollView}
@@ -460,28 +456,14 @@ export default function RequestDetailsScreen() {
             )}
           </View>
 
-          <View
-            style={[
-              styles.contactCard,
-              { backgroundColor: colors.background.primary },
-            ]}
-          >
-            <View style={styles.contactInfo}>
-              <Text
-                style={[styles.contactName, { color: colors.text.primary }]}
-              >
-                {currentRequest.delivery_contact_name}
-              </Text>
-              <Text
-                style={[styles.contactPhone, { color: colors.text.secondary }]}
-              >
-                {currentRequest.delivery_contact_phone}
-              </Text>
-            </View>
-          </View>
+          <ContactCard
+            name={currentRequest.delivery_contact_name}
+            phone={currentRequest.delivery_contact_phone}
+            iconColor={colors.primary}
+          />
         </View>
 
-        {/* ── Traveller Info Card ── */}
+        {/* ── Traveller Info Card (only when accepted) ── */}
         {isAccepted && travellerInfo && (
           <View
             style={[
@@ -489,52 +471,15 @@ export default function RequestDetailsScreen() {
               { backgroundColor: colors.background.secondary },
             ]}
           >
-            <View style={styles.sectionHeaderRow}>
-              <Text
-                style={[styles.sectionTitle, { color: colors.text.primary }]}
-              >
-                Traveller
-              </Text>
-              {travellerInfo.phone && (
-                <Pressable
-                  onPress={() => handleCallTraveller(travellerInfo.phone)}
-                  style={[
-                    styles.callButton,
-                    { backgroundColor: colors.primary + "15" },
-                  ]}
-                >
-                  <Ionicons name="call" size={16} color={colors.primary} />
-                  <Text
-                    style={[styles.callButtonText, { color: colors.primary }]}
-                  >
-                    Call
-                  </Text>
-                </Pressable>
-              )}
-            </View>
+            <Text style={[styles.sectionTitle, { color: colors.text.primary }]}>
+              Traveller
+            </Text>
 
-            <View
-              style={[
-                styles.contactCard,
-                { backgroundColor: colors.background.primary },
-              ]}
-            >
-              <View style={styles.contactInfo}>
-                <Text
-                  style={[styles.contactName, { color: colors.text.primary }]}
-                >
-                  {travellerInfo.full_name}
-                </Text>
-                <Text
-                  style={[
-                    styles.contactPhone,
-                    { color: colors.text.secondary },
-                  ]}
-                >
-                  {travellerInfo.phone}
-                </Text>
-              </View>
-            </View>
+            <ContactCard
+              name={travellerInfo.full_name}
+              phone={travellerInfo.phone}
+              iconColor={colors.primary}
+            />
           </View>
         )}
 
@@ -728,31 +673,6 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     alignItems: "center",
   },
-  header: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: Spacing.sm,
-    paddingHorizontal: Spacing.lg,
-    paddingVertical: Spacing.md,
-    borderBottomWidth: 1,
-  },
-  headerTitle: {
-    flex: 1,
-    fontSize: Typography.sizes.lg,
-    fontWeight: Typography.weights.bold,
-  },
-  statusBadge: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 6,
-    paddingHorizontal: Spacing.sm,
-    paddingVertical: Spacing.xs,
-    borderRadius: BorderRadius.sm,
-  },
-  statusBadgeText: {
-    fontSize: Typography.sizes.sm,
-    fontWeight: Typography.weights.semibold,
-  },
   scrollView: { flex: 1 },
   scrollContent: {
     padding: Spacing.lg,
@@ -806,6 +726,7 @@ const styles = StyleSheet.create({
   sectionTitle: {
     fontSize: Typography.sizes.sm,
     fontWeight: Typography.weights.semibold,
+    marginBottom: Spacing.sm,
   },
   editButton: {
     flexDirection: "row",
@@ -871,34 +792,6 @@ const styles = StyleSheet.create({
   photoCountText: {
     fontSize: Typography.sizes.xs,
     fontWeight: Typography.weights.bold,
-  },
-  contactCard: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    padding: Spacing.md,
-    borderRadius: BorderRadius.lg,
-  },
-  contactInfo: { flex: 1 },
-  contactName: {
-    fontSize: Typography.sizes.md,
-    fontWeight: Typography.weights.bold,
-    marginBottom: 2,
-  },
-  contactPhone: {
-    fontSize: Typography.sizes.sm,
-  },
-  callButton: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: Spacing.xs,
-    paddingHorizontal: Spacing.sm,
-    paddingVertical: Spacing.xs,
-    borderRadius: BorderRadius.sm,
-  },
-  callButtonText: {
-    fontSize: Typography.sizes.sm,
-    fontWeight: Typography.weights.semibold,
   },
   otpBox: {
     padding: Spacing.md,

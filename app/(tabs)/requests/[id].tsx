@@ -2,8 +2,13 @@
 import AcceptRequestModal from "@/components/modals/AcceptRequestModal";
 import RejectRequestModal from "@/components/modals/RejectRequestModal";
 import VerifyOtpModal from "@/components/modals/VerifyOtpModal";
+import ContactCard from "@/components/request/ContactCard";
 import PhotoGallery from "@/components/request/PhotoGallery";
-import { AlertCard, BackButton } from "@/components/shared";
+import {
+  AlertCard,
+  DetailScreenHeader,
+  StatusBadge,
+} from "@/components/shared";
 import TripInfoRow from "@/components/trip/TripInfoRow";
 import TripRouteCard from "@/components/trip/TripRouteCard";
 import TripScheduleGrid from "@/components/trip/TripScheduleGrid";
@@ -21,18 +26,12 @@ import { router, useLocalSearchParams } from "expo-router";
 import { useEffect, useState } from "react";
 import {
   ActivityIndicator,
-  Linking,
   Pressable,
   ScrollView,
   StyleSheet,
   Text,
   View,
 } from "react-native";
-import Animated, {
-  useAnimatedStyle,
-  useSharedValue,
-  withSpring,
-} from "react-native-reanimated";
 import { SafeAreaView } from "react-native-safe-area-context";
 
 const MODULE = "IncomingRequestDetailsScreen";
@@ -60,11 +59,6 @@ export default function IncomingRequestDetailsScreen() {
       getRequestById(id);
     }
   }, [id]);
-
-  const handleCall = (phone: string) => {
-    haptics.light();
-    Linking.openURL(`tel:${phone}`);
-  };
 
   const handleAccept = async () => {
     try {
@@ -176,20 +170,16 @@ export default function IncomingRequestDetailsScreen() {
       edges={["top"]}
     >
       {/* Header */}
-      <View style={[styles.header, { borderBottomColor: colors.border.light }]}>
-        <BackButton />
-        <Text style={[styles.headerTitle, { color: colors.text.primary }]}>
-          Request Details
-        </Text>
-        <View
-          style={[styles.statusBadge, { backgroundColor: statusColor + "15" }]}
-        >
-          <Ionicons name={statusConfig.icon} size={14} color={statusColor} />
-          <Text style={[styles.statusBadgeText, { color: statusColor }]}>
-            {statusConfig.label}
-          </Text>
-        </View>
-      </View>
+      <DetailScreenHeader
+        title="Request Details"
+        right={
+          <StatusBadge
+            icon={statusConfig.icon}
+            label={statusConfig.label}
+            color={statusColor}
+          />
+        }
+      />
 
       <ScrollView
         style={styles.scrollView}
@@ -387,7 +377,6 @@ export default function IncomingRequestDetailsScreen() {
                 <ContactCard
                   name={request.sender.full_name}
                   phone={request.sender.phone}
-                  onCall={() => handleCall(request.sender!.phone)}
                   iconColor={colors.primary}
                 />
               </>
@@ -416,7 +405,6 @@ export default function IncomingRequestDetailsScreen() {
             <ContactCard
               name={request.delivery_contact_name}
               phone={request.delivery_contact_phone}
-              onCall={() => handleCall(request.delivery_contact_phone)}
               iconColor={colors.success}
             />
           </View>
@@ -584,89 +572,12 @@ export default function IncomingRequestDetailsScreen() {
   );
 }
 
-// ── ContactCard helper ── unchanged logic, updated style usage
-function ContactCard({
-  name,
-  phone,
-  onCall,
-  iconColor,
-}: {
-  name: string;
-  phone: string;
-  onCall: () => void;
-  iconColor: string;
-}) {
-  const colors = useThemeColors();
-  const scale = useSharedValue(1);
-
-  const animatedStyle = useAnimatedStyle(() => ({
-    transform: [{ scale: scale.value }],
-  }));
-
-  return (
-    <View
-      style={[
-        styles.contactCard,
-        { backgroundColor: colors.background.primary },
-      ]}
-    >
-      <View style={styles.contactInfo}>
-        <Text style={[styles.contactName, { color: colors.text.primary }]}>
-          {name}
-        </Text>
-        <Text style={[styles.contactPhone, { color: colors.text.secondary }]}>
-          {phone}
-        </Text>
-      </View>
-      <Animated.View style={animatedStyle}>
-        <Pressable
-          style={[styles.callButton, { backgroundColor: iconColor + "15" }]}
-          onPress={onCall}
-          onPressIn={() => {
-            scale.value = withSpring(0.9);
-          }}
-          onPressOut={() => {
-            scale.value = withSpring(1);
-          }}
-        >
-          <Ionicons name="call" size={20} color={iconColor} />
-        </Pressable>
-      </Animated.View>
-    </View>
-  );
-}
-
 const styles = StyleSheet.create({
   container: { flex: 1 },
   loadingContainer: {
     flex: 1,
     justifyContent: "center",
     alignItems: "center",
-  },
-  header: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: Spacing.sm,
-    paddingHorizontal: Spacing.lg,
-    paddingVertical: Spacing.md,
-    borderBottomWidth: 1,
-  },
-  headerTitle: {
-    flex: 1,
-    fontSize: Typography.sizes.lg,
-    fontWeight: Typography.weights.bold,
-  },
-  statusBadge: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 6,
-    paddingHorizontal: Spacing.sm,
-    paddingVertical: Spacing.xs,
-    borderRadius: BorderRadius.sm,
-  },
-  statusBadgeText: {
-    fontSize: Typography.sizes.sm,
-    fontWeight: Typography.weights.semibold,
   },
   scrollView: { flex: 1 },
   scrollContent: {
@@ -784,29 +695,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
-  contactCard: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    padding: Spacing.md,
-    borderRadius: BorderRadius.lg,
-  },
-  contactInfo: { flex: 1 },
-  contactName: {
-    fontSize: Typography.sizes.md,
-    fontWeight: Typography.weights.bold,
-    marginBottom: 2,
-  },
-  contactPhone: {
-    fontSize: Typography.sizes.sm,
-  },
-  callButton: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    alignItems: "center",
-    justifyContent: "center",
-  },
+  // ── Action Buttons — inside ScrollView, NO position absolute ──
   actionsContainer: {
     flexDirection: "row",
     gap: Spacing.sm,
@@ -826,9 +715,15 @@ const styles = StyleSheet.create({
     shadowRadius: 8,
     elevation: 4,
   },
-  actionButtonPressed: { opacity: 0.8 },
-  acceptButton: { flex: 1.5 },
-  fullWidthButton: { flex: 1 },
+  actionButtonPressed: {
+    opacity: 0.8,
+  },
+  acceptButton: {
+    flex: 1.5,
+  },
+  fullWidthButton: {
+    flex: 1,
+  },
   actionButtonText: {
     fontSize: Typography.sizes.md,
     fontWeight: Typography.weights.bold,

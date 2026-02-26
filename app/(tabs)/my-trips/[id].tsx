@@ -1,6 +1,6 @@
 // app/(tabs)/my-trips/[id].tsx
 import CancellationOtpModal from "@/components/modals/CancellationOtpModal";
-import { BackButton } from "@/components/shared";
+import { DetailScreenHeader, StatusBadge } from "@/components/shared";
 import EditTripDatesModal from "@/components/trip/EditTripDatesModal";
 import EditTripDetailsModal from "@/components/trip/EditTripDetailsModal";
 import TripInfoRow from "@/components/trip/TripInfoRow";
@@ -261,20 +261,16 @@ export default function TripDetailsScreen() {
       edges={["top"]}
     >
       {/* Header */}
-      <View style={[styles.header, { borderBottomColor: colors.border.light }]}>
-        <BackButton />
-        <Text style={[styles.headerTitle, { color: colors.text.primary }]}>
-          Trip Details
-        </Text>
-        <View
-          style={[styles.statusBadge, { backgroundColor: statusColor + "15" }]}
-        >
-          <Ionicons name={statusConfig.icon} size={14} color={statusColor} />
-          <Text style={[styles.statusBadgeText, { color: statusColor }]}>
-            {statusConfig.label}
-          </Text>
-        </View>
-      </View>
+      <DetailScreenHeader
+        title="Trip Details"
+        right={
+          <StatusBadge
+            icon={statusConfig.icon}
+            label={statusConfig.label}
+            color={statusColor}
+          />
+        }
+      />
 
       <ScrollView
         style={styles.scrollView}
@@ -508,31 +504,6 @@ const styles = StyleSheet.create({
   },
   loadingText: {
     fontSize: Typography.sizes.md,
-  },
-  header: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: Spacing.sm,
-    paddingHorizontal: Spacing.lg,
-    paddingVertical: Spacing.md,
-    borderBottomWidth: 1,
-  },
-  headerTitle: {
-    flex: 1,
-    fontSize: Typography.sizes.lg,
-    fontWeight: Typography.weights.bold,
-  },
-  statusBadge: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 6,
-    paddingHorizontal: Spacing.sm,
-    paddingVertical: Spacing.xs,
-    borderRadius: BorderRadius.sm,
-  },
-  statusBadgeText: {
-    fontSize: Typography.sizes.sm,
-    fontWeight: Typography.weights.semibold,
   },
   scrollView: {
     flex: 1,
