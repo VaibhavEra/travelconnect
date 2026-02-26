@@ -1,6 +1,6 @@
 // app/(tabs)/create-trip.tsx
 import CategoryCheckboxes from "@/components/forms/CategoryCheckboxes";
-import CityDropdown from "@/components/forms/CityDropdown";
+import CitySwapPair from "@/components/forms/CitySwapPair";
 import DatePickerInput from "@/components/forms/DatePickerInput";
 import FileUploadButton from "@/components/forms/FileUploadButton";
 import ParcelSizeSelector from "@/components/forms/ParcelSizeSelector";
@@ -73,7 +73,6 @@ export default function CreateTripScreen() {
     formState: { errors, isValid },
     reset,
     watch,
-    setValue,
   } = useForm<TripFormData>({
     resolver: zodResolver(tripSchema),
     mode: "onChange",
@@ -87,15 +86,6 @@ export default function CreateTripScreen() {
   }
 
   const departureDate = watch("departure_date");
-  const source = watch("source");
-  const destination = watch("destination");
-
-  const handleCitySwap = () => {
-    haptics.light();
-    const temp = source;
-    setValue("source", destination);
-    setValue("destination", temp);
-  };
 
   const onSubmit = async (data: TripFormData) => {
     try {
@@ -179,87 +169,48 @@ export default function CreateTripScreen() {
               </Text>
             </View>
 
-            <View style={styles.cityWrapper}>
-              <Controller
-                control={control}
-                name="source"
-                render={({ field: { onChange, value } }) => (
-                  <CityDropdown
-                    label="From"
-                    value={value}
-                    onChange={onChange}
-                    placeholder="Select origin city"
-                    error={errors.source?.message}
-                  />
-                )}
-              />
-            </View>
-
-            <View style={styles.swapContainer}>
-              <View
-                style={[
-                  styles.swapLine,
-                  { backgroundColor: colors.border.default },
-                ]}
-              />
-              <Pressable
-                style={[
-                  styles.swapButton,
-                  {
-                    backgroundColor: colors.background.primary,
-                    borderColor: colors.border.default,
-                  },
-                  !source && !destination && styles.swapButtonDisabled,
-                ]}
-                onPress={handleCitySwap}
-                disabled={!source && !destination}
-              >
-                <Ionicons
-                  name="swap-vertical"
-                  size={20}
-                  color={
-                    source || destination
-                      ? colors.primary
-                      : colors.text.tertiary
-                  }
-                />
-              </Pressable>
-              <View
-                style={[
-                  styles.swapLine,
-                  { backgroundColor: colors.border.default },
-                ]}
-              />
-            </View>
-
-            <View style={styles.cityWrapperLast}>
-              <Controller
-                control={control}
-                name="destination"
-                render={({ field: { onChange, value } }) => (
-                  <CityDropdown
-                    label="To"
-                    value={value}
-                    onChange={onChange}
-                    placeholder="Select destination city"
-                    error={errors.destination?.message}
-                  />
-                )}
-              />
-            </View>
-
             <Controller
               control={control}
-              name="transport_mode"
-              render={({ field: { onChange, value } }) => (
-                <TransportModeSelector
-                  label="Transport Mode"
-                  value={value as TransportMode}
-                  onChange={onChange}
-                  error={errors.transport_mode?.message}
+              name="source"
+              render={({
+                field: { onChange: onSourceChange, value: sourceValue },
+              }) => (
+                <Controller
+                  control={control}
+                  name="destination"
+                  render={({
+                    field: {
+                      onChange: onDestinationChange,
+                      value: destinationValue,
+                    },
+                  }) => (
+                    <CitySwapPair
+                      sourceValue={sourceValue}
+                      destinationValue={destinationValue}
+                      onSourceChange={onSourceChange}
+                      onDestinationChange={onDestinationChange}
+                      sourceError={errors.source?.message}
+                      destinationError={errors.destination?.message}
+                    />
+                  )}
                 />
               )}
             />
+
+            <View style={styles.transportRow}>
+              <Controller
+                control={control}
+                name="transport_mode"
+                render={({ field: { onChange, value } }) => (
+                  <TransportModeSelector
+                    label="Transport Mode"
+                    value={value as TransportMode}
+                    onChange={onChange}
+                    error={errors.transport_mode?.message}
+                  />
+                )}
+              />
+            </View>
           </View>
 
           {/* Schedule */}
@@ -563,30 +514,8 @@ const styles = StyleSheet.create({
     fontSize: Typography.sizes.md,
     fontWeight: Typography.weights.bold,
   },
-  cityWrapper: {},
-  cityWrapperLast: {
-    marginBottom: Spacing.md,
-  },
-  swapContainer: {
-    flexDirection: "row",
-    alignItems: "center",
-    marginVertical: Spacing.xs,
-  },
-  swapLine: {
-    flex: 1,
-    height: 1,
-  },
-  swapButton: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    alignItems: "center",
-    justifyContent: "center",
-    borderWidth: 1,
-    marginHorizontal: Spacing.sm,
-  },
-  swapButtonDisabled: {
-    opacity: 0.5,
+  transportRow: {
+    marginTop: Spacing.md,
   },
   scheduleLabel: {
     fontSize: Typography.sizes.md,
