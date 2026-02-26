@@ -1,6 +1,8 @@
+export { default as AlertCard } from "./AlertCard";
 export { default as BackButton } from "./BackButton";
 export { default as BaseModal } from "./BaseModal";
 export * from "./CategoryBadge";
+export { default as DetailCard } from "./DetailCard";
 export { default as FilterChip } from "./FilterChip";
 export { default as ModalButton } from "./ModalButton";
 export { default as ModeSwitcher } from "./ModeSwitcher";

@@ -1,11 +1,8 @@
 import { BackButton } from "@/components/shared";
+import TripInfoRow from "@/components/trip/TripInfoRow";
+import TripRouteCard from "@/components/trip/TripRouteCard";
+import TripScheduleGrid from "@/components/trip/TripScheduleGrid";
 import { CATEGORY_CONFIG } from "@/lib/constants/categories";
-import {
-  getSizeCapacityIcon,
-  getSizeCapacityLabel,
-} from "@/lib/constants/parcel";
-import { TRANSPORT_ICONS } from "@/lib/constants/transport";
-import { formatDate, formatTime } from "@/lib/utils/dateTime";
 import { haptics } from "@/lib/utils/haptics";
 import { useTripStore } from "@/stores/tripStore";
 import { BorderRadius, Spacing, Typography } from "@/styles";
@@ -85,198 +82,30 @@ export default function TripPreviewScreen() {
             { backgroundColor: colors.background.secondary },
           ]}
         >
-          {/* Route */}
-          <View style={styles.routeContainer}>
-            <View style={styles.routePoint}>
-              <View
-                style={[styles.routeDot, { backgroundColor: colors.primary }]}
-              />
-              <View style={styles.routeInfo}>
-                <Text
-                  style={[styles.routeLabel, { color: colors.text.tertiary }]}
-                >
-                  From
-                </Text>
-                <Text
-                  style={[styles.routeCity, { color: colors.text.primary }]}
-                >
-                  {currentTrip.source}
-                </Text>
-              </View>
-            </View>
-
-            <View
-              style={[
-                styles.routeConnector,
-                { borderColor: colors.border.default },
-              ]}
-            />
-
-            <View style={styles.routePoint}>
-              <View
-                style={[styles.routeDot, { backgroundColor: colors.success }]}
-              />
-              <View style={styles.routeInfo}>
-                <Text
-                  style={[styles.routeLabel, { color: colors.text.tertiary }]}
-                >
-                  To
-                </Text>
-                <Text
-                  style={[styles.routeCity, { color: colors.text.primary }]}
-                >
-                  {currentTrip.destination}
-                </Text>
-              </View>
-            </View>
-          </View>
+          <TripRouteCard
+            source={currentTrip.source}
+            destination={currentTrip.destination}
+          />
 
           <View
             style={[styles.divider, { backgroundColor: colors.border.light }]}
           />
 
-          {/* Schedule Grid */}
-          <View style={styles.scheduleGrid}>
-            {/* Departure */}
-            <View style={styles.scheduleBlock}>
-              <View
-                style={[
-                  styles.scheduleIconContainer,
-                  { backgroundColor: colors.primary + "10" },
-                ]}
-              >
-                <Ionicons
-                  name="arrow-up-circle"
-                  size={20}
-                  color={colors.primary}
-                />
-              </View>
-              <View style={styles.scheduleDetails}>
-                <Text
-                  style={[
-                    styles.scheduleLabel,
-                    { color: colors.text.tertiary },
-                  ]}
-                >
-                  Departure
-                </Text>
-                <Text
-                  style={[styles.scheduleDate, { color: colors.text.primary }]}
-                >
-                  {formatDate(currentTrip.departure_date)}
-                </Text>
-                <Text
-                  style={[
-                    styles.scheduleTime,
-                    { color: colors.text.secondary },
-                  ]}
-                >
-                  {formatTime(currentTrip.departure_time)}
-                </Text>
-              </View>
-            </View>
-
-            {/* Arrival */}
-            <View style={styles.scheduleBlock}>
-              <View
-                style={[
-                  styles.scheduleIconContainer,
-                  { backgroundColor: colors.success + "10" },
-                ]}
-              >
-                <Ionicons
-                  name="arrow-down-circle"
-                  size={20}
-                  color={colors.success}
-                />
-              </View>
-              <View style={styles.scheduleDetails}>
-                <Text
-                  style={[
-                    styles.scheduleLabel,
-                    { color: colors.text.tertiary },
-                  ]}
-                >
-                  Arrival
-                </Text>
-                <Text
-                  style={[styles.scheduleDate, { color: colors.text.primary }]}
-                >
-                  {formatDate(currentTrip.arrival_date)}
-                </Text>
-                <Text
-                  style={[
-                    styles.scheduleTime,
-                    { color: colors.text.secondary },
-                  ]}
-                >
-                  {formatTime(currentTrip.arrival_time)}
-                </Text>
-              </View>
-            </View>
-          </View>
+          <TripScheduleGrid
+            departureDate={currentTrip.departure_date}
+            departureTime={currentTrip.departure_time}
+            arrivalDate={currentTrip.arrival_date}
+            arrivalTime={currentTrip.arrival_time}
+          />
 
           <View
             style={[styles.divider, { backgroundColor: colors.border.light }]}
           />
 
-          {/* Trip Info Row */}
-          <View style={styles.infoRow}>
-            <View style={styles.infoItem}>
-              <View
-                style={[
-                  styles.infoIcon,
-                  { backgroundColor: colors.primary + "10" },
-                ]}
-              >
-                <Ionicons
-                  name={TRANSPORT_ICONS[currentTrip.transport_mode]}
-                  size={18}
-                  color={colors.primary}
-                />
-              </View>
-              <View>
-                <Text
-                  style={[styles.infoLabel, { color: colors.text.tertiary }]}
-                >
-                  Transport
-                </Text>
-                <Text
-                  style={[styles.infoValue, { color: colors.text.primary }]}
-                >
-                  {currentTrip.transport_mode.charAt(0).toUpperCase() +
-                    currentTrip.transport_mode.slice(1)}
-                </Text>
-              </View>
-            </View>
-
-            <View style={styles.infoItem}>
-              <View
-                style={[
-                  styles.infoIcon,
-                  { backgroundColor: colors.success + "10" },
-                ]}
-              >
-                <Ionicons
-                  name={getSizeCapacityIcon(currentTrip.parcel_size_capacity)}
-                  size={18}
-                  color={colors.success}
-                />
-              </View>
-              <View>
-                <Text
-                  style={[styles.infoLabel, { color: colors.text.tertiary }]}
-                >
-                  Parcel Size
-                </Text>
-                <Text
-                  style={[styles.infoValue, { color: colors.text.primary }]}
-                >
-                  {getSizeCapacityLabel(currentTrip.parcel_size_capacity)}
-                </Text>
-              </View>
-            </View>
-          </View>
+          <TripInfoRow
+            transportMode={currentTrip.transport_mode}
+            parcelSizeCapacity={currentTrip.parcel_size_capacity}
+          />
 
           <View
             style={[styles.divider, { backgroundColor: colors.border.light }]}
@@ -389,96 +218,9 @@ const styles = StyleSheet.create({
     shadowRadius: 8,
     elevation: 2,
   },
-  routeContainer: {
-    marginBottom: Spacing.md,
-  },
-  routePoint: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: Spacing.sm,
-  },
-  routeDot: {
-    width: 12,
-    height: 12,
-    borderRadius: 6,
-  },
-  routeInfo: {},
-  routeLabel: {
-    fontSize: Typography.sizes.xs,
-    marginBottom: 2,
-  },
-  routeCity: {
-    fontSize: Typography.sizes.lg,
-    fontWeight: Typography.weights.bold,
-  },
-  routeConnector: {
-    width: 2,
-    height: 20,
-    marginLeft: 5,
-    marginVertical: Spacing.xs,
-    borderLeftWidth: 2,
-    borderStyle: "dashed",
-  },
   divider: {
     height: 1,
     marginVertical: Spacing.md,
-  },
-  scheduleGrid: {
-    flexDirection: "row",
-    gap: Spacing.md,
-    marginBottom: Spacing.md,
-  },
-  scheduleBlock: {
-    flex: 1,
-    flexDirection: "row",
-    gap: Spacing.sm,
-  },
-  scheduleIconContainer: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  scheduleDetails: {
-    flex: 1,
-  },
-  scheduleLabel: {
-    fontSize: Typography.sizes.xs,
-    marginBottom: 2,
-  },
-  scheduleDate: {
-    fontSize: Typography.sizes.sm,
-    fontWeight: Typography.weights.semibold,
-    marginBottom: 2,
-  },
-  scheduleTime: {
-    fontSize: Typography.sizes.xs,
-  },
-  infoRow: {
-    flexDirection: "row",
-    gap: Spacing.md,
-    marginBottom: Spacing.md,
-  },
-  infoItem: {
-    flex: 1,
-    flexDirection: "row",
-    gap: Spacing.sm,
-  },
-  infoIcon: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  infoLabel: {
-    fontSize: Typography.sizes.xs,
-    marginBottom: 4,
-  },
-  infoValue: {
-    fontSize: Typography.sizes.sm,
-    fontWeight: Typography.weights.semibold,
   },
   categoriesSection: {
     marginBottom: Spacing.md,

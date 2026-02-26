@@ -2,17 +2,16 @@
 import CancelRequestModal from "@/components/request/CancelRequestModal";
 import EditReceiverDetailsModal from "@/components/request/EditReceiverDetailsModal";
 import EditRequestDetailsModal from "@/components/request/EditRequestDetailsModal";
+import OtpCard from "@/components/request/OtpCard";
 import PhotoGallery from "@/components/request/PhotoGallery";
-import { BackButton } from "@/components/shared";
+import { AlertCard, BackButton } from "@/components/shared";
+import TripInfoRow from "@/components/trip/TripInfoRow";
+import TripRouteCard from "@/components/trip/TripRouteCard";
+import TripScheduleGrid from "@/components/trip/TripScheduleGrid";
 import { CATEGORY_CONFIG } from "@/lib/constants/categories";
-import {
-  getSizeCapacityIcon,
-  getSizeCapacityLabel,
-} from "@/lib/constants/parcel";
 import { REQUEST_STATUS_CONFIG, RequestStatus } from "@/lib/constants/status";
-import { TRANSPORT_ICONS } from "@/lib/constants/transport";
 import { showErrorAlert } from "@/lib/utils/alerts";
-import { formatCountdown, formatDate, formatTime } from "@/lib/utils/dateTime";
+import { formatCountdown } from "@/lib/utils/dateTime";
 import { haptics } from "@/lib/utils/haptics";
 import { logger } from "@/lib/utils/logger";
 import { showSuccessToast } from "@/lib/utils/toast";
@@ -178,12 +177,6 @@ export default function RequestDetailsScreen() {
   const tripData = currentRequest.trip as any;
   const travellerInfo = tripData?.traveller || null;
   const transportMode = tripData?.transport_mode || "";
-  const transportIcon =
-    TRANSPORT_ICONS[transportMode as keyof typeof TRANSPORT_ICONS] ??
-    "car-outline";
-  const sizeCapacityLabel = getSizeCapacityLabel(
-    tripData?.parcel_size_capacity || "",
-  );
 
   const pickupExpiryText =
     currentRequest.pickup_otp_expiry != null
@@ -235,202 +228,31 @@ export default function RequestDetailsScreen() {
               { backgroundColor: colors.background.secondary },
             ]}
           >
-            {/* Route */}
-            <View style={styles.routeContainer}>
-              <View style={styles.routePoint}>
-                <View
-                  style={[styles.routeDot, { backgroundColor: colors.primary }]}
-                />
-                <View style={styles.routeInfo}>
-                  <Text
-                    style={[styles.routeLabel, { color: colors.text.tertiary }]}
-                  >
-                    From
-                  </Text>
-                  <Text
-                    style={[styles.routeCity, { color: colors.text.primary }]}
-                  >
-                    {currentRequest.trip.source}
-                  </Text>
-                </View>
-              </View>
-              <View
-                style={[
-                  styles.routeConnector,
-                  { borderColor: colors.border.default },
-                ]}
-              />
-              <View style={styles.routePoint}>
-                <View
-                  style={[styles.routeDot, { backgroundColor: colors.success }]}
-                />
-                <View style={styles.routeInfo}>
-                  <Text
-                    style={[styles.routeLabel, { color: colors.text.tertiary }]}
-                  >
-                    To
-                  </Text>
-                  <Text
-                    style={[styles.routeCity, { color: colors.text.primary }]}
-                  >
-                    {currentRequest.trip.destination}
-                  </Text>
-                </View>
-              </View>
-            </View>
+            <TripRouteCard
+              source={currentRequest.trip.source}
+              destination={currentRequest.trip.destination}
+            />
 
             <View
               style={[styles.divider, { backgroundColor: colors.border.light }]}
             />
 
-            {/* Schedule Grid */}
-            <View style={styles.scheduleGrid}>
-              <View style={styles.scheduleBlock}>
-                <View
-                  style={[
-                    styles.scheduleIconContainer,
-                    { backgroundColor: colors.primary + "10" },
-                  ]}
-                >
-                  <Ionicons
-                    name="arrow-up-circle"
-                    size={20}
-                    color={colors.primary}
-                  />
-                </View>
-                <View style={styles.scheduleDetails}>
-                  <Text
-                    style={[
-                      styles.scheduleLabel,
-                      { color: colors.text.tertiary },
-                    ]}
-                  >
-                    Departure
-                  </Text>
-                  <Text
-                    style={[
-                      styles.scheduleDate,
-                      { color: colors.text.primary },
-                    ]}
-                  >
-                    {formatDate(currentRequest.trip.departure_date)}
-                  </Text>
-                  <Text
-                    style={[
-                      styles.scheduleTime,
-                      { color: colors.text.secondary },
-                    ]}
-                  >
-                    {formatTime(currentRequest.trip.departure_time)}
-                  </Text>
-                </View>
-              </View>
-              <View style={styles.scheduleBlock}>
-                <View
-                  style={[
-                    styles.scheduleIconContainer,
-                    { backgroundColor: colors.success + "10" },
-                  ]}
-                >
-                  <Ionicons
-                    name="arrow-down-circle"
-                    size={20}
-                    color={colors.success}
-                  />
-                </View>
-                <View style={styles.scheduleDetails}>
-                  <Text
-                    style={[
-                      styles.scheduleLabel,
-                      { color: colors.text.tertiary },
-                    ]}
-                  >
-                    Arrival
-                  </Text>
-                  <Text
-                    style={[
-                      styles.scheduleDate,
-                      { color: colors.text.primary },
-                    ]}
-                  >
-                    {formatDate(currentRequest.trip.arrival_date)}
-                  </Text>
-                  <Text
-                    style={[
-                      styles.scheduleTime,
-                      { color: colors.text.secondary },
-                    ]}
-                  >
-                    {formatTime(currentRequest.trip.arrival_time)}
-                  </Text>
-                </View>
-              </View>
-            </View>
+            <TripScheduleGrid
+              departureDate={currentRequest.trip.departure_date}
+              departureTime={currentRequest.trip.departure_time}
+              arrivalDate={currentRequest.trip.arrival_date}
+              arrivalTime={currentRequest.trip.arrival_time}
+            />
 
             <View
               style={[styles.divider, { backgroundColor: colors.border.light }]}
             />
 
-            {/* Info Row — Transport + Capacity */}
-            <View style={styles.infoRow}>
-              <View style={styles.infoItem}>
-                <View
-                  style={[
-                    styles.infoIcon,
-                    { backgroundColor: colors.primary + "10" },
-                  ]}
-                >
-                  <Ionicons
-                    name={transportIcon}
-                    size={18}
-                    color={colors.primary}
-                  />
-                </View>
-                <View>
-                  <Text
-                    style={[styles.infoLabel, { color: colors.text.tertiary }]}
-                  >
-                    Transport
-                  </Text>
-                  <Text
-                    style={[styles.infoValue, { color: colors.text.primary }]}
-                  >
-                    {transportMode
-                      ? transportMode.charAt(0).toUpperCase() +
-                        transportMode.slice(1)
-                      : "—"}
-                  </Text>
-                </View>
-              </View>
-              <View style={styles.infoItem}>
-                <View
-                  style={[
-                    styles.infoIcon,
-                    { backgroundColor: colors.success + "10" },
-                  ]}
-                >
-                  <Ionicons
-                    name={getSizeCapacityIcon(
-                      tripData?.parcel_size_capacity || "small",
-                    )}
-                    size={18}
-                    color={colors.success}
-                  />
-                </View>
-                <View>
-                  <Text
-                    style={[styles.infoLabel, { color: colors.text.tertiary }]}
-                  >
-                    Trip Capacity
-                  </Text>
-                  <Text
-                    style={[styles.infoValue, { color: colors.text.primary }]}
-                  >
-                    {sizeCapacityLabel}
-                  </Text>
-                </View>
-              </View>
-            </View>
+            <TripInfoRow
+              transportMode={transportMode}
+              parcelSizeCapacity={tripData?.parcel_size_capacity || "small"}
+              capacityLabel="Trip Capacity"
+            />
 
             {/* PNR + Ticket — only after acceptance */}
             {isAccepted && (
@@ -659,7 +481,7 @@ export default function RequestDetailsScreen() {
           </View>
         </View>
 
-        {/* ── Traveller Info Card (only when accepted) ── */}
+        {/* ── Traveller Info Card ── */}
         {isAccepted && travellerInfo && (
           <View
             style={[
@@ -724,57 +546,15 @@ export default function RequestDetailsScreen() {
               { backgroundColor: colors.background.secondary },
             ]}
           >
-            <Text style={[styles.sectionTitle, { color: colors.text.primary }]}>
-              Pickup OTP
-            </Text>
-
-            <View
-              style={[
-                styles.otpBox,
-                { backgroundColor: colors.background.primary },
-              ]}
-            >
-              <Text style={[styles.otpCode, { color: colors.text.primary }]}>
-                {currentRequest.pickup_otp}
-              </Text>
-              {pickupExpiryText && (
-                <Text
-                  style={[styles.otpExpiry, { color: colors.text.secondary }]}
-                >
-                  {pickupExpiryText}
-                </Text>
-              )}
-            </View>
-
-            <Text style={[styles.helperText, { color: colors.text.secondary }]}>
-              Share this OTP with the traveller only when they arrive for
-              pickup.
-            </Text>
-
-            <View
-              style={[styles.divider, { backgroundColor: colors.border.light }]}
+            <OtpCard
+              title="Pickup OTP"
+              otp={currentRequest.pickup_otp}
+              expiryText={pickupExpiryText}
+              helperText="Share this OTP with the traveller only when they arrive for pickup."
+              accentColor="primary"
+              isRegenerating={regeneratingPickup}
+              onRegenerate={handleRegeneratePickupOtp}
             />
-
-            <Pressable
-              style={[
-                styles.secondaryButton,
-                { backgroundColor: colors.primary + "10" },
-                regeneratingPickup && styles.buttonDisabled,
-              ]}
-              onPress={handleRegeneratePickupOtp}
-              disabled={regeneratingPickup}
-            >
-              {regeneratingPickup ? (
-                <ActivityIndicator size="small" color={colors.primary} />
-              ) : (
-                <Ionicons name="refresh" size={18} color={colors.primary} />
-              )}
-              <Text
-                style={[styles.secondaryButtonText, { color: colors.primary }]}
-              >
-                {regeneratingPickup ? "Regenerating…" : "Regenerate OTP"}
-              </Text>
-            </Pressable>
           </View>
         )}
 
@@ -786,60 +566,19 @@ export default function RequestDetailsScreen() {
               { backgroundColor: colors.background.secondary },
             ]}
           >
-            <Text style={[styles.sectionTitle, { color: colors.text.primary }]}>
-              Delivery OTP
-            </Text>
-
-            <View
-              style={[
-                styles.otpBox,
-                { backgroundColor: colors.background.primary },
-              ]}
-            >
-              <Text style={[styles.otpCode, { color: colors.text.primary }]}>
-                {currentRequest.delivery_otp}
-              </Text>
-              {deliveryExpiryText && (
-                <Text
-                  style={[styles.otpExpiry, { color: colors.text.secondary }]}
-                >
-                  {deliveryExpiryText}
-                </Text>
-              )}
-            </View>
-
-            <Text style={[styles.helperText, { color: colors.text.secondary }]}>
-              Share this OTP with the receiver to confirm parcel delivery.
-            </Text>
-
-            <View
-              style={[styles.divider, { backgroundColor: colors.border.light }]}
+            <OtpCard
+              title="Delivery OTP"
+              otp={currentRequest.delivery_otp}
+              expiryText={deliveryExpiryText}
+              helperText="Share this OTP with the receiver to confirm parcel delivery."
+              accentColor="success"
+              isRegenerating={regeneratingDelivery}
+              onRegenerate={handleRegenerateDeliveryOtp}
             />
-
-            <Pressable
-              style={[
-                styles.secondaryButton,
-                { backgroundColor: colors.success + "10" },
-                regeneratingDelivery && styles.buttonDisabled,
-              ]}
-              onPress={handleRegenerateDeliveryOtp}
-              disabled={regeneratingDelivery}
-            >
-              {regeneratingDelivery ? (
-                <ActivityIndicator size="small" color={colors.success} />
-              ) : (
-                <Ionicons name="refresh" size={18} color={colors.success} />
-              )}
-              <Text
-                style={[styles.secondaryButtonText, { color: colors.success }]}
-              >
-                {regeneratingDelivery ? "Regenerating…" : "Regenerate OTP"}
-              </Text>
-            </Pressable>
           </View>
         )}
 
-        {/* ── Cancellation OTP Card (Issue #25) ── */}
+        {/* ── Cancellation OTP Card ── */}
         {status === "picked_up" &&
           currentRequest.cancellation_otp != null &&
           currentRequest.cancellation_otp_expiry != null &&
@@ -916,36 +655,12 @@ export default function RequestDetailsScreen() {
         {/* ── Alert Card — rejected / cancelled reason ── */}
         {(status === "rejected" || status === "cancelled") &&
           currentRequest.rejection_reason && (
-            <View
-              style={[
-                styles.alertCard,
-                {
-                  backgroundColor: colors.error + "10",
-                  borderColor: colors.error + "30",
-                },
-              ]}
-            >
-              <View
-                style={[
-                  styles.alertIconContainer,
-                  { backgroundColor: colors.error + "20" },
-                ]}
-              >
-                <Ionicons name="alert-circle" size={20} color={colors.error} />
-              </View>
-              <View style={styles.alertContent}>
-                <Text style={[styles.alertTitle, { color: colors.error }]}>
-                  {status === "rejected"
-                    ? "Request Rejected"
-                    : "Request Cancelled"}
-                </Text>
-                <Text
-                  style={[styles.alertText, { color: colors.text.primary }]}
-                >
-                  {currentRequest.rejection_reason}
-                </Text>
-              </View>
-            </View>
+            <AlertCard
+              title={
+                status === "rejected" ? "Request Rejected" : "Request Cancelled"
+              }
+              message={currentRequest.rejection_reason}
+            />
           )}
 
         {/* ── Cancel Button ── */}
@@ -1007,15 +722,12 @@ export default function RequestDetailsScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-  },
+  container: { flex: 1 },
   loadingContainer: {
     flex: 1,
     justifyContent: "center",
     alignItems: "center",
   },
-  // ── Header ──
   header: {
     flexDirection: "row",
     alignItems: "center",
@@ -1041,15 +753,11 @@ const styles = StyleSheet.create({
     fontSize: Typography.sizes.sm,
     fontWeight: Typography.weights.semibold,
   },
-  // ── ScrollView ──
-  scrollView: {
-    flex: 1,
-  },
+  scrollView: { flex: 1 },
   scrollContent: {
     padding: Spacing.lg,
     paddingBottom: Spacing.xxxl,
   },
-  // ── Main Card ── identical to requests/[id].tsx
   mainCard: {
     borderRadius: BorderRadius.xl,
     padding: Spacing.lg,
@@ -1060,92 +768,13 @@ const styles = StyleSheet.create({
     shadowRadius: 8,
     elevation: 2,
   },
-  // ── Divider ──
   divider: {
     height: 1,
     marginVertical: Spacing.md,
   },
-  // ── Route ──
-  routeContainer: {
-    marginBottom: Spacing.md,
-  },
-  routePoint: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: Spacing.sm,
-  },
-  routeDot: {
-    width: 12,
-    height: 12,
-    borderRadius: 6,
-  },
-  routeInfo: {},
-  routeLabel: {
-    fontSize: Typography.sizes.xs,
-    marginBottom: 2,
-  },
-  routeCity: {
-    fontSize: Typography.sizes.lg,
-    fontWeight: Typography.weights.bold,
-  },
-  routeConnector: {
-    width: 2,
-    height: 20,
-    marginLeft: 5,
-    marginVertical: Spacing.xs,
-    borderLeftWidth: 2,
-    borderStyle: "dashed",
-  },
-  // ── Schedule Grid ──
-  scheduleGrid: {
-    flexDirection: "row",
-    gap: Spacing.md,
-    marginBottom: Spacing.md,
-  },
-  scheduleBlock: {
-    flex: 1,
-    flexDirection: "row",
-    gap: Spacing.sm,
-  },
-  scheduleIconContainer: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  scheduleDetails: {
-    flex: 1,
-  },
-  scheduleLabel: {
-    fontSize: Typography.sizes.xs,
-    marginBottom: 2,
-  },
-  scheduleDate: {
-    fontSize: Typography.sizes.sm,
-    fontWeight: Typography.weights.semibold,
-    marginBottom: 2,
-  },
-  scheduleTime: {
-    fontSize: Typography.sizes.xs,
-  },
-  // ── Info Row ──
-  infoRow: {
-    flexDirection: "row",
-    gap: Spacing.md,
-    marginBottom: Spacing.md,
-  },
-  infoItem: {
-    flex: 1,
-    flexDirection: "row",
-    gap: Spacing.sm,
-  },
-  infoIcon: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    alignItems: "center",
-    justifyContent: "center",
+  pnrRow: {
+    gap: Spacing.xs,
+    marginBottom: Spacing.sm,
   },
   infoLabel: {
     fontSize: Typography.sizes.xs,
@@ -1154,11 +783,6 @@ const styles = StyleSheet.create({
   infoValue: {
     fontSize: Typography.sizes.sm,
     fontWeight: Typography.weights.semibold,
-  },
-  // ── PNR ──
-  pnrRow: {
-    gap: Spacing.xs,
-    marginBottom: Spacing.sm,
   },
   ticketButton: {
     flexDirection: "row",
@@ -1173,7 +797,6 @@ const styles = StyleSheet.create({
     fontSize: Typography.sizes.sm,
     fontWeight: Typography.weights.semibold,
   },
-  // ── Section Header Row ──
   sectionHeaderRow: {
     flexDirection: "row",
     alignItems: "center",
@@ -1196,7 +819,6 @@ const styles = StyleSheet.create({
     fontSize: Typography.sizes.sm,
     fontWeight: Typography.weights.semibold,
   },
-  // ── Parcel section ──
   descriptionBox: {
     padding: Spacing.md,
     borderRadius: BorderRadius.lg,
@@ -1250,7 +872,6 @@ const styles = StyleSheet.create({
     fontSize: Typography.sizes.xs,
     fontWeight: Typography.weights.bold,
   },
-  // ── Contact Card (receiver / traveller) ──
   contactCard: {
     flexDirection: "row",
     alignItems: "center",
@@ -1258,9 +879,7 @@ const styles = StyleSheet.create({
     padding: Spacing.md,
     borderRadius: BorderRadius.lg,
   },
-  contactInfo: {
-    flex: 1,
-  },
+  contactInfo: { flex: 1 },
   contactName: {
     fontSize: Typography.sizes.md,
     fontWeight: Typography.weights.bold,
@@ -1281,112 +900,53 @@ const styles = StyleSheet.create({
     fontSize: Typography.sizes.sm,
     fontWeight: Typography.weights.semibold,
   },
-  // ── OTP Cards ──
   otpBox: {
-    flexDirection: "row",
-    alignItems: "baseline",
-    justifyContent: "space-between",
     padding: Spacing.md,
     borderRadius: BorderRadius.lg,
-    marginBottom: Spacing.xs,
+    alignItems: "center",
+    marginBottom: Spacing.sm,
   },
   otpCode: {
-    fontSize: Typography.sizes.xl,
+    fontSize: Typography.sizes.xxxl,
     fontWeight: Typography.weights.bold,
-    letterSpacing: 4,
+    letterSpacing: 8,
   },
   otpExpiry: {
-    fontSize: Typography.sizes.sm,
+    fontSize: Typography.sizes.xs,
+    marginTop: 4,
   },
   helperText: {
     fontSize: Typography.sizes.sm,
     lineHeight: Typography.sizes.sm * 1.5,
+    marginBottom: Spacing.xs,
   },
-  secondaryButton: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: Spacing.xs,
-    paddingVertical: Spacing.sm + 2,
-    borderRadius: BorderRadius.lg,
-  },
-  secondaryButtonText: {
-    fontSize: Typography.sizes.sm,
-    fontWeight: Typography.weights.semibold,
-  },
-  buttonDisabled: {
-    opacity: 0.6,
-  },
-  // ── Warning Notice (cancellation OTP) ──
   warningNotice: {
     flexDirection: "row",
     alignItems: "flex-start",
-    gap: Spacing.sm,
-    padding: Spacing.md,
-    borderRadius: BorderRadius.lg,
+    gap: Spacing.xs,
+    padding: Spacing.sm,
+    borderRadius: BorderRadius.md,
     borderWidth: 1,
   },
   warningText: {
     flex: 1,
-    fontSize: Typography.sizes.sm,
-    fontWeight: Typography.weights.medium,
-    lineHeight: Typography.sizes.sm * 1.4,
+    fontSize: Typography.sizes.xs,
+    lineHeight: Typography.sizes.xs * 1.5,
   },
-  // ── Alert Card (rejected / cancelled) ──
-  alertCard: {
-    flexDirection: "row",
-    alignItems: "flex-start",
-    gap: Spacing.sm,
-    padding: Spacing.md,
-    borderRadius: BorderRadius.xl,
-    borderWidth: 1,
-    marginBottom: Spacing.md,
-  },
-  alertIconContainer: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    alignItems: "center",
-    justifyContent: "center",
-    marginTop: 2,
-  },
-  alertContent: {
-    flex: 1,
-  },
-  alertTitle: {
-    fontSize: Typography.sizes.sm,
-    fontWeight: Typography.weights.bold,
-    marginBottom: 4,
-  },
-  alertText: {
-    fontSize: Typography.sizes.sm,
-    lineHeight: Typography.sizes.sm * 1.5,
-  },
-  // ── Action Button (cancel) ──
   actionsContainer: {
-    flexDirection: "row",
-    gap: Spacing.sm,
     marginTop: Spacing.md,
   },
   actionButton: {
-    flex: 1,
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
     gap: Spacing.xs,
     paddingVertical: Spacing.md + 2,
     borderRadius: BorderRadius.xl,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.15,
-    shadowRadius: 8,
-    elevation: 4,
   },
-  actionButtonPressed: {
-    opacity: 0.8,
-  },
+  actionButtonPressed: { opacity: 0.8 },
   actionButtonText: {
     fontSize: Typography.sizes.md,
-    fontWeight: Typography.weights.bold,
+    fontWeight: Typography.weights.semibold,
   },
 });
