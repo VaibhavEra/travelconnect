@@ -1,4 +1,9 @@
-import { dateToISOLocal, formatDateLong } from "@/lib/utils/dateTime";
+// components/search/DateFilter.tsx
+import {
+  dateToISOLocal,
+  formatDateLong,
+  isoToDateLocal,
+} from "@/lib/utils/dateTime";
 import { haptics } from "@/lib/utils/haptics";
 import { useSearchStore } from "@/stores/searchStore";
 import { BorderRadius, Overlays, Spacing, Typography } from "@/styles";
@@ -83,7 +88,9 @@ export default function DateFilter() {
     haptics.light();
     if (Platform.OS === "ios") {
       setTempDate(
-        filters.departureDate ? new Date(filters.departureDate) : new Date(),
+        filters.departureDate
+          ? isoToDateLocal(filters.departureDate) // ← fixed: was new Date(string)
+          : new Date(),
       );
     }
     setShowPicker(true);
@@ -94,7 +101,7 @@ export default function DateFilter() {
     Platform.OS === "ios" && tempDate
       ? tempDate
       : filters.departureDate
-        ? new Date(filters.departureDate)
+        ? isoToDateLocal(filters.departureDate) // ← fixed: was new Date(string)
         : today;
 
   return (

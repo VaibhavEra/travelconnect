@@ -10,7 +10,7 @@
  * @returns Formatted date string
  */
 export const formatDate = (dateString: string): string => {
-  const date = new Date(dateString);
+  const date = isoToDateLocal(dateString); // ← fixed
   const today = new Date();
   const tomorrow = new Date(today);
   tomorrow.setDate(tomorrow.getDate() + 1);
@@ -36,7 +36,7 @@ export const formatDate = (dateString: string): string => {
  * @returns Formatted date string with year
  */
 export const formatDateLong = (dateString: string): string => {
-  const date = new Date(dateString);
+  const date = isoToDateLocal(dateString); // ← fixed
   return date.toLocaleDateString("en-US", {
     weekday: "short",
     month: "short",
@@ -46,12 +46,12 @@ export const formatDateLong = (dateString: string): string => {
 };
 
 /**
- * Formats a date string to short format (Mon, Jan 15)
+ * Formats a date string to short format (Jan 15)
  * @param dateString - ISO date string (YYYY-MM-DD)
  * @returns Short formatted date
  */
 export const formatDateShort = (dateString: string): string => {
-  const date = new Date(dateString);
+  const date = isoToDateLocal(dateString); // ← fixed
   return date.toLocaleDateString("en-US", {
     month: "short",
     day: "numeric",
@@ -103,7 +103,7 @@ export const isPast = (dateString: string, timeString?: string): boolean => {
   const now = new Date();
   const dateTime = timeString
     ? combineDateAndTime(dateString, timeString)
-    : new Date(dateString);
+    : isoToDateLocal(dateString); // ← fixed
   return dateTime < now;
 };
 
@@ -159,8 +159,8 @@ export const getDaysDifference = (
   dateString1: string,
   dateString2: string,
 ): number => {
-  const date1 = new Date(dateString1);
-  const date2 = new Date(dateString2);
+  const date1 = isoToDateLocal(dateString1); // ← fixed
+  const date2 = isoToDateLocal(dateString2); // ← fixed
   const diffTime = Math.abs(date2.getTime() - date1.getTime());
   const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
   return diffDays;
@@ -172,7 +172,7 @@ export const getDaysDifference = (
  * @returns Relative time string
  */
 export const formatRelativeTime = (dateString: string): string => {
-  const date = new Date(dateString);
+  const date = isoToDateLocal(dateString); // ← fixed
   const now = new Date();
   const diffMs = now.getTime() - date.getTime();
   const diffMins = Math.floor(diffMs / (1000 * 60));
@@ -247,10 +247,22 @@ export const dateToTimeString = (date: Date): string => {
  * @returns Formatted date string without weekday
  */
 export const formatDateNoDay = (dateString: string): string => {
-  const date = new Date(dateString);
+  const date = isoToDateLocal(dateString); // ← fixed
   return date.toLocaleDateString("en-US", {
     month: "short",
     day: "numeric",
     year: "numeric",
   });
+};
+
+/**
+ * Parses a YYYY-MM-DD string into a local-timezone Date object.
+ * Prevents UTC-midnight → previous-day shift in UTC+ timezones (e.g. IST).
+ * Use this instead of new Date(dateString) when working with date-only strings.
+ * @param dateString - ISO date string (YYYY-MM-DD)
+ * @returns Date object in local timezone
+ */
+export const isoToDateLocal = (dateString: string): Date => {
+  const [year, month, day] = dateString.split("-").map(Number);
+  return new Date(year, month - 1, day);
 };
