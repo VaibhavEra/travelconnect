@@ -9,7 +9,11 @@ import TimePickerInput from "@/components/forms/TimePickerInput";
 import TransportModeSelector from "@/components/forms/TransportModeSelector";
 import { ScreenHeader } from "@/components/shared";
 import { showErrorAlert } from "@/lib/utils/alerts";
-import { dateToISO, dateToTimeString } from "@/lib/utils/dateTime";
+import {
+  combineDateAndTime,
+  dateToISO,
+  dateToTimeString,
+} from "@/lib/utils/dateTime";
 import { uploadFile } from "@/lib/utils/fileUpload";
 import { haptics } from "@/lib/utils/haptics";
 import { logger } from "@/lib/utils/logger";
@@ -28,7 +32,6 @@ import { useThemeColors } from "@/styles/theme";
 import { Ionicons } from "@expo/vector-icons";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { router } from "expo-router";
-import { useState } from "react";
 import { Controller, useForm } from "react-hook-form";
 import {
   ActivityIndicator,
@@ -44,11 +47,25 @@ import { SafeAreaView } from "react-native-safe-area-context";
 
 const MODULE = "CreateTripScreen";
 
+// ── Extracted default values to avoid duplication between useForm and reset() ──
+const DEFAULT_VALUES: TripFormData = {
+  source: "",
+  destination: "",
+  transport_mode: "train",
+  departure_date: "",
+  departure_time: "",
+  arrival_date: "",
+  arrival_time: "",
+  parcel_size_capacity: "medium",
+  allowed_categories: [],
+  pnr_number: "",
+  ticket_file_url: "",
+};
+
 export default function CreateTripScreen() {
   const colors = useThemeColors();
   const user = useAuthStore((state) => state.user);
   const { createTrip, loading } = useTripStore();
-  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const {
     control,
@@ -60,22 +77,11 @@ export default function CreateTripScreen() {
   } = useForm<TripFormData>({
     resolver: zodResolver(tripSchema),
     mode: "onChange",
-    defaultValues: {
-      source: "",
-      destination: "",
-      transport_mode: "train",
-      departure_date: "",
-      departure_time: "",
-      arrival_date: "",
-      arrival_time: "",
-      parcel_size_capacity: "medium",
-      allowed_categories: [],
-      pnr_number: "",
-      ticket_file_url: "",
-    },
+    defaultValues: DEFAULT_VALUES,
   });
 
   // Guard against null user during sign out
+  // hooks must run before this guard
   if (!user) {
     return null;
   }
@@ -83,24 +89,6 @@ export default function CreateTripScreen() {
   const departureDate = watch("departure_date");
   const source = watch("source");
   const destination = watch("destination");
-
-  const parseDate = (
-    dateString: string | null,
-    timeString?: string | null,
-  ): Date | null => {
-    // Return null for empty/null values
-    if (!dateString || dateString.trim() === "") {
-      return null;
-    }
-
-    if (timeString && timeString.trim() !== "") {
-      const date = new Date(`${dateString}T${timeString}`);
-      return isNaN(date.getTime()) ? null : date;
-    }
-
-    const date = new Date(dateString);
-    return isNaN(date.getTime()) ? null : date;
-  };
 
   const handleCitySwap = () => {
     haptics.light();
@@ -112,7 +100,6 @@ export default function CreateTripScreen() {
   const onSubmit = async (data: TripFormData) => {
     try {
       haptics.light();
-      setIsSubmitting(true);
 
       // Upload ticket file if selected (local URI → Supabase URL)
       let ticketUrl = data.ticket_file_url;
@@ -125,32 +112,13 @@ export default function CreateTripScreen() {
             module: MODULE,
           });
           showErrorAlert(uploadError);
-          setIsSubmitting(false);
           return;
         }
       }
 
-      // Prepare trip data with uploaded URL
-      const tripData = {
-        ...data,
-        ticket_file_url: ticketUrl,
-      };
+      await createTrip({ ...data, ticket_file_url: ticketUrl }, user.id);
 
-      await createTrip(tripData, user.id);
-
-      reset({
-        source: "",
-        destination: "",
-        transport_mode: "train",
-        departure_date: "",
-        departure_time: "",
-        arrival_date: "",
-        arrival_time: "",
-        parcel_size_capacity: "medium",
-        allowed_categories: [],
-        pnr_number: "",
-        ticket_file_url: "",
-      });
+      reset(DEFAULT_VALUES);
 
       haptics.success();
       router.push("/(tabs)/my-trips");
@@ -164,12 +132,10 @@ export default function CreateTripScreen() {
       logger.error("Trip creation failed", error, { module: MODULE });
       haptics.error();
       showErrorAlert(error);
-    } finally {
-      setIsSubmitting(false);
     }
   };
 
-  const isFormDisabled = !isValid || loading || isSubmitting;
+  const isFormDisabled = !isValid || loading;
   const hasErrors = Object.keys(errors).length > 0;
 
   return (
@@ -184,7 +150,7 @@ export default function CreateTripScreen() {
 
       <KeyboardAvoidingView
         style={styles.keyboardView}
-        behavior={Platform.OS === "ios" ? "padding" : undefined}
+        behavior={Platform.OS === "ios" ? "padding" : "height"} // ← fixed
       >
         <ScrollView
           style={styles.scrollView}
@@ -328,7 +294,7 @@ export default function CreateTripScreen() {
                 name="departure_date"
                 render={({ field: { onChange, value } }) => (
                   <DatePickerInput
-                    value={parseDate(value)}
+                    value={value ? new Date(value) : null}
                     onChange={(date) => onChange(date ? dateToISO(date) : "")}
                     error={errors.departure_date?.message}
                     minimumDate={new Date()}
@@ -343,7 +309,7 @@ export default function CreateTripScreen() {
                   <TimePickerInput
                     value={
                       value && value.trim() !== ""
-                        ? parseDate("2000-01-01", value)
+                        ? combineDateAndTime("2000-01-01", value)
                         : null
                     }
                     onChange={(date) =>
@@ -367,10 +333,12 @@ export default function CreateTripScreen() {
                 name="arrival_date"
                 render={({ field: { onChange, value } }) => (
                   <DatePickerInput
-                    value={parseDate(value)}
+                    value={value ? new Date(value) : null}
                     onChange={(date) => onChange(date ? dateToISO(date) : null)}
                     error={errors.arrival_date?.message}
-                    minimumDate={parseDate(departureDate) || new Date()}
+                    minimumDate={
+                      departureDate ? new Date(departureDate) : new Date()
+                    }
                     placeholder="Select date"
                   />
                 )}
@@ -382,7 +350,7 @@ export default function CreateTripScreen() {
                   <TimePickerInput
                     value={
                       value && value.trim() !== ""
-                        ? parseDate("2000-01-01", value)
+                        ? combineDateAndTime("2000-01-01", value)
                         : null
                     }
                     onChange={(date) =>
@@ -527,7 +495,7 @@ export default function CreateTripScreen() {
             onPress={handleSubmit(onSubmit)}
             disabled={isFormDisabled}
           >
-            {loading || isSubmitting ? (
+            {loading ? (
               <ActivityIndicator color={colors.text.inverse} />
             ) : (
               <>
@@ -595,9 +563,7 @@ const styles = StyleSheet.create({
     fontSize: Typography.sizes.md,
     fontWeight: Typography.weights.bold,
   },
-  cityWrapper: {
-    // No flex needed for vertical layout
-  },
+  cityWrapper: {},
   cityWrapperLast: {
     marginBottom: Spacing.md,
   },
