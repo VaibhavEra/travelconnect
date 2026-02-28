@@ -1,8 +1,10 @@
-import DateFilter from "@/components/search/DateFilter";
-import TransportModeFilter from "@/components/search/TransportModeFilter";
-import TripSearchBar from "@/components/search/TripSearchBar";
+import {
+  DateFilter,
+  TransportModeFilter,
+  TripSearchBar,
+} from "@/components/search";
 import { ScreenContainer, ScreenHeader } from "@/components/shared";
-import { haptics } from "@/lib/utils/haptics";
+import { haptics } from "@/lib/utils";
 import { useSearchStore } from "@/stores/searchStore";
 import { BorderRadius, Spacing, Typography } from "@/styles";
 import { useThemeColors } from "@/styles/theme";

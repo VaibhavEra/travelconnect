@@ -3,14 +3,15 @@ import {
   LoadingScreen,
   ScreenContainer,
 } from "@/components/shared";
-import TripInfoRow from "@/components/trip/TripInfoRow";
-import TripRouteCard from "@/components/trip/TripRouteCard";
-import TripScheduleGrid from "@/components/trip/TripScheduleGrid";
-import { CATEGORY_CONFIG } from "@/lib/constants/categories";
-import { haptics } from "@/lib/utils/haptics";
+import {
+  TripInfoRow,
+  TripRouteCard,
+  TripScheduleGrid,
+} from "@/components/trip";
+import { CATEGORY_CONFIG } from "@/lib/constants";
+import { haptics } from "@/lib/utils";
 import { useTripStore } from "@/stores/tripStore";
-import { BorderRadius, Spacing, Typography } from "@/styles";
-import { useThemeColors } from "@/styles/theme";
+import { BorderRadius, Spacing, Typography, useThemeColors } from "@/styles";
 import { Ionicons } from "@expo/vector-icons";
 import { router, useLocalSearchParams } from "expo-router";
 import { useEffect } from "react";

@@ -1,7 +1,7 @@
 // app/_layout.tsx
 import { useAuthStore } from "@/stores/authStore";
 import { useModeStore } from "@/stores/modeStore";
-import { useThemeColors } from "@/styles/theme";
+import { useThemeColors } from "@/styles";
 import {
   Slot,
   useRootNavigationState,

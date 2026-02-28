@@ -1,21 +1,20 @@
 // app/(tabs)/explore/request-form.tsx
-import ImagePicker from "@/components/forms/ImagePicker";
-import TextInput from "@/components/forms/TextInput";
+import { ImagePicker, TextInput } from "@/components/forms";
 import { LoadingScreen, ScreenContainer } from "@/components/shared";
-import { CATEGORY_CONFIG } from "@/lib/constants/categories";
-import { getSizeCapacityLabel } from "@/lib/constants/parcel";
-import { showErrorAlert } from "@/lib/utils/alerts";
-import { formatDate } from "@/lib/utils/dateTime";
-import { uploadFile } from "@/lib/utils/fileUpload";
-import { haptics } from "@/lib/utils/haptics";
-import { logger } from "@/lib/utils/logger";
-import { showSuccessToast } from "@/lib/utils/toast";
-import { RequestFormData, requestSchema } from "@/lib/validations/request";
+import { CATEGORY_CONFIG, getSizeCapacityLabel } from "@/lib/constants";
+import {
+  formatDate,
+  haptics,
+  logger,
+  showErrorAlert,
+  showSuccessToast,
+  uploadFile,
+} from "@/lib/utils";
+import { RequestFormData, requestSchema } from "@/lib/validations";
 import { useAuthStore } from "@/stores/authStore";
 import { useRequestStore } from "@/stores/requestStore";
 import { useTripStore } from "@/stores/tripStore";
-import { BorderRadius, Spacing, Typography } from "@/styles";
-import { useThemeColors } from "@/styles/theme";
+import { BorderRadius, Spacing, Typography, useThemeColors } from "@/styles";
 import { Ionicons } from "@expo/vector-icons";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { router, useLocalSearchParams } from "expo-router";

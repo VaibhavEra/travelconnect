@@ -1,31 +1,37 @@
 // app/(tabs)/my-trips/[id].tsx
-import CancellationOtpModal from "@/components/modals/CancellationOtpModal";
+import {
+  CancellationOtpModal,
+  EditTripDatesModal,
+  EditTripDetailsModal,
+} from "@/components/modals";
 import {
   DetailScreenHeader,
   LoadingScreen,
   ScreenContainer,
   StatusBadge,
 } from "@/components/shared";
-import EditTripDatesModal from "@/components/trip/EditTripDatesModal";
-import EditTripDetailsModal from "@/components/trip/EditTripDetailsModal";
-import TripInfoRow from "@/components/trip/TripInfoRow";
-import TripRouteCard from "@/components/trip/TripRouteCard";
-import TripScheduleGrid from "@/components/trip/TripScheduleGrid";
-import { CATEGORY_CONFIG } from "@/lib/constants/categories";
-import { TRIP_STATUS_CONFIG, TripStatus } from "@/lib/constants/status";
 import {
+  TripInfoRow,
+  TripRouteCard,
+  TripScheduleGrid,
+} from "@/components/trip";
+import {
+  CATEGORY_CONFIG,
+  TRIP_STATUS_CONFIG,
+  TripStatus,
+} from "@/lib/constants";
+import {
+  haptics,
+  logger,
   showConfirmAlert,
   showErrorAlert,
   showSessionAlert,
-} from "@/lib/utils/alerts";
-import { haptics } from "@/lib/utils/haptics";
-import { logger } from "@/lib/utils/logger";
-import { showSuccessToast } from "@/lib/utils/toast";
+  showSuccessToast,
+} from "@/lib/utils";
 import { useAuthStore } from "@/stores/authStore";
 import { useRequestStore } from "@/stores/requestStore";
 import { useTripStore } from "@/stores/tripStore";
-import { BorderRadius, Spacing, Typography } from "@/styles";
-import { useThemeColors } from "@/styles/theme";
+import { BorderRadius, Spacing, Typography, useThemeColors } from "@/styles";
 import { Ionicons } from "@expo/vector-icons";
 import { router, useLocalSearchParams } from "expo-router";
 import { useEffect, useState } from "react";

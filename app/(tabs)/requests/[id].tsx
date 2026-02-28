@@ -1,9 +1,10 @@
 // app/(tabs)/requests/[id].tsx
-import AcceptRequestModal from "@/components/modals/AcceptRequestModal";
-import RejectRequestModal from "@/components/modals/RejectRequestModal";
-import VerifyOtpModal from "@/components/modals/VerifyOtpModal";
-import ContactCard from "@/components/request/ContactCard";
-import PhotoGallery from "@/components/request/PhotoGallery";
+import {
+  AcceptRequestModal,
+  RejectRequestModal,
+  VerifyOtpModal,
+} from "@/components/modals";
+import { ContactCard, PhotoGallery } from "@/components/request";
 import {
   AlertCard,
   DetailScreenHeader,
@@ -11,18 +12,25 @@ import {
   ScreenContainer,
   StatusBadge,
 } from "@/components/shared";
-import TripInfoRow from "@/components/trip/TripInfoRow";
-import TripRouteCard from "@/components/trip/TripRouteCard";
-import TripScheduleGrid from "@/components/trip/TripScheduleGrid";
-import { CATEGORY_CONFIG } from "@/lib/constants/categories";
-import { REQUEST_STATUS_CONFIG, RequestStatus } from "@/lib/constants/status";
-import { showErrorAlert, showSessionAlert } from "@/lib/utils/alerts";
-import { haptics } from "@/lib/utils/haptics";
-import { logger } from "@/lib/utils/logger";
-import { showSuccessToast } from "@/lib/utils/toast";
+import {
+  TripInfoRow,
+  TripRouteCard,
+  TripScheduleGrid,
+} from "@/components/trip";
+import {
+  CATEGORY_CONFIG,
+  REQUEST_STATUS_CONFIG,
+  RequestStatus,
+} from "@/lib/constants";
+import {
+  haptics,
+  logger,
+  showErrorAlert,
+  showSessionAlert,
+  showSuccessToast,
+} from "@/lib/utils";
 import { useRequestStore } from "@/stores/requestStore";
-import { BorderRadius, Spacing, Typography } from "@/styles";
-import { useThemeColors } from "@/styles/theme";
+import { BorderRadius, Spacing, Typography, useThemeColors } from "@/styles";
 import { Ionicons } from "@expo/vector-icons";
 import { router, useLocalSearchParams } from "expo-router";
 import { useEffect, useState } from "react";

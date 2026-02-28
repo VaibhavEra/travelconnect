@@ -1,10 +1,10 @@
 // app/(tabs)/my-requests/[id].tsx
-import CancelRequestModal from "@/components/request/CancelRequestModal";
-import ContactCard from "@/components/request/ContactCard";
-import EditReceiverDetailsModal from "@/components/request/EditReceiverDetailsModal";
-import EditRequestDetailsModal from "@/components/request/EditRequestDetailsModal";
-import OtpCard from "@/components/request/OtpCard";
-import PhotoGallery from "@/components/request/PhotoGallery";
+import {
+  CancelRequestModal,
+  EditReceiverDetailsModal,
+  EditRequestDetailsModal,
+} from "@/components/modals";
+import { ContactCard, OtpCard, PhotoGallery } from "@/components/request";
 import {
   AlertCard,
   DetailScreenHeader,
@@ -12,19 +12,25 @@ import {
   ScreenContainer,
   StatusBadge,
 } from "@/components/shared";
-import TripInfoRow from "@/components/trip/TripInfoRow";
-import TripRouteCard from "@/components/trip/TripRouteCard";
-import TripScheduleGrid from "@/components/trip/TripScheduleGrid";
-import { CATEGORY_CONFIG } from "@/lib/constants/categories";
-import { REQUEST_STATUS_CONFIG, RequestStatus } from "@/lib/constants/status";
-import { showErrorAlert } from "@/lib/utils/alerts";
-import { formatCountdown } from "@/lib/utils/dateTime";
-import { haptics } from "@/lib/utils/haptics";
-import { logger } from "@/lib/utils/logger";
-import { showSuccessToast } from "@/lib/utils/toast";
+import {
+  TripInfoRow,
+  TripRouteCard,
+  TripScheduleGrid,
+} from "@/components/trip";
+import {
+  CATEGORY_CONFIG,
+  REQUEST_STATUS_CONFIG,
+  RequestStatus,
+} from "@/lib/constants";
+import {
+  formatCountdown,
+  haptics,
+  logger,
+  showErrorAlert,
+  showSuccessToast,
+} from "@/lib/utils";
 import { useRequestStore } from "@/stores/requestStore";
-import { BorderRadius, Spacing, Typography } from "@/styles";
-import { useThemeColors } from "@/styles/theme";
+import { BorderRadius, Spacing, Typography, useThemeColors } from "@/styles";
 import { Ionicons } from "@expo/vector-icons";
 import { router, useLocalSearchParams } from "expo-router";
 import { useEffect, useState } from "react";

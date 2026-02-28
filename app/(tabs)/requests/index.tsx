@@ -1,12 +1,11 @@
-import DeliveryCard from "@/components/delivery/DeliveryCard";
-import VerifyOtpModal from "@/components/modals/VerifyOtpModal";
-import IncomingRequestCard from "@/components/request/IncomingRequestCard";
+import { VerifyOtpModal } from "@/components/modals";
+import { DeliveryCard, IncomingRequestCard } from "@/components/request";
 import {
+  FilterChip,
   LoadingScreen,
   ScreenContainer,
   ScreenHeader,
 } from "@/components/shared";
-import FilterChip from "@/components/shared/FilterChip";
 import {
   ACTIVE_REQUEST_FILTERS,
   ActiveRequestFilterKey,
@@ -14,14 +13,12 @@ import {
   CompletedRequestFilterKey,
   INCOMING_REQUEST_FILTERS,
   IncomingRequestFilterKey,
-} from "@/lib/constants/filters";
-import { haptics } from "@/lib/utils/haptics";
-import { showSuccessToast } from "@/lib/utils/toast";
+} from "@/lib/constants";
+import { haptics, showSuccessToast } from "@/lib/utils";
 import { useAuthStore } from "@/stores/authStore";
 import { useModeStore } from "@/stores/modeStore";
 import { useRequestStore } from "@/stores/requestStore";
-import { BorderRadius, Spacing, Typography } from "@/styles";
-import { useThemeColors } from "@/styles/theme";
+import { BorderRadius, Spacing, Typography, useThemeColors } from "@/styles";
 import { Ionicons } from "@expo/vector-icons";
 import { useFocusEffect } from "expo-router";
 import { useCallback, useState } from "react";

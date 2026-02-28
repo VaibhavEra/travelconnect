@@ -1,4 +1,4 @@
-import { useThemeColors } from "@/styles/theme";
+import { useThemeColors } from "@/styles";
 import { Stack } from "expo-router";
 
 export default function ExploreLayout() {

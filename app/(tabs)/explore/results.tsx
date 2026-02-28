@@ -3,8 +3,8 @@ import {
   LoadingScreen,
   ScreenContainer,
 } from "@/components/shared";
-import AvailableTripCard from "@/components/trip/AvailableTripCard";
-import { haptics } from "@/lib/utils/haptics";
+import { AvailableTripCard } from "@/components/trip";
+import { haptics } from "@/lib/utils";
 import { useSearchStore } from "@/stores/searchStore";
 import { BorderRadius, Spacing, Typography } from "@/styles";
 import { useThemeColors } from "@/styles/theme";

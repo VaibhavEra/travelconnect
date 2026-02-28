@@ -1,30 +1,32 @@
 // app/(tabs)/create-trip.tsx
-import CategoryCheckboxes from "@/components/forms/CategoryCheckboxes";
-import CitySwapPair from "@/components/forms/CitySwapPair";
-import DatePickerInput from "@/components/forms/DatePickerInput";
-import FileUploadButton from "@/components/forms/FileUploadButton";
-import ParcelSizeSelector from "@/components/forms/ParcelSizeSelector";
-import TextInput from "@/components/forms/TextInput";
-import TimePickerInput from "@/components/forms/TimePickerInput";
-import TransportModeSelector from "@/components/forms/TransportModeSelector";
+import {
+  CategoryCheckboxes,
+  CitySwapPair,
+  DatePickerInput,
+  FileUploadButton,
+  ParcelSizeSelector,
+  TextInput,
+  TimePickerInput,
+  TransportModeSelector,
+} from "@/components/forms";
 import { ScreenContainer, ScreenHeader } from "@/components/shared";
-import { showErrorAlert } from "@/lib/utils/alerts";
 import {
   combineDateAndTime,
   dateToISO,
   dateToTimeString,
-} from "@/lib/utils/dateTime";
-import { uploadFile } from "@/lib/utils/fileUpload";
-import { haptics } from "@/lib/utils/haptics";
-import { logger } from "@/lib/utils/logger";
-import { showSuccessToast } from "@/lib/utils/toast";
+  haptics,
+  logger,
+  showErrorAlert,
+  showSuccessToast,
+  uploadFile,
+} from "@/lib/utils";
 import {
   PackageCategory,
   ParcelSizeCapacity,
   TransportMode,
   TripFormData,
   tripSchema,
-} from "@/lib/validations/trip";
+} from "@/lib/validations";
 import { useAuthStore } from "@/stores/authStore";
 import { useTripStore } from "@/stores/tripStore";
 import { BorderRadius, Spacing, Typography } from "@/styles";

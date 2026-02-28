@@ -1,16 +1,15 @@
-import RequestCard from "@/components/request/RequestCard";
+import { RequestCard } from "@/components/request";
 import {
+  FilterChip,
   LoadingScreen,
   ScreenContainer,
   ScreenHeader,
 } from "@/components/shared";
-import FilterChip from "@/components/shared/FilterChip";
-import { REQUEST_FILTERS, RequestFilterKey } from "@/lib/constants/filters";
-import { haptics } from "@/lib/utils/haptics";
+import { REQUEST_FILTERS, RequestFilterKey } from "@/lib/constants";
+import { haptics } from "@/lib/utils";
 import { useAuthStore } from "@/stores/authStore";
 import { useRequestStore } from "@/stores/requestStore";
-import { BorderRadius, Spacing, Typography } from "@/styles";
-import { useThemeColors } from "@/styles/theme";
+import { BorderRadius, Spacing, Typography, useThemeColors } from "@/styles";
 import { Ionicons } from "@expo/vector-icons";
 import { useFocusEffect } from "expo-router";
 import { useCallback, useState } from "react";

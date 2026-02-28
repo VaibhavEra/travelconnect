@@ -1,5 +1,5 @@
 import { useModeStore } from "@/stores/modeStore";
-import { useThemeColors } from "@/styles/theme";
+import { useThemeColors } from "@/styles";
 import { Ionicons } from "@expo/vector-icons";
 import { Tabs } from "expo-router";
 import { useMemo } from "react";

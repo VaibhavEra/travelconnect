@@ -1,16 +1,15 @@
 import {
+  FilterChip,
   LoadingScreen,
   ScreenContainer,
   ScreenHeader,
 } from "@/components/shared";
-import FilterChip from "@/components/shared/FilterChip";
-import TripCard from "@/components/trip/TripCard";
-import { TRIP_FILTERS, TripFilterKey } from "@/lib/constants/filters";
-import { haptics } from "@/lib/utils/haptics";
+import { TripCard } from "@/components/trip";
+import { TRIP_FILTERS, TripFilterKey } from "@/lib/constants";
+import { haptics } from "@/lib/utils";
 import { useAuthStore } from "@/stores/authStore";
 import { useTripStore } from "@/stores/tripStore";
-import { BorderRadius, Spacing, Typography } from "@/styles";
-import { useThemeColors } from "@/styles/theme";
+import { BorderRadius, Spacing, Typography, useThemeColors } from "@/styles";
 import { Ionicons } from "@expo/vector-icons";
 import { router, useFocusEffect } from "expo-router";
 import { useCallback, useState } from "react";

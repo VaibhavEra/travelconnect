@@ -1,4 +1,4 @@
-import ModeSwitcher from "@/components/shared/ModeSwitcher";
+import { ModeSwitcher } from "@/components/shared";
 import { haptics } from "@/lib/utils/haptics";
 import { useAuthStore } from "@/stores/authStore";
 import { useModeStore } from "@/stores/modeStore";
